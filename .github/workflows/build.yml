@@ -69,6 +69,12 @@ jobs:
           # GDScript の実行時エラーはテストを止めないので、ログに出たら失敗扱いにする
           if grep -q "SCRIPT ERROR" test.log; then echo "::error::SCRIPT ERROR がテスト中に発生"; exit 1; fi
 
+      - name: Smoke run (game boots without script errors)
+        run: |
+          # 描画・UIのスクリプトは単体テストから読まれないので、実際に3秒起動してコンパイルエラーを拾う
+          ~/godot/godot --headless --path . --quit-after 180 2>&1 | tee smoke.log || true
+          if grep -q "SCRIPT ERROR" smoke.log; then echo "::error::起動時に SCRIPT ERROR"; exit 1; fi
+
       - name: Export Web (single-threaded, works on GitHub Pages)
         run: |
           mkdir -p build/web

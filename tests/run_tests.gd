@@ -15,7 +15,7 @@ var meta: MetaService
 func _init() -> void:
 	data = DataLoader.load_file()
 	var tests := [
-		"test_data_valid", "test_data_rejects_broken",
+		"test_data_valid", "test_data_rejects_broken", "t_separation_pushes_apart",
 		"t01_fresh_play_levelup_boss_death", "t02_tier_from_survival", "t03_solo_keeps_vault", "t04_companion_consumed_on_death",
 		"t05_companion_consumed_on_clear", "t06_ghost_matches_and_attacks", "t07_settle_idempotent", "t08_crash_resume",
 		"t08b_abandon_consumes", "t09_vault_full_swap", "t10_load_300",
@@ -95,6 +95,24 @@ func bot_step(r: RunSim) -> void:
 			break
 	r.step(RunSim.STEP, mv)
 	r.drain_events()
+
+
+# ------------------------------------------------------------------ sim
+## 押し合い: 重なった小さい敵は離れ、精鋭は小さい敵を押しのける
+func t_separation_pushes_apart() -> void:
+	var r := RunSim.new(data, {"run_id": "sep", "seed": 3, "mode": "full", "weapon": "sword"})
+	r.weapons = {}
+	var a := r.spawn_enemy("chaser", 600.0)
+	var b := r.spawn_enemy("chaser", 600.0)
+	var e := r.spawn_enemy("elite", 600.0)
+	var c := r.spawn_enemy("chaser", 600.0)
+	b.pos = a.pos + Vector2(4, 0)
+	c.pos = e.pos + Vector2(6, 0)
+	for i in 10:
+		r.step(RunSim.STEP, Vector2.ZERO)
+	check(a.pos.distance_to(b.pos) > 15.0, "小さい敵どうしが離れない: %.1f" % a.pos.distance_to(b.pos))
+	check(e.pos.distance_to(c.pos) > 20.0, "精鋭が押しのけない: %.1f" % e.pos.distance_to(c.pos))
+	r.dispose()
 
 
 # ------------------------------------------------------------------ data

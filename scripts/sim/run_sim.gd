@@ -88,6 +88,8 @@ var gems: Array = []     # {pos, v, mag}
 var events: Array = []
 var rng: RngStreams
 var grid := SpatialGrid.new(64.0)
+const SEP_MAX_R := 12.0                       # これ以下の半径の敵は sep_grid で押し合い
+var sep_grid := SpatialGrid.new(SEP_MAX_R * 2.0)
 
 
 ## opts: run_id, seed, mode, weapon, ghost(Dictionary|null), heirloom(Dictionary|null), card_mods, checkpoint(Dictionary|null)
@@ -380,16 +382,16 @@ func step(dt: float, move: Vector2) -> void:
 
 	for e in enemies:
 		_enemy_update(e, dt)
-	grid.rebuild(enemies)
+	# 押し合い: 小さい敵どうしは細かいグリッドで各組1回、大きい敵（精鋭・冥王）は近傍探索で
+	sep_grid.rebuild(enemies)
+	_separate_small(0.25)
+	# grid はティック冒頭の位置のまま（探索半径に余裕があるので作り直さない）
 	for a in enemies:
+		if a.r <= SEP_MAX_R:
+			continue
 		for b in grid.query(a.pos, a.r + 24.0):
-			if a == b:
-				continue
-			var off: Vector2 = b.pos - a.pos
-			var d := off.length()
-			var rr: float = a.r + b.r
-			if d < rr and d > 0.0:
-				a.pos -= off / d * (rr - d) * 0.25
+			if a != b:
+				SpatialGrid.push_pair(a, b, 0.25)
 	for s in eshots:
 		s.pos += s.vel * dt
 		s.life -= dt
@@ -418,6 +420,45 @@ func step(dt: float, move: Vector2) -> void:
 		pending += 1
 	max_alive = maxi(max_alive, enemies.size())
 	update_ms = update_ms * 0.9 + (Time.get_ticks_usec() - t0) / 1000.0 * 0.1
+
+
+const _HALF := [Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 1)]
+
+
+## 小さい敵どうしの押し合い。sep_grid（セル＝半径の和の最大）で、各組を1回だけ調べて両方を逆向きに動かす。
+## 負荷の大半がここなので、型付き・関数呼び出しなしで書いている。
+func _separate_small(k: float) -> void:
+	var cells: Dictionary = sep_grid.cells
+	for key: Vector2i in cells:
+		var b: Array = cells[key]
+		var n := b.size()
+		for i in n:
+			var a: Foe = b[i]
+			for j in range(i + 1, n):
+				var c: Foe = b[j]
+				var off := c.pos - a.pos
+				var rr := a.r + c.r
+				var d2 := off.length_squared()
+				if d2 < rr * rr and d2 > 0.0:
+					var d := sqrt(d2)
+					var push := off * ((rr - d) / d * k)
+					a.pos -= push
+					c.pos += push
+		for o: Vector2i in _HALF:
+			var nb: Variant = cells.get(key + o)
+			if nb == null:
+				continue
+			var na: Array = nb
+			for a: Foe in b:
+				for c: Foe in na:
+					var off := c.pos - a.pos
+					var rr := a.r + c.r
+					var d2 := off.length_squared()
+					if d2 < rr * rr and d2 > 0.0:
+						var d := sqrt(d2)
+						var push := off * ((rr - d) / d * k)
+						a.pos -= push
+						c.pos += push
 
 
 func _ghost_update(dt: float) -> void:
@@ -710,3 +751,4 @@ func dispose() -> void:
 	boss = null
 	ghost = null
 	grid.cells.clear()
+	sep_grid.cells.clear()

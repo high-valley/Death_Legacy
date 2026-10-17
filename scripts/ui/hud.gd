@@ -8,6 +8,7 @@ var font: Font
 var toast_text := ""
 var toast_t := 0.0
 var fps := 60.0
+var _redraw_acc := 1.0
 
 
 func _ready() -> void:
@@ -24,7 +25,10 @@ func toast(text: String) -> void:
 func _process(delta: float) -> void:
 	toast_t -= delta
 	fps = lerpf(fps, Engine.get_frames_per_second(), 0.1)
-	if visible:
+	# 文字の描画は重いので 20Hz で十分（スマホ対策）
+	_redraw_acc += delta
+	if visible and _redraw_acc >= 0.05:
+		_redraw_acc = 0.0
 		queue_redraw()
 
 

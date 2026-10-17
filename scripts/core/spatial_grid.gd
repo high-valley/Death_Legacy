@@ -42,3 +42,16 @@ func nearest(p: Vector2, r: float) -> Object:
 			bd = d
 			best = e
 	return best
+
+
+
+## 重なっていれば両方を逆向きに押し離す（大きい敵の押し合い用）
+static func push_pair(a: Object, b: Object, strength: float) -> void:
+	var off: Vector2 = b.pos - a.pos
+	var rr: float = a.r + b.r
+	var d2 := off.length_squared()
+	if d2 < rr * rr and d2 > 0.0:
+		var d := sqrt(d2)
+		var push := off / d * (rr - d) * strength
+		a.pos -= push
+		b.pos += push

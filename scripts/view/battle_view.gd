@@ -8,11 +8,36 @@ var camera := Camera2D.new()
 var fx: Array = []
 var shake := 0.0
 var _rng := RandomNumberGenerator.new()
+const COL_GEM := Color("#f0b35a")
+const COL_SHOT := Color("#b9a6ff")
+const COL_BOSS_SHOT := Color("#ff8a8e")
+const COL_ARROW := Color("#f2e3b3")
+const COL_GARROW := Color("#8ff0e0")
+const COL_GRID := Color("#131c21")
+const COL_STONE := Color("#18242a")
+
+
+var _disc: Texture2D   # 白い円。敵や弾を同じテクスチャで描くとまとめて描画できる（draw_circle より大幅に軽い）
 
 
 func _ready() -> void:
 	add_child(camera)
 	camera.make_current()
+	_disc = _make_disc(64)
+
+
+static func _make_disc(n: int) -> Texture2D:
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var c := (n - 1) / 2.0
+	for y in n:
+		for x in n:
+			var d := Vector2(x - c, y - c).length()
+			img.set_pixel(x, y, Color(1, 1, 1, clampf(c + 0.5 - d, 0.0, 1.0)))
+	return ImageTexture.create_from_image(img)
+
+
+func _disc_at(p: Vector2, r: float, col: Color) -> void:
+	draw_texture_rect(_disc, Rect2(p.x - r, p.y - r, r * 2.0, r * 2.0), false, col)
 
 
 func add_fx(e: Dictionary) -> void:
@@ -63,9 +88,9 @@ func _draw() -> void:
 			draw_circle(f.pos, f.r * k, Color(0.89, 0.33, 0.35, 0.1 + 0.22 * k))
 			draw_arc(f.pos, f.r, 0, TAU, 48, Color(0.89, 0.33, 0.35, 0.75), 2.0)
 	for g in sim.gems:
-		draw_rect(Rect2(g.pos - Vector2(3, 3), Vector2(6, 6)), Color("#f0b35a"))
+		draw_rect(Rect2(g.pos - Vector2(3, 3), Vector2(6, 6)), COL_GEM)
 	for e in sim.enemies:
-		draw_circle(e.pos, e.r, Color.WHITE if e.flash > 0.0 else e.def.color_c)
+		_disc_at(e.pos, e.r, Color.WHITE if e.flash > 0.0 else e.def.color_c)
 		if e.kind == "charger" and e.phase == 1:
 			draw_line(e.pos, e.pos + e.dir * 120.0, Color("#e2555a"), 1.5)
 		if e.kind in ["boss", "elite"]:
@@ -74,9 +99,9 @@ func _draw() -> void:
 		_draw_ghost()
 	_draw_hero()
 	for s in sim.shots:
-		draw_line(s.pos, s.pos - s.vel * 0.02, Color("#8ff0e0") if s.ghost else Color("#f2e3b3"), 2.0)
+		draw_line(s.pos, s.pos - s.vel * 0.02, COL_GARROW if s.ghost else COL_ARROW, 2.0)
 	for s in sim.eshots:
-		draw_circle(s.pos, 4.5, Color("#ff8a8e") if s.cause == "boss" else Color("#b9a6ff"))
+		_disc_at(s.pos, 4.5, COL_BOSS_SHOT if s.cause == "boss" else COL_SHOT)
 	for f in fx:
 		var k: float = f.t / f.dur
 		match f.kind:
@@ -86,12 +111,12 @@ func _draw() -> void:
 			"boom":
 				draw_arc(f.pos, f.r, 0, TAU, 48, Color(1, 0.55, 0.47, 1.0 - k), 6.0)
 			"poof":
-				draw_circle(f.pos, 5.0 + 12.0 * k, Color(f.color, (1.0 - k) * 0.5))
+				_disc_at(f.pos, 5.0 + 12.0 * k, Color(f.color, (1.0 - k) * 0.5))
 
 
 func _ground(a: Vector2, b: Vector2) -> void:
 	var g := 96.0
-	var col := Color("#131c21")
+	var col := COL_GRID
 	var x := floorf(a.x / g) * g
 	while x < b.x:
 		draw_line(Vector2(x, a.y), Vector2(x, b.y), col, 1.0)
@@ -109,8 +134,8 @@ func _ground(a: Vector2, b: Vector2) -> void:
 			var h := absi(hash(Vector2i(int(gx), int(gy))))
 			if h % 3 == 0:
 				var o := Vector2(h % 200, (h >> 8) % 200)
-				draw_rect(Rect2(Vector2(gx, gy) + o, Vector2(14, 20)), Color("#18242a"))
-				draw_rect(Rect2(Vector2(gx, gy) + o + Vector2(-4, 4), Vector2(22, 5)), Color("#18242a"))
+				draw_rect(Rect2(Vector2(gx, gy) + o, Vector2(14, 20)), COL_STONE)
+				draw_rect(Rect2(Vector2(gx, gy) + o + Vector2(-4, 4), Vector2(22, 5)), COL_STONE)
 			gy += step
 		gx += step
 

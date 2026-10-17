@@ -37,6 +37,10 @@ godot --path . -- --shot=out.png --screen=hub|altar|library|shelf|level|result [
 - バランス値は `data/balance.json`。項目を足したら `DataLoader.validate()` にも検証を足す。
 - 全画面 Control は `set_anchors_and_offsets_preset(PRESET_FULL_RECT)`。型推論 `:=` は Variant（辞書の値など）に使わない（Godot 4.7 ではエラー）。
 
+## 負荷（スマホ）
+- Web版 `?bench` で敵300体の負荷試験（FPS表示）、`?lowres` で解像度1倍。ネイティブは `tools/bench_sim.gd`。経緯は ADR 011。
+- 敵の押し合いは `RunSim._separate_small()`（負荷の中心。型付き・インラインで書いてある）。毎ティックの処理を増やしたら bench で確認。
+
 ## 既知の課題
 - 自動ボットでは祭壇0でも6回中5回クリアできる（ブラウザ試作では2回）。人が遊んだ感想を聞いてから難度を調整する。
 - 仮アセット（図形・コード生成の効果音）。

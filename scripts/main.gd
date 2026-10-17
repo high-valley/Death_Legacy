@@ -24,6 +24,9 @@ var sfx: Sfx
 
 
 func _ready() -> void:
+	# 1フレームに追いつき処理で回す物理ステップの上限。端末が遅い時は「処理落ち（ゆっくり）」になり、
+	# 追いつこうとしてさらに重くなる悪循環を防ぐ。
+	Engine.max_physics_steps_per_frame = 3 if Platform.is_web else 6
 	randomize()
 	data = DataLoader.load_file()
 	if not data.is_valid():
@@ -75,6 +78,23 @@ func _ready() -> void:
 	_on_touch_mode(router.touch_mode)
 	_to_title()
 	_dev_hooks()
+	_web_bench()
+
+
+## Web版の計測用: URL に ?bench を付けると敵300体の負荷試験を動かし続け、5秒ごとに FPS をコンソールと画面に出す
+func _web_bench() -> void:
+	if not Platform.is_web:
+		return
+	var q: Variant = JavaScriptBridge.eval("location.search", true)
+	if not (q is String and "bench" in q):
+		return
+	_start_load_test()
+	_load["bench"] = true
+	Settings.debug_hud = true
+	if "nodraw" in q:
+		view.visible = false
+	if "nohud" in q:
+		hud.visible = false
 
 
 # ------------------------------------------------------------------ loop
@@ -110,6 +130,13 @@ func _process(delta: float) -> void:
 		_load.frames += 1
 		_load.upd += sim.update_ms
 		_load.worst = maxf(_load.worst, sim.update_ms)
+		if _load.get("bench", false):
+			if _load.time >= 5.0:
+				var line := "BENCH fps=%.1f upd=%.2fms worst=%.1fms enemies=%d" % [_load.frames / _load.time, _load.upd / maxf(1, _load.frames), _load.worst, sim.enemies.size()]
+				print(line)
+				hud.toast(line)
+				_load = {"time": 0.0, "frames": 0, "upd": 0.0, "worst": 0.0, "bench": true}
+			return
 		if _load.time >= 10.0:
 			load_text = "敵%d体: 平均 %d FPS / 更新 %.2f ms（最大 %.1f ms）" % [sim.enemies.size(), roundi(_load.frames / _load.time), _load.upd / _load.frames, _load.worst]
 			_drop_sim()
