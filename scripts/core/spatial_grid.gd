@@ -1,0 +1,44 @@
+class_name SpatialGrid
+extends RefCounted
+## 一様グリッドの空間分割。敵100〜300体の近傍探索に使う。毎ティック作り直す。
+
+var cell: float
+var cells: Dictionary = {}
+
+
+func _init(cell_size: float = 64.0) -> void:
+	cell = cell_size
+
+
+func rebuild(items: Array) -> void:
+	cells.clear()
+	for e in items:
+		var k := Vector2i(floori(e.pos.x / cell), floori(e.pos.y / cell))
+		var b: Variant = cells.get(k)
+		if b == null:
+			cells[k] = [e]
+		else:
+			b.append(e)
+
+
+func query(p: Vector2, r: float) -> Array:
+	var out: Array = []
+	for cx in range(floori((p.x - r) / cell), floori((p.x + r) / cell) + 1):
+		for cy in range(floori((p.y - r) / cell), floori((p.y + r) / cell) + 1):
+			var b: Variant = cells.get(Vector2i(cx, cy))
+			if b != null:
+				out.append_array(b)
+	return out
+
+
+func nearest(p: Vector2, r: float) -> Object:
+	var best: Object = null
+	var bd := r * r
+	for e in query(p, r):
+		if e.dead:
+			continue
+		var d := p.distance_squared_to(e.pos)
+		if d < bd:
+			bd = d
+			best = e
+	return best

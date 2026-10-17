@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "data_version": 1,
+  "run_length": { "full": 600, "short": 180 },
+  "vault_capacity": 10,
+  "solo_xp_bonus": 0.10,
+  "tiers": [
+    { "id": "echo", "name": "残響", "from": 0.0, "mult": 0.5, "color": "#8fa39c" },
+    { "id": "lesser", "name": "下級霊", "from": 0.1667, "mult": 0.8, "color": "#7cc4ff" },
+    { "id": "warrior", "name": "戦霊", "from": 0.3333, "mult": 1.2, "color": "#8ff0a4" },
+    { "id": "hero", "name": "英霊", "from": 0.5, "mult": 1.7, "color": "#c9a3ff" },
+    { "id": "greater_hero", "name": "大英霊", "from": 0.6667, "mult": 2.3, "color": "#f0b35a" },
+    { "id": "legend", "name": "伝説の英霊", "from": 0.8333, "mult": 3.0, "color": "#ff7ad9" }
+  ],
+  "ghost_unlock": [[1, 0.25], [6, 0.5], [12, 0.75], [18, 1.0]],
+  "player": { "hp": 120, "speed": 205, "radius": 12, "dash_speed": 720, "dash_time": 0.16, "dash_cd": 1.5, "hit_iframe": 0.6, "pickup": 100 },
+  "xp": { "base": 4, "per_level": 3 },
+  "weapons": {
+    "sword": { "name": "剣", "desc": "近距離の扇形斬り", "cd": 0.9, "damage": 20, "range": 92, "arc": 1.9 },
+    "bow":   { "name": "弓", "desc": "最寄りの敵を射抜く", "cd": 0.65, "damage": 14, "speed": 560 },
+    "fire":  { "name": "炎魔法", "desc": "着弾地点を焼く範囲・継続", "cd": 2.0, "damage": 7, "radius": 68, "burn": 2.6, "tick": 0.4 }
+  },
+  "weapon_max_level": 5,
+  "sub_weapon_slots": 2,
+  "passives": {
+    "might":  { "name": "攻撃力", "per": 12, "fmt": "与ダメージ +{v}%" },
+    "haste":  { "name": "攻撃速度", "per": 10, "fmt": "攻撃速度 +{v}%" },
+    "swift":  { "name": "移動速度", "per": 8, "fmt": "移動 +{v}%" },
+    "vigor":  { "name": "最大HP", "per": 20, "fmt": "最大HP +{v}（回復も）" },
+    "area":   { "name": "攻撃範囲", "per": 12, "fmt": "剣の届く距離・炎の範囲 +{v}%" },
+    "magnet": { "name": "経験値取得範囲", "per": 25, "fmt": "吸い寄せ距離 +{v}%" }
+  },
+  "passive_slots": 4,
+  "passive_max_level": 5,
+  "rarities": [
+    { "id": "N",  "name": "ノーマル",       "weight": 70,  "color": "#9aa5a0", "wlv": 1, "wbonus": 0.0,  "pmul": 1.0 },
+    { "id": "R",  "name": "レア",           "weight": 20,  "color": "#6fb6ff", "wlv": 1, "wbonus": 0.10, "pmul": 1.5 },
+    { "id": "SR", "name": "スーパーレア",   "weight": 7,   "color": "#b88cff", "wlv": 2, "wbonus": 0.10, "pmul": 2.0 },
+    { "id": "UR", "name": "ウルトラレア",   "weight": 2.5, "color": "#f0b35a", "wlv": 2, "wbonus": 0.25, "pmul": 2.5 },
+    { "id": "LR", "name": "レジェンドレア", "weight": 0.5, "color": "#ff7ad9", "wlv": 1, "wbonus": 0.25, "pmul": 3.0, "evolve": true }
+  ],
+  "maxed_weapon_bonus": { "N": 0.05, "R": 0.10, "SR": 0.15, "UR": 0.25, "LR": 0.25 },
+  "evolutions": {
+    "sword": { "name": "冥剣", "desc": "全周を薙ぎ払う・射程 +30%" },
+    "bow":   { "name": "千本矢", "desc": "矢 +3本・3体まで貫通" },
+    "fire":  { "name": "業火", "desc": "炎が3か所・範囲 +40%・長く燃える" }
+  },
+  "offerings": { "per_tenth_survived": 1, "per_100_kills": 1, "clear_bonus": 5, "retire_rate": 0.5 },
+  "altar": { "max": 10, "shift": { "N": -5, "R": 1.6, "SR": 1.8, "UR": 1.1, "LR": 0.45 } },
+  "library": { "unlock_total_survival": 300, "affinity_step": 0.25, "affinity_max": 4, "seal_cost": 2, "seal_max": 3 },
+  "shelf": { "unlock_generation": 1, "capacity": 5, "max_level": 3 },
+  "enemies": {
+    "chaser":  { "name": "亡者", "hp": 10, "speed": 70, "radius": 10, "damage": 5, "xp": 1, "ai": "chase", "color": "#6d7f7a" },
+    "charger": { "name": "突進鬼", "hp": 26, "speed": 58, "radius": 12, "damage": 10, "xp": 2, "ai": "charge", "color": "#c46b4f", "dash_speed": 380 },
+    "shooter": { "name": "呪術師", "hp": 16, "speed": 62, "radius": 10, "damage": 6, "xp": 2, "ai": "shoot", "color": "#7f6bd6", "range": 270, "interval": 2.6, "bullet_speed": 190 },
+    "elite":   { "name": "墓守", "hp": 260, "speed": 64, "radius": 20, "damage": 14, "xp": 20, "ai": "chase", "color": "#a8b36a" },
+    "boss":    { "name": "冥王", "hp": 5200, "speed": 58, "radius": 34, "damage": 20, "xp": 0, "ai": "boss", "color": "#e2555a", "short_hp_mult": 0.65,
+                 "slam": { "damage": 18, "radius": 130, "windup": 1.0 }, "nova": { "count": 14, "speed": 170, "damage": 9 }, "cycle": 3.2 }
+  },
+  "spawn": { "base_per_sec": 1.0, "per_progress": 7, "max_alive": 300, "hp_growth": 1.6, "shooter_from": 0.15, "charger_from": 0.3,
+             "shooter_share": 0.15, "charger_share": 0.15, "elites_at": [0.3, 0.6, 0.85], "boss_phase_rate": 0.4 },
+  "checkpoint_interval": 10
+}
