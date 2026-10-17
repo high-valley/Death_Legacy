@@ -1,11 +1,12 @@
 # Death Legacy（仮）
 
 今日の自分が、明日の仲間になる。
-死んだ主人公が**亡霊**として残り、次の出撃に一度だけ連れていける、2D見下ろし型サバイバー・ローグライトの縦切りスライス（Godot 4.7 / GDScript）。
+死んだ主人公が**亡霊**として残り、次の出撃に一度だけ連れていける、2D見下ろし型サバイバー・ローグライトの縦切りスライス（TypeScript / Canvas 2D）。
 
-- 遊ぶ（Web版）: `https://high-valley.github.io/death_legacy/` ※ Pages 有効化後
+- 遊ぶ（Web版・スマホ可）: https://high-valley.github.io/death_legacy/
 - 仕様: `docs/specs/DEATH_LEGACY_GDD.md`（MVP）＋ 打ち合わせで追加したフェーズ1（レア度・供物・形見）
-- 配信方針: GitHub Pages で確認 → 固まったら同じプロジェクトから Windows 版を書き出して Steam へ
+- 配信方針: GitHub Pages で確認 → 固まったら同じコードを Electron で包んで Windows 版を作り Steam へ（ADR 012）
+- 旧 Godot 版は `godot-legacy` ブランチに保存（iPhone のブラウザで重かったため移行。ADR 012）
 
 ## 遊び方
 
@@ -17,40 +18,43 @@
 
 | 操作 | キーボード | スマホ（横向き推奨） |
 |---|---|---|
-| 移動 | WASD / 矢印 | 画面をドラッグ |
+| 移動 | WASD / 矢印 | 画面をドラッグ（スティックは指に付いてくる） |
 | 攻撃 | 自動 | 自動 |
 | 回避 | Space | 右下「回避」 |
 | ポーズ | Esc / P | 右上「II」 |
 | 強化の選択 | クリック / 1・2・3 | タップ |
-| デバッグHUD | F3 | 設定画面 |
+| デバッグ表示 | F3 | 設定画面 / URL に `?fps` |
 
-## 初回だけ必要な設定（GitHub Pages）
-
-1. **Settings → Pages → Build and deployment → Source** を **GitHub Actions** にする
-2. **Actions** タブで最新の「Build & Deploy」を **Re-run all jobs**
-
-以降は `main` に push するたびに、フォント確認 → テスト → Web版を Pages に公開 → Windows版を Artifacts に保存。
+URL の付け足し: `?fps`（FPS表示）、`?bench`（敵300体の負荷試験を流し続ける）、`?lowres`（解像度を半分に）、`?demo`（見本データ。本物のセーブとは別の場所）
 
 ## ローカルで動かす
 
-1. [Godot 4.7.2](https://godotengine.org/download/archive/4.7.2-stable/)（標準版）で `project.godot` を開いて F5
-2. テスト: `godot --headless --path . -s res://tests/run_tests.gd`
+Node.js 22.18 以上（TypeScript をそのまま実行できる版）が必要。
 
-セーブはデスクトップでは OS のユーザーデータ領域、Web版ではブラウザ内に保存される（PCとスマホで保管庫は別）。
+```bash
+npm install
+npm run dev        # http://localhost:8000 （保存すると自動で作り直す）
+npm test           # 単体テスト 31件
+npm run typecheck  # 型チェック
+npm run build      # dist/ に書き出し（GitHub Pages に置くもの）
+npm run bench      # 戦闘ロジックの速度（敵300体）
+```
+
+`main` に push すると、型チェック → テスト → Web版を Pages に公開（テストが落ちると公開されない）。
+セーブはブラウザ内（localStorage）に保存される（PCとスマホで保管庫は別）。
 
 ## フォルダ構成
 
 ```
 data/balance.json   バランス値（等級・武器・レア度・供物・敵・出現）。数値調整はここだけ
-scripts/
-  sim/run_sim.gd    1回のランの戦闘ロジック（ノード非依存・テスト可能）
-  meta/             SaveRepository（原子的書き込み・バックアップ）, MetaService（亡霊・供物・形見・ラン終了処理）
-  input/ ui/ view/  入力層・タッチ操作・HUD・画面・描画
-  main.gd           状態機械と配線
+src/
+  sim/runSim.ts     1回のランの戦闘ロジック（DOM非依存・テスト可能・固定ステップ）
+  meta/             SaveRepository（検証付き書き込み・バックアップ）, MetaService（亡霊・供物・形見・ラン終了処理）
+  core/             乱数（用途別ストリーム）・空間グリッド
+  input/            InputRouter（キーボード）・TouchControls（追従スティック）・stick（計算だけ）
+  view/ ui/         戦場の描画・HUD・効果音 / 納骨堂などの画面（HTML）
+  main.ts           状態機械・60Hz固定ステップのループ・配線
 tests/              §11 受け入れ条件1〜10＋フェーズ1のテスト（CIで実行）
+tools/              build.mjs（書き出し）, bench.ts（速度計測）
 docs/               設計メモ・判断記録・マイルストーン・仕様書
 ```
-
-## ライセンス
-
-- フォント: Noto Sans CJK JP（SIL Open Font License 1.1）— `assets/fonts/LICENSE-NotoSansCJK.txt`

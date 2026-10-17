@@ -22,3 +22,17 @@
 - 計測: Web版を URL `?bench` で開くと敵300体の負荷試験が自動で走り、5秒ごとに FPS を画面とコンソールに出す。
   ネイティブの計測は `godot --headless --path . -s res://tools/bench_sim.gd`。
 - CI: 描画・UIのスクリプトは単体テストから読まれないので、実際に3秒起動して SCRIPT ERROR を検出する手順を追加。
+
+## ADR 012: Godot から TypeScript（ブラウザ向け技術）へ移行
+- 背景: Godot 4.7 の Web版は、ADR 011 の対策後も iPhone Air のブラウザで「もっさり」して遊べなかった。
+  一方、同じ仕様の単一HTML試作（Canvas 2D）は同じ iPhone で滑らか。原因はゲームの中身ではなく、Godot の Web版（WASM＋WebGL）と iPhone の相性。
+  GitHub Pages でスマホ確認する流れはオーナーの必須要件なので、オーナーと相談のうえ移行した（選択肢 C）。
+- 決定:
+  - TypeScript＋Canvas 2D、メニューは HTML。外部ライブラリなし。書き出しは esbuild、テストは Node 標準のテスト機能。
+  - 設計（戦闘ロジックとセーブの分離・events・用途別乱数・状態機械・冪等な settle・予約→消費）とテストは Godot 版から移植。
+  - 日本語は端末の書体（iPhone=ヒラギノ、Windows=游ゴシック/メイリオ）を使い、フォントの同梱・サブセットは不要にした。
+  - Godot 版は `godot-legacy` ブランチに残す。
+- Steam 版: 遊びが固まったら、同じ `dist/` を Electron で包んで Windows 版を作る（Vampire Survivors も初期はこの方式）。
+  Steamworks は Electron 用の連携（steamworks.js など）を `src/platform.ts` の `steamAvailable()` から使い、Web版では読み込まない。
+  セーブは `KV` をファイル保存に差し替える。
+- 計測（同じ環境・敵300体の最悪ケース）: 戦闘ロジック 0.2〜0.3 ms/ティック（Godot 版は約2 ms）。書き出しは約75KB（Godot 版は数十MB）。
