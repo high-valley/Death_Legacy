@@ -3,7 +3,7 @@
 今日の自分が、明日の仲間になる。
 死んだ主人公が**亡霊**として残り、次の出撃に一度だけ連れていける、2D見下ろし型サバイバー・ローグライトの縦切りスライス（TypeScript / Canvas 2D）。
 
-- 遊ぶ（Web版・スマホ可）: https://high-valley.github.io/death_legacy/
+- 遊ぶ（Web版・スマホ可）: https://high-valley.github.io/Death_Legacy/
 - 仕様: `docs/specs/DEATH_LEGACY_GDD.md`（MVP）＋ 打ち合わせで追加したフェーズ1（レア度・供物・形見）
 - 配信方針: GitHub Pages で確認 → 固まったら同じコードを Electron で包んで Windows 版を作り Steam へ（ADR 012）
 - 旧 Godot 版は `godot-legacy` ブランチに保存（iPhone のブラウザで重かったため移行。ADR 012）
