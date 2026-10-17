@@ -15,7 +15,7 @@ var meta: MetaService
 func _init() -> void:
 	data = DataLoader.load_file()
 	var tests := [
-		"test_data_valid", "test_data_rejects_broken", "t_separation_pushes_apart",
+		"test_data_valid", "test_data_rejects_broken", "t_separation_pushes_apart", "t_touch_stick_follows",
 		"t01_fresh_play_levelup_boss_death", "t02_tier_from_survival", "t03_solo_keeps_vault", "t04_companion_consumed_on_death",
 		"t05_companion_consumed_on_clear", "t06_ghost_matches_and_attacks", "t07_settle_idempotent", "t08_crash_resume",
 		"t08b_abandon_consumes", "t09_vault_full_swap", "t10_load_300",
@@ -98,6 +98,22 @@ func bot_step(r: RunSim) -> void:
 
 
 # ------------------------------------------------------------------ sim
+## タッチ操作: 大きくスワイプした後でも、少し逆に動かすだけで向きが変わる
+func t_touch_stick_follows() -> void:
+	var o := Vector2(100, 100)
+	var p := o
+	for i in 20:   # 右へ200px スワイプ
+		p += Vector2(10, 0)
+		o = TouchControls.follow_origin(o, p)
+	check(o.distance_to(p) <= TouchControls.JOY_RADIUS + 0.01, "中心が指に付いてこない")
+	check(TouchControls.stick_vector(o, p).x > 0.99, "右に全速で進まない")
+	# 左へ切り返し: 中心を越えるまでの距離は半径ぶん（56px）＋少し
+	for i in 7:
+		p += Vector2(-10, 0)
+		o = TouchControls.follow_origin(o, p)
+	check(TouchControls.stick_vector(o, p).x < 0.0, "70px戻しても左へ向かない: %s" % TouchControls.stick_vector(o, p))
+
+
 ## 押し合い: 重なった小さい敵は離れ、精鋭は小さい敵を押しのける
 func t_separation_pushes_apart() -> void:
 	var r := RunSim.new(data, {"run_id": "sep", "seed": 3, "mode": "full", "weapon": "sword"})
