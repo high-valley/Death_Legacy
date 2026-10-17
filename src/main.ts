@@ -14,6 +14,7 @@ import { Menus, type SortieRequest } from "./ui/menus.ts";
 import { BattleView } from "./view/battleView.ts";
 import { Hud } from "./view/hud.ts";
 import { Sfx } from "./view/sfx.ts";
+import { C } from "./view/theme.ts";
 
 type State = "title" | "hub" | "play" | "level" | "pause" | "settings" | "result" | "loadtest";
 const MAX_STEPS_PER_FRAME = 4;   // 端末が遅い時は「処理落ち（ゆっくり）」にして、追いつこうとする悪循環を防ぐ
@@ -190,7 +191,7 @@ class Game {
   private render(): void {
     const ctx = this.ctx;
     ctx.setTransform(this.DPR, 0, 0, this.DPR, 0, 0);
-    ctx.fillStyle = "#0b1014";
+    ctx.fillStyle = C.night;
     ctx.fillRect(0, 0, this.W, this.H);
     if (!this.sim) {
       this.drawTitleBg();
@@ -203,7 +204,7 @@ class Game {
 
   private drawTitleBg(): void {
     const ctx = this.ctx, t = performance.now() / 1000;
-    ctx.fillStyle = "#8ff0e0";
+    ctx.fillStyle = C.soul;
     for (let i = 0; i < 18; i++) {
       const x = ((i * 157 + t * 12 * (1 + (i % 3))) % (this.W + 80)) - 40;
       const y = this.H * (0.2 + (0.6 * ((i * 37) % 100)) / 100) + Math.sin(t + i) * 10;
@@ -257,7 +258,7 @@ class Game {
     this.endTimer = 1.3;
     this.setState("play");
     if (s.ghost) {
-      this.hud.toast(`${s.ghost.rec.display_name} が付き従う`);
+      this.hud.toast(`${s.ghost.rec.display_name}が付き従う`);
       this.sfx.play("ghost");
     }
   }
@@ -265,12 +266,13 @@ class Game {
   private sortie(r: SortieRequest): void {
     const rid = uuid();
     // 出撃確定の瞬間に予約を保存（亡霊・形見は reserved）
-    if (!this.meta.reserve(rid, r.seed, r.mode, r.weapon, r.ghostId, r.heirId)) {
+    if (!this.meta.reserve(rid, r.seed, r.mode, r.weapon, r.ghostId, r.heirId, r.lineage)) {
       this.toHub();
       return;
     }
+    const ar = this.meta.S.active_run!;
     const s = new RunSim(this.D, {
-      run_id: rid, seed: r.seed, mode: r.mode, weapon: r.weapon,
+      run_id: rid, seed: r.seed, mode: r.mode, weapon: ar.weapon, lineage: ar.lineage_id,
       ghost: r.ghostId ? this.meta.getGhost(r.ghostId) : null, heirloom: r.heirId ? this.meta.getHeir(r.heirId) : null, card_mods: this.meta.cardMods(),
     });
     this.menus.hub.ghost = "";
@@ -283,7 +285,7 @@ class Game {
     const ar = this.meta.S.active_run;
     if (!ar) return this.toTitle();
     this.begin(new RunSim(this.D, {
-      run_id: ar.run_id, seed: ar.seed, mode: ar.mode, weapon: ar.weapon,
+      run_id: ar.run_id, seed: ar.seed, mode: ar.mode, weapon: ar.weapon, lineage: ar.lineage_id,
       ghost: ar.ghost_id ? this.meta.getGhost(ar.ghost_id) : null, heirloom: ar.heirloom_id ? this.meta.getHeir(ar.heirloom_id) : null,
       card_mods: this.meta.cardMods(), checkpoint: ar.checkpoint,
     }));
@@ -394,6 +396,8 @@ class Game {
       this.meta.resolveHeirloom(0);
     }
     this.repo.data.alloc = { altar: 4, affinity: { fire: 2, might: 1 }, seals: ["swift"] };
+    this.repo.data.lineages = ["nameless", "firekeeper"];
+    this.repo.data.progress.companion_runs = 1;
     this.repo.write();
   }
 }

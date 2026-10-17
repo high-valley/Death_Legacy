@@ -1,7 +1,7 @@
 // スマホ用の操作レイヤー。画面をドラッグ = 仮想スティック（指に付いてくる）、右下 = 回避、右上 = ポーズ。攻撃は自動。
 // pointer イベントを直接使うので、指の動きがそのフレームのうちに移動入力へ反映される。
 import type { RunSim } from "../sim/runSim.ts";
-import { FONT } from "../view/theme.ts";
+import { C, FONT, SERIF } from "../view/theme.ts";
 import type { InputRouter } from "./inputRouter.ts";
 import { followOrigin, JOY_RADIUS, stickVector, type P } from "./stick.ts";
 
@@ -66,42 +66,47 @@ export class TouchControls {
     const b = this.buttons();
     const h = sim.hero, D = sim.D;
     // 回避ボタン（クールダウンは扇形で表示）
-    ctx.fillStyle = "rgba(18,26,31,.8)";
+    const ready = h.dashCd <= 0;
+    // 回避: 使える時は蝋燭色の輪、待ち時間は輪が時計回りに満ちていく
+    ctx.fillStyle = "rgba(14,18,23,.78)";
     ctx.beginPath(); ctx.arc(b.dash.x, b.dash.y, b.dash.r, 0, 7); ctx.fill();
-    if (h.dashCd > 0) {
-      ctx.fillStyle = "rgba(0,0,0,.6)";
-      ctx.beginPath(); ctx.moveTo(b.dash.x, b.dash.y);
-      ctx.arc(b.dash.x, b.dash.y, b.dash.r, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * h.dashCd) / D.player.dash_cd);
-      ctx.closePath(); ctx.fill();
-    }
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = h.dashCd <= 0 ? "#f0b35a" : "#24323a";
-    ctx.beginPath(); ctx.arc(b.dash.x, b.dash.y, b.dash.r, 0, 7); ctx.stroke();
-    ctx.fillStyle = "rgba(18,26,31,.8)";
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = C.edge;
+    ctx.beginPath(); ctx.arc(b.dash.x, b.dash.y, b.dash.r - 0.5, 0, 7); ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = C.candle;
+    ctx.globalAlpha = ready ? 1 : 0.55;
+    const prog = ready ? 1 : 1 - h.dashCd / D.player.dash_cd;
+    ctx.beginPath(); ctx.arc(b.dash.x, b.dash.y, b.dash.r - 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog); ctx.stroke();
+    ctx.globalAlpha = 1;
+    // ポーズ
+    ctx.fillStyle = "rgba(14,18,23,.78)";
     ctx.beginPath(); ctx.arc(b.pause.x, b.pause.y, b.pause.r, 0, 7); ctx.fill();
-    ctx.strokeStyle = "#24323a"; ctx.stroke();
-    ctx.fillStyle = "#e8efe9"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = `700 ${Math.round(b.dash.r * 0.42)}px ${FONT}`;
-    ctx.fillText("回避", b.dash.x, b.dash.y);
-    ctx.font = `700 13px ${FONT}`;
-    ctx.fillText("II", b.pause.x, b.pause.y);
+    ctx.lineWidth = 1; ctx.strokeStyle = C.edge; ctx.stroke();
+    ctx.fillStyle = C.bone;
+    const bw = 3, bh = 12;
+    ctx.fillRect(b.pause.x - 5, b.pause.y - bh / 2, bw, bh);
+    ctx.fillRect(b.pause.x + 2, b.pause.y - bh / 2, bw, bh);
+    ctx.fillStyle = ready ? C.bone : C.dim; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = `600 ${Math.round(b.dash.r * 0.36)}px ${SERIF}`;
+    ctx.fillText("回避", b.dash.x, b.dash.y + 1);
     ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
     if (this.joy) {
       const j = this.joy;
       let dx = j.p.x - j.o.x, dy = j.p.y - j.o.y;
       const l = Math.hypot(dx, dy);
       if (l > JOY_RADIUS) { dx = (dx / l) * JOY_RADIUS; dy = (dy / l) * JOY_RADIUS; }
-      ctx.strokeStyle = "rgba(232,239,233,.35)";
+      ctx.strokeStyle = "rgba(230,225,214,.28)";
       ctx.beginPath(); ctx.arc(j.o.x, j.o.y, JOY_RADIUS, 0, 7); ctx.stroke();
-      ctx.fillStyle = "rgba(143,240,224,.6)";
+      ctx.fillStyle = "rgba(134,224,210,.55)";
       ctx.beginPath(); ctx.arc(j.o.x + dx, j.o.y + dy, 20, 0, 7); ctx.fill();
     } else if (sim.t < 8) {
-      ctx.fillStyle = "#8fa39c"; ctx.font = `14px ${FONT}`;
+      ctx.fillStyle = C.dim; ctx.font = `14px ${FONT}`;
       ctx.fillText("画面をドラッグで移動（攻撃は自動）", 16, this.H * 0.62);
     }
     ctx.lineWidth = 1;
     if (this.H > this.W) {
-      ctx.fillStyle = "#f0b35a"; ctx.textAlign = "center"; ctx.font = `14px ${FONT}`;
+      ctx.fillStyle = C.candle; ctx.textAlign = "center"; ctx.font = `14px ${FONT}`;
       ctx.fillText("横向きにすると遊びやすくなります", this.W / 2, 120);
       ctx.textAlign = "left";
     }

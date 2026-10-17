@@ -57,11 +57,13 @@ export class RngStreams {
   readonly spawn: Rng;   // 敵の種類と出現位置
   readonly cards: Rng;   // レベルアップの候補とレア度
   readonly misc: Rng;    // 炎の落下先などのばらつき
+  readonly lineage: Rng; // 家系の札（送り火など）の発動判定
 
   constructor(seed: number) {
     this.spawn = new Rng(`${seed}:spawn`);
     this.cards = new Rng(`${seed}:cards`);
     this.misc = new Rng(`${seed}:misc`);
+    this.lineage = new Rng(`${seed}:lineage`);
   }
 
   /** 再開時に、経過時間ぶん乱数列を進めて同じ流れに戻す */

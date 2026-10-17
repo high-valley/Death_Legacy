@@ -25,7 +25,8 @@ export function freshSave(dataVersion = 1): SaveData {
     schema_version: SCHEMA_VERSION, data_version: dataVersion,
     ghost_seq: 0, ghosts: [], run_history: [], settled_runs: [],
     active_run: null, pending_ghost: null, pending_heirloom: null,
-    progress: { clears: 0, deaths: 0, runs: 0, generation: 0, total_survival: 0 },
+    progress: { clears: 0, deaths: 0, runs: 0, generation: 0, total_survival: 0, companion_runs: 0, best_weapon_level: {} },
+    lineages: ["nameless"],
     offerings: { earned: 0 }, alloc: { altar: 0, affinity: {}, seals: [] },
     heirlooms: [], heir_seq: 0,
   };
@@ -46,6 +47,8 @@ export function migrate(d: SaveData): SaveData {
     const b = base[k] as Record<string, unknown>, cur = o[k] as Record<string, unknown>;
     for (const kk of Object.keys(b)) if (!(kk in cur)) cur[kk] = structuredClone(b[kk]);
   }
+  if (!Array.isArray(d.lineages) || d.lineages.length === 0) d.lineages = ["nameless"];
+  if (d.active_run && !d.active_run.lineage_id) d.active_run.lineage_id = "nameless";
   d.schema_version = SCHEMA_VERSION;
   return d;
 }

@@ -36,3 +36,14 @@
   Steamworks は Electron 用の連携（steamworks.js など）を `src/platform.ts` の `steamAvailable()` から使い、Web版では読み込まない。
   セーブは `KV` をファイル保存に差し替える。
 - 計測（同じ環境・敵300体の最悪ケース）: 戦闘ロジック 0.2〜0.3 ms/ティック（Godot 版は約2 ms）。書き出しは約75KB（Godot 版は数十MB）。
+
+## ADR 013: 家系（フェーズ2）の作り
+- 家系は `data/balance.json` の `lineages` に置き、効果は `mods`（倍率の足し引き）と専用カード1枚だけで表す。コードに家系名の分岐を増やさない。
+- 専用カードはパッシブ枠を使わない（家系を選んだ得が枠争いで消えないように）。確率判定は新しい乱数ストリーム `lineage` を使う。
+- 解放判定は `MetaService.settle` の中（冪等なので二重解放しない）。進み具合は `progress.companion_runs` / `best_weapon_level` に保存。
+- 古いセーブは `migrate()` で `lineages: ["nameless"]` を補う。
+
+## ADR 014: 画面の見た目
+- 墓所の石・蝋燭・魂の3色（`--candle` 強調 / `--soul` 亡霊 / `--blood` 危険）に絞り、見出しは明朝、本文と数字はゴシック・等幅。
+- 出撃画面は「左で選ぶ・右の位牌パネルで確認して出撃」の2段組。スマホ横向き（高さ520px以下）では全画面パネル＋左だけスクロール。
+- Canvas の色は `src/view/theme.ts` を CSS の変数と同じ値にしておく。

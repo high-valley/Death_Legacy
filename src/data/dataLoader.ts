@@ -28,7 +28,7 @@ export function loadBalance(raw: unknown): Loaded {
 
   const D = raw as Balance;
   if (!need(raw, ["schema_version", "data_version", "run_length", "vault_capacity", "tiers", "ghost_unlock", "player", "xp", "weapons",
-    "passives", "rarities", "maxed_weapon_bonus", "evolutions", "offerings", "altar", "library", "shelf", "enemies", "spawn", "checkpoint_interval"], "balance")) {
+    "passives", "rarities", "maxed_weapon_bonus", "evolutions", "offerings", "altar", "library", "shelf", "enemies", "spawn", "checkpoint_interval", "lineages"], "balance")) {
     return { D, errors };
   }
   // 等級は生存割合の昇順で、最初は0から
@@ -57,6 +57,25 @@ export function loadBalance(raw: unknown): Loaded {
   for (const id of Object.keys(D.enemies)) need(D.enemies[id], ["name", "hp", "speed", "radius", "damage", "xp", "ai", "color"], `enemies.${id}`);
   if (!isDict(D.enemies.boss) || D.enemies.boss.ai !== "boss") errors.push("enemies.boss（ai: boss）が必要");
   if (!(D.vault_capacity >= 1)) errors.push("vault_capacity は1以上");
+  // 家系: 最初の1つは最初から使える（unlock なし）。武器は実在するもの、解放条件は既知の型
+  const lids = new Set<string>();
+  D.lineages.forEach((l, i) => {
+    if (!need(l, ["id", "name", "motto", "trait", "weakness", "weapon", "mods", "card", "unlock"], `lineages[${i}]`)) return;
+    if (lids.has(l.id)) errors.push(`lineages: id '${l.id}' が重複`);
+    lids.add(l.id);
+    if (l.weapon !== null && !(l.weapon in D.weapons)) errors.push(`lineages[${l.id}]: weapon '${l.weapon}' がない`);
+    if (need(l.card, ["id", "name", "max", "per", "fmt"], `lineages[${l.id}].card`) && !(l.card.max >= 1)) errors.push(`lineages[${l.id}].card: max は1以上`);
+    const u = l.unlock;
+    if (i === 0 && u !== null) errors.push("lineages[0] は最初から使える家系にする（unlock: null）");
+    if (u !== null) {
+      if (u.type === "weapon_level") {
+        if (!(u.weapon in D.weapons)) errors.push(`lineages[${l.id}].unlock: weapon '${u.weapon}' がない`);
+      } else if (u.type !== "companion_runs") {
+        errors.push(`lineages[${l.id}].unlock: type は weapon_level / companion_runs`);
+      }
+    }
+  });
+  if (D.lineages.length === 0) errors.push("lineages: 1つ以上必要");
   for (const [lv, u] of D.ghost_unlock) if (!(lv >= 1 && u > 0 && u <= 1)) errors.push("ghost_unlock は [レベル, 0〜1]");
   return { D, errors };
 }

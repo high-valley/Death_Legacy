@@ -198,7 +198,7 @@ test("形見: 候補 → 棚 → 身につけて出撃 → 使い切り", () => 
   const h = w.meta.storedHeirs()[0];
   assert.ok(h.type === "passive" && h.id === "haste" && h.level === 2, h.name);
   const r2 = w.sortie("", h.heir_id, "short", "sword", 23)!;
-  assert.ok(w.meta.getHeir(h.heir_id)!.status === "reserved" && r2.passives.haste === 2);
+  assert.ok(w.meta.getHeir(h.heir_id)!.status === "reserved" && r2.passives.haste === 3, "形見 Lv2 ＋ 無名の効果 1");
   w.die(r2, 50);
   assert.equal(w.meta.getHeir(h.heir_id), null);
 });

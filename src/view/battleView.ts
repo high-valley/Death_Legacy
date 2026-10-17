@@ -1,6 +1,7 @@
 // 戦場の描画。RunSim の状態を読むだけ（書き換えない）。仮アセットなので図形で描く。
 // スマホでも軽く描けるように: 画面外は描かない / 同じ色の敵は続けて描く。
 import type { RunSim, SimEvent } from "../sim/runSim.ts";
+import { C } from "./theme.ts";
 
 type Fx = Extract<SimEvent, { type: "fx" }> & { t: number };
 
@@ -46,14 +47,14 @@ export class BattleView {
     const vis = (x: number, y: number, r: number): boolean => x + r > x0 && x - r < x1 && y + r > y0 && y - r < y1;
 
     // 地面: 格子と墓標（座標から決まる飾り）
-    ctx.strokeStyle = "#131c21";
+    ctx.strokeStyle = "#151b22";
     ctx.lineWidth = 1 / z;
     ctx.beginPath();
     const g = 96;
     for (let x = Math.floor(x0 / g) * g; x < x1; x += g) { ctx.moveTo(x, y0); ctx.lineTo(x, y1); }
     for (let y = Math.floor(y0 / g) * g; y < y1; y += g) { ctx.moveTo(x0, y); ctx.lineTo(x1, y); }
     ctx.stroke();
-    ctx.fillStyle = "#18242a";
+    ctx.fillStyle = "#1c232c";
     ctx.beginPath();
     for (let x = Math.floor(x0 / 288) * 288; x < x1; x += 288) {
       for (let y = Math.floor(y0 / 288) * 288; y < y1; y += 288) {
@@ -85,7 +86,7 @@ export class BattleView {
       ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 7); ctx.stroke();
     }
     // 経験値
-    ctx.fillStyle = "#f0b35a";
+    ctx.fillStyle = C.candle;
     ctx.beginPath();
     for (const gm of sim.gems) if (vis(gm.x, gm.y, 4)) ctx.rect(gm.x - 3, gm.y - 3, 6, 6);
     ctx.fill();
@@ -112,10 +113,10 @@ export class BattleView {
     ctx.lineWidth = 1.5;
     for (const e of sim.enemies) {
       if (e.kind === "charger" && e.phase === 1) {
-        ctx.strokeStyle = "#e2555a";
+        ctx.strokeStyle = C.blood;
         ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + e.dx * 120, e.y + e.dy * 120); ctx.stroke();
       } else if ((e.kind === "boss" || e.kind === "elite") && vis(e.x, e.y, e.r)) {
-        ctx.strokeStyle = "#0b1014"; ctx.lineWidth = 3;
+        ctx.strokeStyle = C.night; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 0.55, 0, 7); ctx.stroke();
         ctx.lineWidth = 1.5;
       }
@@ -125,16 +126,16 @@ export class BattleView {
     // 主人公
     const blink = h.iframe > 0 && Math.floor(sim.t * 30) % 2 === 0;
     ctx.globalAlpha = blink ? 0.4 : 1;
-    ctx.fillStyle = h.flash > 0 ? "#ffffff" : "#e8efe9";
+    ctx.fillStyle = h.flash > 0 ? "#ffffff" : C.bone;
     ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, 7); ctx.fill();
-    ctx.fillStyle = "#f0b35a";
+    ctx.fillStyle = C.candle;
     ctx.beginPath(); ctx.arc(h.x + h.fx * 6, h.y + h.fy * 6, 3.5, 0, 7); ctx.fill();
     ctx.globalAlpha = 1;
 
     // 矢
     ctx.lineWidth = 2;
     for (const ghost of [false, true]) {
-      ctx.strokeStyle = ghost ? "#8ff0e0" : "#f2e3b3";
+      ctx.strokeStyle = ghost ? C.soul : "#f2e3b3";
       ctx.beginPath();
       for (const s of sim.shots) {
         if (s.ghost !== ghost) continue;

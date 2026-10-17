@@ -14,6 +14,19 @@ export interface EnemyDef {
   cycle?: number;
 }
 
+export interface LineageCard { id: string; name: string; max: number; per: number; fmt: string }
+export type LineageUnlock =
+  | { type: "weapon_level"; weapon: string; level: number; text: string }
+  | { type: "companion_runs"; count: number; text: string };
+export interface LineageMods {
+  heir_level_bonus?: number; fire_area?: number; fire_burn?: number; max_hp?: number;
+  ghost_unlock_step?: number; ghost_atk?: number; solo_xp?: number; speed?: number;
+}
+export interface Lineage {
+  id: string; name: string; motto: string; trait: string; weakness: string;
+  weapon: string | null; mods: LineageMods; card: LineageCard; unlock: LineageUnlock | null;
+}
+
 export interface Balance {
   schema_version: number;
   data_version: number;
@@ -43,6 +56,7 @@ export interface Balance {
     shooter_share: number; charger_share: number; elites_at: number[]; boss_phase_rate: number;
   };
   checkpoint_interval: number;
+  lineages: Lineage[];
 }
 
 export type RunMode = "full" | "short";

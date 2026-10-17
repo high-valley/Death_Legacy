@@ -29,11 +29,12 @@ export class World {
   }
 
   /** 出撃（予約まで含む）。失敗時は null */
-  sortie(ghostId = "", heirId = "", mode: RunMode = "short", weapon = "sword", seed = 1): RunSim | null {
+  sortie(ghostId = "", heirId = "", mode: RunMode = "short", weapon = "sword", seed = 1, lineage = "nameless"): RunSim | null {
     const rid = uuid();
-    if (!this.meta.reserve(rid, seed, mode, weapon, ghostId, heirId)) return null;
+    if (!this.meta.reserve(rid, seed, mode, weapon, ghostId, heirId, lineage)) return null;
+    const ar = this.repo.data.active_run!;
     return new RunSim(D, {
-      run_id: rid, seed, mode, weapon,
+      run_id: rid, seed, mode, weapon: ar.weapon, lineage: ar.lineage_id,
       ghost: ghostId ? this.meta.getGhost(ghostId) : null, heirloom: heirId ? this.meta.getHeir(heirId) : null, card_mods: this.meta.cardMods(),
     });
   }

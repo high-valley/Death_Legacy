@@ -4,7 +4,7 @@
 死んだ主人公が**亡霊**として残り、次の出撃に一度だけ連れていける、2D見下ろし型サバイバー・ローグライトの縦切りスライス（TypeScript / Canvas 2D）。
 
 - 遊ぶ（Web版・スマホ可）: https://high-valley.github.io/Death_Legacy/
-- 仕様: `docs/specs/DEATH_LEGACY_GDD.md`（MVP）＋ 打ち合わせで追加したフェーズ1（レア度・供物・形見）
+- 仕様: `docs/specs/DEATH_LEGACY_GDD.md`（MVP）＋ 打ち合わせで追加したフェーズ1（レア度・供物・形見）・フェーズ2（家系）
 - 配信方針: GitHub Pages で確認 → 固まったら同じコードを Electron で包んで Windows 版を作り Steam へ（ADR 012）
 - 旧 Godot 版は `godot-legacy` ブランチに保存（iPhone のブラウザで重かったため移行。ADR 012）
 
@@ -54,7 +54,7 @@ src/
   input/            InputRouter（キーボード）・TouchControls（追従スティック）・stick（計算だけ）
   view/ ui/         戦場の描画・HUD・効果音 / 納骨堂などの画面（HTML）
   main.ts           状態機械・60Hz固定ステップのループ・配線
-tests/              §11 受け入れ条件1〜10＋フェーズ1のテスト（CIで実行）
+tests/              §11 受け入れ条件1〜10＋フェーズ1・2のテスト（CIで実行）
 tools/              build.mjs（書き出し）, bench.ts（速度計測）
 docs/               設計メモ・判断記録・マイルストーン・仕様書
 ```

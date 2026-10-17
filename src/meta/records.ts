@@ -21,6 +21,7 @@ export interface GhostRecord {
   death_cause_id: string;
   stat_snapshot: { attack_mult: number; attack_speed: number; area: number };
   data_version: number;
+  lineage_id?: string;
   status: GhostStatus;
   reserved_by_run?: string;
   consumed_by_run?: string;
@@ -47,6 +48,7 @@ export interface Snapshot {
   weapons: Record<string, number>; passives: Record<string, number>; ppow: Record<string, number>;
   wbonus: Record<string, number>; evolved: Record<string, boolean>;
   kills: number; boss_kills: number; boss_spawned: boolean; elite_idx: number; spawn_acc: number;
+  lineage_lv?: number; lpow?: number;
 }
 
 /** ラン終了処理（MetaService.settle）に渡す要約 */
@@ -55,11 +57,12 @@ export interface Summary {
   weapons: Record<string, number>; passives: Record<string, number>; ppow: Record<string, number>;
   wbonus: Record<string, number>; evolved: Record<string, boolean>;
   level: number; kills: number; boss_kills: number; death_cause: string; ghost_id: string; heirloom_id: string;
+  lineage_id: string;
 }
 
 export interface ActiveRun {
   run_id: string; seed: number; mode: RunMode; weapon: string; ghost_id: string; heirloom_id: string;
-  started_at: string; checkpoint: Snapshot | null;
+  lineage_id: string; started_at: string; checkpoint: Snapshot | null;
 }
 
 export interface RunRecord {
@@ -68,6 +71,7 @@ export interface RunRecord {
   player_level: number; kills: number; boss_kills: number; ended_at: string;
   consumed_ghost: string; new_ghost_id: string; new_ghost?: string; new_ghost_pending: boolean;
   used_heirloom: string; offerings: number; generation: number;
+  lineage_id: string; unlocked_lineages: string[];
 }
 
 export interface SaveData {
@@ -80,7 +84,12 @@ export interface SaveData {
   active_run: ActiveRun | null;
   pending_ghost: GhostRecord | null;
   pending_heirloom: { run_id: string; generation: number; options: HeirOption[] } | null;
-  progress: { clears: number; deaths: number; runs: number; generation: number; total_survival: number };
+  progress: {
+    clears: number; deaths: number; runs: number; generation: number; total_survival: number;
+    companion_runs: number;                      // 亡霊を連れて出撃して終えたラン数（墓守の解放条件）
+    best_weapon_level: Record<string, number>;   // 武器ごとの最高Lv（火守の解放条件）
+  };
+  lineages: string[];                            // 解放済みの家系
   offerings: { earned: number };
   alloc: CardMods;
   heirlooms: Heirloom[];

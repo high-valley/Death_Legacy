@@ -1,107 +1,211 @@
-/* 戦場はキャンバス全面、納骨堂やメニューはその上に重ねる「台帳」 */
+/* Death Legacy — 納骨堂の台帳。
+   見出しと名前は明朝（家系・位牌の格）、本文と操作はゴシック。
+   目立たせるのは「出撃札」だけ（位牌のように家系と代を縦書きで刻む）。ほかは静かに。 */
 :root {
-  --night: #0b1014;
-  --moss: #121a1f;
-  --edge: #24323a;
-  --bone: #e8efe9;
-  --dim: #8fa39c;
-  --soul: #8ff0e0;
-  --candle: #f0b35a;
-  --blood: #e2555a;
-  --f-body: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans JP", "Noto Sans CJK JP", sans-serif;
-  --f-display: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
-  --f-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --stone: #12161c;     /* 地 */
+  --slab: #1a2029;      /* 面 */
+  --slab-2: #222a35;    /* 一段上の面 */
+  --line: #2e3845;      /* 区切り */
+  --bone: #e6e1d6;      /* 文字 */
+  --mute: #9aa3a8;      /* 補助の文字 */
+  --faint: #66717a;     /* さらに弱い文字 */
+  --candle: #d9a85b;    /* 行動・供物 */
+  --soul: #86e0d2;      /* 亡霊 */
+  --blood: #d65a5e;     /* 危険 */
+  --f-sans: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif;
+  --f-serif: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+  --r: 6px;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 [hidden] { display: none !important; }
 body {
-  background: var(--night); color: var(--bone); font-family: var(--f-body);
+  background: var(--stone); color: var(--bone); font: 15px/1.6 var(--f-sans);
   overflow: hidden; overscroll-behavior: none; touch-action: manipulation;
   -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent;
+  font-feature-settings: "palt";
 }
 #app { position: fixed; inset: 0; }
 canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 #ui { position: absolute; inset: 0; }
+
+/* ---------- 重ねる画面 ---------- */
 .ov {
   position: absolute; inset: 0; display: grid; place-items: center; overflow-y: auto; -webkit-overflow-scrolling: touch;
-  background: rgba(11, 16, 20, .86);
-  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: rgba(14, 18, 23, .78); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
 }
-.panel { background: var(--moss); border: 1px solid var(--edge); border-radius: 4px; padding: 24px 28px; max-width: 980px; width: 100%; display: grid; gap: 16px; }
-@media (max-width: 640px), (max-height: 500px) { .panel { padding: 16px; gap: 12px; } }
-h1, h2, h3 { font-family: var(--f-display); font-weight: 800; margin: 0; text-wrap: balance; }
-h1 { font-size: clamp(40px, 8vw, 78px); line-height: 1.05; letter-spacing: .02em; }
-h1 span { color: var(--soul); }
-h2 { font-size: 26px; } h3 { font-size: 17px; font-weight: 700; }
-p { margin: 0; line-height: 1.75; color: var(--dim); max-width: 70ch; }
-.eyebrow { font: 600 12px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--candle); }
-.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.row.spread { justify-content: space-between; }
-.col { display: grid; gap: 10px; align-content: start; min-width: 0; }
-button {
-  font: 700 15px var(--f-body); color: var(--bone); background: #1b262c; border: 1px solid #2f414a; border-radius: 3px;
-  padding: 11px 18px; cursor: pointer; min-height: 44px; touch-action: manipulation;
+.panel {
+  width: 100%; max-width: 980px; background: var(--slab); border: 1px solid var(--line); border-radius: 10px;
+  padding: 28px 32px; display: grid; gap: 18px; align-content: start;
 }
-button:hover:not(:disabled) { border-color: var(--soul); }
-button:active:not(:disabled) { background: #22323a; }
-button:disabled { opacity: .45; cursor: not-allowed; }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
-button.primary { background: var(--soul); border-color: var(--soul); color: #082420; }
-button.danger { border-color: var(--blood); color: #ffd9da; }
-label { font-size: 14px; color: var(--dim); display: grid; gap: 6px; }
-label.check { display: flex; gap: 10px; align-items: center; color: var(--bone); }
-label.check input { width: 22px; height: 22px; }
-input { font: 16px var(--f-mono); background: var(--night); color: var(--bone); border: 1px solid var(--edge); border-radius: 3px; padding: 8px 10px; }
-input[type="range"] { padding: 0; accent-color: var(--soul); }
-.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--edge); border-radius: 3px; overflow: hidden; }
-.seg button { border: 0; border-radius: 0; background: transparent; padding: 9px 14px; }
-.seg button[aria-pressed="true"] { background: #1f3036; color: var(--soul); }
-.grid2 { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; }
-@media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
-.vault { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; align-content: start; }
-.ghost {
-  text-align: left; display: grid; gap: 4px; padding: 12px 14px; background: var(--night); border: 1px solid var(--edge);
-  border-left: 3px solid var(--tc, var(--dim)); min-height: 104px; align-content: start; font-weight: 400;
+.panel.narrow { max-width: 620px; }
+.panel.wide { max-width: 1120px; }
+/* スマホ横向きなど高さが小さい時は、画面いっぱいに使う */
+@media (max-height: 520px) {
+  .ov { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); place-items: start stretch; }
+  .panel { max-width: none; border-radius: 0; border: 0; padding: 12px 18px; gap: 10px; min-height: 100%; }
+  .panel h2 { font-size: 20px; }
+  .panel.narrow { max-width: none; }
 }
-.ghost[aria-pressed="true"] { border-color: var(--soul); box-shadow: inset 0 0 0 1px var(--soul); }
-.ghost .t { font: 600 12px var(--f-mono); color: var(--tc, var(--dim)); }
-.ghost .n { font: 700 16px var(--f-display); color: var(--bone); }
-.ghost .d { font-size: 12px; color: var(--dim); line-height: 1.55; }
-.ghost .x { font-size: 12px; color: var(--candle); }
-.empty { padding: 16px; border: 1px dashed var(--edge); color: var(--dim); font-size: 14px; line-height: 1.7; }
-.warn { border: 1px solid rgba(240, 179, 90, .6); background: rgba(240, 179, 90, .08); padding: 10px 12px; font-size: 13px; line-height: 1.6; color: #f6dcb4; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-.card { text-align: left; display: grid; gap: 6px; align-content: start; padding: 16px; background: var(--night); border: 1px solid var(--edge); min-height: 140px; font-weight: 400; }
-.card .k { font: 500 12px var(--f-mono); color: var(--dim); }
-.card .n { font: 700 19px var(--f-display); }
-.card .d { font-size: 13px; color: var(--dim); line-height: 1.6; white-space: pre-line; }
-.rar { display: inline-block; font: 700 11px var(--f-mono); letter-spacing: .06em; padding: 1px 6px; border-radius: 2px; color: #0b1014; background: var(--rc); }
-.card.r-N { border-color: #3a4a50; } .card.r-R { border-color: #6fb6ff; } .card.r-SR { border-color: #b88cff; }
-.card.r-UR { border-color: #f0b35a; box-shadow: 0 0 0 1px #f0b35a55 inset; }
-.card.r-LR { border-color: #ff7ad9; box-shadow: 0 0 18px #ff7ad955, 0 0 0 1px #ff7ad9 inset; }
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
-.stats div { background: var(--night); border-radius: 3px; padding: 10px 12px; display: grid; gap: 2px; }
-.stats b { font: 600 20px var(--f-mono); font-variant-numeric: tabular-nums; }
-.stats span { font-size: 12px; color: var(--dim); }
-.hist { display: grid; gap: 4px; font: 12px var(--f-mono); color: var(--dim); max-height: 160px; overflow: auto; }
+@media (max-width: 640px) { .panel { padding: 18px; } }
+
+/* ---------- 文字 ---------- */
+h1, h2, h3, .serif { font-family: var(--f-serif); font-weight: 600; margin: 0; letter-spacing: .02em; }
+h1 { font-size: clamp(44px, 7vw, 84px); line-height: 1.02; font-weight: 600; letter-spacing: .04em; }
+h2 { font-size: 24px; line-height: 1.3; }
+h3 { font-size: 15px; color: var(--mute); font-family: var(--f-sans); font-weight: 600; letter-spacing: .04em; }
+p { margin: 0; color: var(--mute); max-width: 62ch; }
+.lead { font-size: 16px; color: var(--bone); opacity: .82; line-height: 1.9; }
+.small { font-size: 13px; }
+.num { font-variant-numeric: tabular-nums; }
+.gold { color: var(--candle); } .soul { color: var(--soul); } .danger { color: var(--blood); } .mute { color: var(--mute); }
 .win { color: var(--candle); } .lose { color: var(--blood); }
-.note { font-size: 13px; color: var(--dim); border-left: 2px solid var(--edge); padding-left: 10px; }
-.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--edge); }
-.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 8px 14px; color: var(--dim); }
-.tabs button[aria-selected="true"] { color: var(--bone); border-bottom-color: var(--soul); }
-.tabs .lock { font-size: 11px; color: var(--dim); margin-left: 6px; }
-.bal { font: 600 14px var(--f-mono); color: var(--candle); }
-.dist { display: grid; gap: 6px; }
-.dist .r { display: grid; grid-template-columns: 9.5em 1fr 4.5em; gap: 10px; align-items: center; font-size: 13px; }
-.dist .bar { height: 10px; background: var(--night); border-radius: 2px; overflow: hidden; }
-.dist .bar i { display: block; height: 100%; background: var(--rc); }
-.dist .v { font: 500 12px var(--f-mono); text-align: right; color: var(--dim); }
+
+/* ---------- 操作 ---------- */
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.row.end { justify-content: flex-end; }
+.spread { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+button {
+  font: 600 15px var(--f-sans); color: var(--bone); background: var(--slab-2); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 10px 18px; min-height: 44px; cursor: pointer; touch-action: manipulation; transition: border-color .12s, background-color .12s;
+}
+button:hover:not(:disabled) { border-color: #4a5868; }
+button:active:not(:disabled) { background: #2a3442; }
+button:disabled { opacity: .4; cursor: not-allowed; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
+button.primary { background: var(--candle); border-color: var(--candle); color: #20180b; }
+button.primary:hover:not(:disabled) { background: #e4b66d; border-color: #e4b66d; }
+button.ghostly { border-color: rgba(134,224,210,.45); color: var(--soul); background: transparent; }
+button.danger { border-color: rgba(214,90,94,.6); color: #f0c4c5; background: transparent; }
+button.quiet { background: transparent; border-color: transparent; color: var(--mute); }
+button.quiet:hover:not(:disabled) { color: var(--bone); border-color: var(--line); }
+label { font-size: 13px; color: var(--mute); display: grid; gap: 6px; }
+label.check { display: flex; gap: 12px; align-items: center; color: var(--bone); font-size: 15px; min-height: 40px; }
+label.check input { width: 22px; height: 22px; accent-color: var(--candle); }
+input { font: 16px var(--f-sans); background: var(--stone); color: var(--bone); border: 1px solid var(--line); border-radius: var(--r); padding: 9px 12px; }
+input[type="range"] { padding: 0; accent-color: var(--candle); }
+.seg { justify-self: start; display: inline-flex; flex-wrap: wrap; background: var(--stone); border: 1px solid var(--line); border-radius: var(--r); padding: 3px; gap: 3px; }
+.seg button { min-height: 36px; padding: 6px 14px; border: 0; background: transparent; color: var(--mute); font-size: 14px; }
+.seg button[aria-pressed="true"] { background: var(--slab-2); color: var(--bone); box-shadow: inset 0 0 0 1px var(--line); }
+
+/* ---------- タブ（納骨堂） ---------- */
+.tabs { flex-shrink: 0; min-height: 42px; display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.tabs button { min-height: 40px; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--mute); padding: 8px 14px; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--bone); border-bottom-color: var(--candle); }
+.tabs .lock { margin-left: 6px; font-size: 11px; color: var(--faint); font-weight: 400; }
+.purse { font-variant-numeric: tabular-nums; color: var(--mute); font-size: 13px; }
+.purse b { color: var(--candle); font-size: 18px; font-weight: 700; margin: 0 2px; }
+
+/* ---------- 選ぶカード ---------- */
+.picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 8px; }
+.pick {
+  position: relative; text-align: left; display: grid; gap: 3px; align-content: start; min-height: 0;
+  padding: 11px 12px 12px 15px; background: var(--stone); border: 1px solid var(--line); border-radius: var(--r); font-weight: 400;
+}
+.pick::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--edge, var(--line)); }
+.pick[aria-pressed="true"] { border-color: var(--soul); box-shadow: inset 0 0 0 1px var(--soul); background: #151c22; }
+.pick .tier { font-size: 12px; color: var(--edge, var(--mute)); font-weight: 600; }
+.pick .name { font: 600 16px/1.35 var(--f-serif); color: var(--bone); }
+.pick .meta { font-size: 12px; color: var(--mute); line-height: 1.55; }
+.pick .note { font-size: 12px; color: var(--candle); }
+.pick.locked { opacity: .62; }
+.pick.locked .name { color: var(--mute); }
+.bar { height: 4px; border-radius: 2px; background: var(--slab-2); overflow: hidden; margin-top: 4px; }
+.bar i { display: block; height: 100%; background: var(--candle); }
+
+/* 家系のカード */
+.house .motto { font: 13px/1.5 var(--f-serif); color: var(--mute); }
+.house .plus, .house .minus { font-size: 12px; line-height: 1.5; padding-left: 1.1em; text-indent: -1.1em; }
+.house .plus { color: #b9d7b0; } .house .minus { color: #e3a6a8; }
+.house .plus::before { content: "＋"; } .house .minus::before { content: "－"; }
+
+.empty { padding: 14px; border: 1px dashed var(--line); border-radius: var(--r); color: var(--mute); font-size: 13px; }
+
+/* ---------- 納骨堂: 2列（左＝選ぶ、右＝出撃札） ---------- */
+.hub { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 20px; align-items: start; }
+.hub .choose { display: grid; gap: 16px; min-width: 0; }
+.hub .section { display: grid; gap: 8px; }
+@media (max-width: 720px) { .hub { grid-template-columns: 1fr; } }
+@media (max-height: 520px) and (min-width: 721px) {
+  .hub { grid-template-columns: minmax(0, 1fr) 240px; height: calc(100dvh - 104px); }
+  .hub .choose { overflow-y: auto; height: 100%; padding-right: 6px; scrollbar-width: thin; }
+}
+
+/* 出撃札（位牌）: このゲームの顔 */
+.tablet {
+  position: sticky; top: 0; display: grid; gap: 12px; padding: 16px 16px 14px; border-radius: 10px 10px 6px 6px;
+  background: linear-gradient(180deg, #232b36, #1b222c); border: 1px solid #3a4655; box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+}
+.tablet .plate { display: flex; gap: 14px; align-items: stretch; }
+.tablet .vertical {
+  writing-mode: vertical-rl; text-orientation: upright; font: 600 26px/1.15 var(--f-serif); letter-spacing: .12em; color: var(--bone);
+  padding: 12px 8px; border: 1px solid #4a3c22; border-radius: 4px; background: #1a1712; min-height: 132px; text-align: start;
+}
+.tablet .vertical small { font-size: 15px; color: var(--candle); letter-spacing: .1em; }
+.tablet dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 13px; align-content: start; }
+.tablet dt { color: var(--faint); }
+.tablet dd { margin: 0; color: var(--bone); min-width: 0; overflow-wrap: anywhere; }
+.tablet dd.soul { color: var(--soul); }
+.tablet .warn { font-size: 12px; line-height: 1.6; color: var(--mute); border-top: 1px solid var(--line); padding-top: 10px; }
+.tablet .warn b { color: var(--candle); font-weight: 600; }
+.tablet button.primary { width: 100%; min-height: 52px; font: 600 19px var(--f-serif); letter-spacing: .2em; }
+@media (max-height: 520px) { .tablet .vertical { min-height: 120px; font-size: 22px; } .tablet { gap: 9px; padding: 12px; } }
+
+.opts { display: grid; gap: 8px; }
+.opts .row { gap: 8px; }
+.hist { display: grid; gap: 3px; font-size: 12px; color: var(--mute); font-variant-numeric: tabular-nums; }
+.hist div { display: grid; grid-template-columns: 6.5em 3.5em 3.5em 1fr; gap: 8px; }
+
+/* ---------- レベルアップのカード ---------- */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.card {
+  position: relative; text-align: left; display: grid; gap: 6px; align-content: start; padding: 18px 16px 16px; min-height: 150px;
+  background: var(--stone); border: 1px solid var(--line); border-radius: 8px; font-weight: 400; overflow: hidden;
+}
+.card::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--rc, var(--line)); }
+.card:hover:not(:disabled) { border-color: var(--rc, #4a5868); }
+.card .rar { font-size: 12px; font-weight: 700; color: var(--rc, var(--mute)); letter-spacing: .04em; }
+.card .what { font-size: 12px; color: var(--mute); }
+.card .n { font: 600 21px/1.3 var(--f-serif); color: var(--bone); }
+.card .d { font-size: 13px; line-height: 1.65; color: var(--mute); white-space: pre-line; }
+.card .key { position: absolute; right: 12px; top: 12px; font-size: 12px; color: var(--faint); }
+.card.r-UR { box-shadow: inset 0 0 0 1px rgba(240,179,90,.35); }
+.card.r-LR { box-shadow: inset 0 0 0 1px rgba(255,122,217,.5), 0 0 24px rgba(255,122,217,.18); }
+.card.house-card { background: #17150f; }
+
+/* ---------- 数字の並び（結果） ---------- */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.stats div { background: var(--stone); padding: 10px 14px; display: grid; gap: 1px; }
+.stats b { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stats span { font-size: 12px; color: var(--mute); }
+.notice { display: grid; gap: 4px; padding: 12px 14px; border-radius: 8px; background: #1d1912; border: 1px solid #4a3c22; }
+.notice b { font: 600 16px var(--f-serif); color: var(--candle); }
+.notice.soul { background: #13201f; border-color: #2c4f4a; }
+.notice.soul b { color: var(--soul); }
+.build { font-size: 13px; color: var(--mute); line-height: 1.7; }
+
+/* ---------- 祭壇・書庫 ---------- */
+.dist { display: grid; gap: 7px; max-width: 560px; }
+.dist .r { display: grid; grid-template-columns: 8.5em 1fr 4em; gap: 12px; align-items: center; font-size: 13px; }
+.dist .track { height: 8px; background: var(--stone); border-radius: 4px; overflow: hidden; }
+.dist .track i { display: block; height: 100%; background: var(--rc); border-radius: 4px; }
+.dist .v { text-align: right; color: var(--mute); font-variant-numeric: tabular-nums; }
+.stepper { display: flex; align-items: center; gap: 14px; }
+.stepper .count { font: 600 30px var(--f-serif); font-variant-numeric: tabular-nums; min-width: 3.2em; text-align: center; }
 .alloc { display: grid; gap: 6px; }
-.alloc .r { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--night); border: 1px solid var(--edge); }
-@media (max-width: 560px) { .alloc .r { grid-template-columns: minmax(0, 1fr) auto auto; } .alloc .pips { grid-column: 2 / 4; } }
+.alloc .r { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--stone); border: 1px solid var(--line); border-radius: var(--r); }
 .alloc .r.sealed { opacity: .55; }
-.alloc .pips { font: 500 13px var(--f-mono); color: var(--soul); letter-spacing: 2px; }
-.alloc button { padding: 6px 10px; font-size: 13px; min-height: 38px; }
-.alloc .nm { min-width: 0; } .alloc .nm small { display: block; color: var(--dim); font-size: 12px; }
+.alloc .pips { color: var(--soul); letter-spacing: 3px; font-size: 13px; }
+.alloc button { min-height: 36px; padding: 4px 12px; font-size: 13px; }
+.alloc .nm { min-width: 0; font-weight: 600; } .alloc .nm small { display: block; color: var(--mute); font-size: 12px; font-weight: 400; }
+@media (max-width: 560px) { .alloc .r { grid-template-columns: minmax(0, 1fr) auto auto; } .alloc .pips { grid-column: 2 / 4; } }
+
+/* ---------- タイトル ---------- */
+.title-screen { max-width: 720px; justify-self: start; background: transparent; border: 0; padding: 8px 4px; gap: 22px; }
+.title-screen h1 { color: var(--bone); }
+.title-screen h1 .sub { display: block; font-size: .3em; letter-spacing: .5em; color: var(--candle); margin-top: 12px; font-weight: 600; }
+.title-screen .help { font-size: 13px; color: var(--faint); max-width: 56ch; }
+.title-screen .ver { font-size: 11px; color: var(--faint); }
+@media (max-height: 520px) { .title-screen { background: transparent; padding: 14px 24px; } }

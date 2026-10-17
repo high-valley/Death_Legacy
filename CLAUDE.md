@@ -12,8 +12,8 @@
 ## 経緯と現在地（2026-10）
 - 単一HTMLのブラウザ試作で手触りを確認 → 世代交代まわりを拡張 → Godot 版を作成 → **iPhone のブラウザで重く遊べなかったため TypeScript（Canvas 2D）へ移行**（ADR 011, 012）。Godot 版は `godot-legacy` ブランチ。
 - **実装済み（フェーズ1）**: MVP一式（3武器・6パッシブ・3敵種＋冥王・亡霊の生成/予約/消費・保管庫10体と入れ替え・セーブと中断復帰）＋ カードのレア度5段階（N/R/SR/UR/LR、LRは武器進化）＋ 供物（祭壇=レア率、書庫=縁・封印）＋ 形見。
+- **実装済み（フェーズ2）**: 家系の解放（無名・火守・墓守。特性・弱点・専用カード・解放条件、ADR 013）＋ 画面のつくり直し（ADR 014）。
 - **次（オーナーと合意済みの順）**:
-  - フェーズ2: 家系の解放（無名・火守・墓守の3つから。特性・弱点・専用カード、解放条件は実績や死に方）
   - フェーズ3: 亡霊の3択（連れていく / 喰らう / 弔う）、喰らうと「穢れ」→ 喰らった亡霊が「怨霊」として敵で出る → 倒すと浄化
   - 拠点（納骨堂）の施設が増えていく仕組み
 - 公開URL: https://high-valley.github.io/Death_Legacy/
@@ -21,7 +21,7 @@
 ## よく使うコマンド
 ```bash
 npm install            # 初回（この作業環境では npm に繋がらないので、ln -s /opt/npm-tools/node_modules node_modules で代用できる）
-npm test               # 単体テスト 31件（Node 22.18+ が TypeScript をそのまま実行）
+npm test               # 単体テスト 38件（Node 22.18+ が TypeScript をそのまま実行）
 npm run typecheck      # tsc --noEmit
 npm run build          # dist/ に書き出し
 npm run dev            # http://localhost:8000
@@ -37,7 +37,7 @@ URL: `?demo`（見本データ・別保存先）`?fps` `?bench` `?lowres`。
 - 異常終了: `active_run` と10秒ごとの `checkpoint` が残る。タイトルで「再開」か「放棄（リタイア扱い・消費）」を選ばせる。
 - 戦闘中の亡霊は保管データの**コピー**（structuredClone）から作る。
 - セーブは `SaveRepository`: 一時キー→検証→.bak退避→本体。読み込み失敗時は .bak。項目を足したら `migrate()` にも足し、`schema_version` を上げる時は段階変換を書く。
-- 乱数は `RngStreams`（spawn / cards / misc）。新しい用途で既存ストリームを使うと seed 再現性が壊れる。`Math.random` は描画の揺れ以外で使わない。
+- 乱数は `RngStreams`（spawn / cards / misc / lineage）。新しい用途で既存ストリームを使うと seed 再現性が壊れる。`Math.random` は描画の揺れ以外で使わない。
 - バランス値は `data/balance.json`。項目を足したら `src/data/types.ts` と `loadBalance()` の検証にも足す。
 - TypeScript は「型を消すだけで動く」書き方にする（`enum`・引数プロパティ禁止、import は `.ts` 付き）。Node がそのまま実行するため。
 - 入力は `InputRouter` / `TouchControls` 経由。スティックは指に付いてくる（`src/input/stick.ts`、テストあり）。

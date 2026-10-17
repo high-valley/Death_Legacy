@@ -53,11 +53,31 @@
     "chaser":  { "name": "亡者", "hp": 10, "speed": 70, "radius": 10, "damage": 5, "xp": 1, "ai": "chase", "color": "#6d7f7a" },
     "charger": { "name": "突進鬼", "hp": 26, "speed": 58, "radius": 12, "damage": 10, "xp": 2, "ai": "charge", "color": "#c46b4f", "dash_speed": 380 },
     "shooter": { "name": "呪術師", "hp": 16, "speed": 62, "radius": 10, "damage": 6, "xp": 2, "ai": "shoot", "color": "#7f6bd6", "range": 270, "interval": 2.6, "bullet_speed": 190 },
-    "elite":   { "name": "墓守", "hp": 260, "speed": 64, "radius": 20, "damage": 14, "xp": 20, "ai": "chase", "color": "#a8b36a" },
+    "elite":   { "name": "墓暴き", "hp": 260, "speed": 64, "radius": 20, "damage": 14, "xp": 20, "ai": "chase", "color": "#a8b36a" },
     "boss":    { "name": "冥王", "hp": 5200, "speed": 58, "radius": 34, "damage": 20, "xp": 0, "ai": "boss", "color": "#e2555a", "short_hp_mult": 0.65,
                  "slam": { "damage": 18, "radius": 130, "windup": 1.0 }, "nova": { "count": 14, "speed": 170, "damage": 9 }, "cycle": 3.2 }
   },
   "spawn": { "base_per_sec": 1.0, "per_progress": 7, "max_alive": 300, "hp_growth": 1.6, "shooter_from": 0.15, "charger_from": 0.3,
              "shooter_share": 0.15, "charger_share": 0.15, "elites_at": [0.3, 0.6, 0.85], "boss_phase_rate": 0.4 },
-  "checkpoint_interval": 10
+  "checkpoint_interval": 10,
+  "lineages": [
+    { "id": "nameless", "name": "無名", "motto": "名も無き者は、何にでもなれる",
+      "trait": "初期武器を自由に選べる。形見の効果 +1Lv（最大Lv5）",
+      "weakness": "なし",
+      "weapon": null, "mods": { "heir_level_bonus": 1 },
+      "card": { "id": "grit", "name": "無名の意地", "max": 3, "per": 15, "fmt": "HPが3割以下の時、与ダメージ +{v}%" },
+      "unlock": null },
+    { "id": "firekeeper", "name": "火守", "motto": "火を絶やさぬことが、生きた証",
+      "trait": "炎魔法で出撃。炎の範囲 +20%・燃える時間 +30%",
+      "weakness": "最大HP −20%",
+      "weapon": "fire", "mods": { "fire_area": 0.2, "fire_burn": 0.3, "max_hp": -0.2 },
+      "card": { "id": "okuribi", "name": "送り火", "max": 3, "per": 10, "fmt": "敵を倒すと {v}% の確率で小さな炎が残る" },
+      "unlock": { "type": "weapon_level", "weapon": "fire", "level": 5, "text": "炎魔法を最大Lv（5）まで育てる" } },
+    { "id": "gravekeeper", "name": "墓守", "motto": "死者と共に歩む一族",
+      "trait": "亡霊の解放が1段階早い。亡霊の攻撃 +20%",
+      "weakness": "単独出撃の経験値ボーナスなし。移動速度 −10%",
+      "weapon": null, "mods": { "ghost_unlock_step": 1, "ghost_atk": 0.2, "solo_xp": -1, "speed": -0.1 },
+      "card": { "id": "bell", "name": "鎮魂の鐘", "max": 3, "per": 12, "fmt": "亡霊の攻撃間隔 −{v}%" },
+      "unlock": { "type": "companion_runs", "count": 3, "text": "亡霊を連れて出撃したランを3回終える" } }
+  ]
 }

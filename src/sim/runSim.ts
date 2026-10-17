@@ -3,7 +3,7 @@
 // 表示や効果音への通知は events キュー、セーブへの受け渡しは summary() / snapshot()。
 import { RngStreams } from "../core/rng.ts";
 import { SpatialGrid, pushPair } from "../core/spatialGrid.ts";
-import type { Balance, EnemyDef, Rarity, RarityId, RunMode } from "../data/types.ts";
+import type { Balance, EnemyDef, Lineage, Rarity, RarityId, RunMode } from "../data/types.ts";
 import type { CardMods, GhostRecord, Heirloom, RunResult, Snapshot, Summary } from "../meta/records.ts";
 
 export const STEP = 1 / 60;
@@ -66,7 +66,7 @@ export type SimEvent =
   | { type: "toast"; text: string }
   | { type: "shake"; amount: number };
 
-export type CardKind = "weapon" | "passive" | "heal";
+export type CardKind = "weapon" | "passive" | "lineage" | "heal";
 export interface Card { kind: CardKind; id: string; lv: number; rar: RarityId }
 type Option = Omit<Card, "rar">;
 
@@ -75,6 +75,7 @@ export interface RunOpts {
   seed?: number;
   mode?: RunMode;
   weapon?: string;
+  lineage?: string;
   ghost?: GhostRecord | null;
   heirloom?: Heirloom | null;
   card_mods?: CardMods;
@@ -107,6 +108,9 @@ export class RunSim {
   readonly mode: RunMode;
   readonly runLen: number;
   readonly mainWeapon: string;
+  readonly lineage: Lineage;
+  lineageLv = 0;     // 家系の札の取得回数
+  lpow = 0;          // 家系の札の効果量（レア度込み）
   ghostId = "";
   heirloomId = "";
   solo: boolean;
@@ -153,11 +157,12 @@ export class RunSim {
     this.seed = o.seed ?? 1;
     this.mode = o.mode ?? "short";
     this.runLen = D.run_length[this.mode];
-    this.mainWeapon = o.weapon ?? "sword";
+    this.lineage = D.lineages.find((l) => l.id === o.lineage) ?? D.lineages[0];
+    this.mainWeapon = this.lineage.weapon ?? o.weapon ?? "sword";
     if (o.card_mods) this.cardMods = o.card_mods;
     this.rng = new RngStreams(this.seed);
     this.hero.r = D.player.radius;
-    this.maxHp = D.player.hp;
+    this.maxHp = Math.round(D.player.hp * (1 + (this.lineage.mods.max_hp ?? 0)));
     this.hp = this.maxHp;
     this.weapons[this.mainWeapon] = 1;
     if (o.ghost) {
@@ -173,7 +178,8 @@ export class RunSim {
   }
 
   private applyHeirloom(h: Heirloom): void {
-    const lv = h.level;
+    const cap = h.type === "weapon" ? this.D.weapon_max_level : this.D.passive_max_level;
+    const lv = Math.min(cap, h.level + (this.lineage.mods.heir_level_bonus ?? 0));
     if (h.type === "weapon") {
       this.weapons[h.id] = Math.max(this.weapons[h.id] ?? 0, lv);
     } else {
@@ -205,10 +211,22 @@ export class RunSim {
   hasteMul(): number { return 1 / (1 + 0.1 * this.pw("haste")); }
   areaMul(): number { return 1 + 0.12 * this.pw("area"); }
 
+  /** 亡霊の解放率。墓守は1段階早い */
   ghostUnlock(): number {
-    let u = 0;
-    for (const [lv, v] of this.D.ghost_unlock) if (this.level >= lv) u = v;
-    return u;
+    const steps = this.D.ghost_unlock;
+    let i = -1;
+    for (let k = 0; k < steps.length; k++) if (this.level >= steps[k][0]) i = k;
+    if (i < 0) return 0;
+    return steps[Math.min(steps.length - 1, i + (this.lineage.mods.ghost_unlock_step ?? 0))][1];
+  }
+
+  mod(key: keyof Lineage["mods"]): number {
+    return this.lineage.mods[key] ?? 0;
+  }
+
+  /** 家系の札の効果（%を割合で） */
+  cardPower(): number {
+    return (this.lineage.card.per / 100) * this.lpow;
   }
 
   weaponName(id: string): string {
@@ -255,9 +273,10 @@ export class RunSim {
       const n = evo ? 3 : lv >= 4 ? 2 : 1;
       for (let i = 0; i < n; i++) {
         const at = i === 0 || this.enemies.length === 0 ? tgt : this.enemies[this.rng.misc.randi(this.enemies.length)];
+        const fa = isGhost ? 0 : this.mod("fire_area"), fb = isGhost ? 0 : this.mod("fire_burn");
         this.zones.push({
-          x: at.x, y: at.y, r: (W.radius ?? 68) * area * (1 + 0.08 * (lv - 1)) * (evo ? 1.4 : 1),
-          dmg: W.damage * dmgMul * (1 + 0.3 * (lv - 1)), life: (W.burn ?? 2.6) * (evo ? 1.5 : 1), tick: 0, ghost: isGhost,
+          x: at.x, y: at.y, r: (W.radius ?? 68) * area * (1 + 0.08 * (lv - 1)) * (evo ? 1.4 : 1) * (1 + fa),
+          dmg: W.damage * dmgMul * (1 + 0.3 * (lv - 1)), life: (W.burn ?? 2.6) * (evo ? 1.5 : 1) * (1 + fb), tick: 0, ghost: isGhost,
         });
       }
     }
@@ -332,7 +351,7 @@ export class RunSim {
     if (this.eliteIdx < S.elites_at.length && p >= S.elites_at[this.eliteIdx]) {
       this.spawnEnemy("elite");
       this.eliteIdx++;
-      this.emit({ type: "toast", text: "墓守が来る" });
+      this.emit({ type: "toast", text: "墓暴きが来る" });
     }
     this.spawnAcc += dt * (S.base_per_sec + S.per_progress * p) * (this.bossSpawned ? S.boss_phase_rate : 1);
     while (this.spawnAcc >= 1) {
@@ -358,7 +377,7 @@ export class RunSim {
       ux = mx / ml; uy = my / ml;
       h.fx = ux; h.fy = uy;
     }
-    const speed = D.player.speed * (1 + 0.08 * this.pw("swift"));
+    const speed = D.player.speed * (1 + 0.08 * this.pw("swift")) * (1 + this.mod("speed"));
     if (h.dashT > 0) {
       h.dashT -= dt;
       h.x += h.dashDx * D.player.dash_speed * dt;
@@ -377,7 +396,9 @@ export class RunSim {
         h.cds[id] = (h.cds[id] ?? 0) - dt;
         if (h.cds[id] <= 0) {
           const lv = this.weapons[id];
-          const ok = this.fireWeapon(id, lv, h.x, h.y, h.fx, h.fy, this.mightMul() * (1 + (this.wbonus[id] ?? 0)), this.areaMul(), false, !!this.evolved[id]);
+          // 無名の意地: HPが3割以下の時に与ダメージが上がる
+          const grit = this.lineage.card.id === "grit" && this.hp <= this.maxHp * 0.3 ? 1 + this.cardPower() : 1;
+          const ok = this.fireWeapon(id, lv, h.x, h.y, h.fx, h.fy, this.mightMul() * (1 + (this.wbonus[id] ?? 0)) * grit, this.areaMul(), false, !!this.evolved[id]);
           h.cds[id] = ok ? D.weapons[id].cd * this.hasteMul() * (1 - 0.06 * (lv - 1)) : 0.2;
         }
       }
@@ -426,6 +447,11 @@ export class RunSim {
         this.end("boss_cleared");
       }
       this.emit({ type: "fx", kind: "poof", x: e.x, y: e.y, dur: 0.3, color: e.def.color });
+      // 送り火: 倒した場所に小さな炎が残る
+      if (this.lineage.card.id === "okuribi" && this.lpow > 0 && this.rng.lineage.randf() < Math.min(0.6, this.cardPower())) {
+        const F = D.weapons.fire;
+        this.zones.push({ x: e.x, y: e.y, r: 45, dmg: F.damage * this.mightMul() * 0.8, life: 1.5, tick: 0, ghost: false });
+      }
     }
     compact(this.enemies, (e) => !e.dead);
     if (this.result === "") this.spawning(dt);
@@ -451,7 +477,7 @@ export class RunSim {
     compact(this.eshots, (s) => s.life > 0);
 
     const pick = D.player.pickup * (1 + 0.25 * this.pw("magnet"));
-    const xpMul = this.solo ? 1 + D.solo_xp_bonus : 1;
+    const xpMul = this.solo ? 1 + D.solo_xp_bonus * (1 + this.mod("solo_xp")) : 1;
     let picked = false;
     compact(this.gems, (g) => {
       const ox = h.x - g.x, oy = h.y - g.y;
@@ -491,8 +517,10 @@ export class RunSim {
     g.cd -= dt;
     if (g.cd <= 0) {
       const r = g.rec, s = r.stat_snapshot, wid = r.primary_weapon_id, lv = r.weapon_level;
-      const ok = this.fireWeapon(wid, lv, g.x, g.y, 1, 0, s.attack_mult * this.ghostUnlock(), s.area, true, !!r.evolved);
-      g.cd = ok ? (this.D.weapons[wid].cd / s.attack_speed) * (1 - 0.06 * (lv - 1)) : 0.25;
+      const ok = this.fireWeapon(wid, lv, g.x, g.y, 1, 0, s.attack_mult * this.ghostUnlock() * (1 + this.mod("ghost_atk")), s.area, true, !!r.evolved);
+      // 鎮魂の鐘: 亡霊の攻撃間隔が短くなる
+      const bell = this.lineage.card.id === "bell" ? Math.max(0.4, 1 - this.cardPower()) : 1;
+      g.cd = ok ? (this.D.weapons[wid].cd / s.attack_speed) * (1 - 0.06 * (lv - 1)) * bell : 0.25;
     }
   }
 
@@ -587,6 +615,8 @@ export class RunSim {
       if (lv > 0 && lv < D.passive_max_level) opts.push({ kind: "passive", id, lv });
       else if (lv === 0 && nPass < D.passive_slots && !seals.includes(id)) opts.push({ kind: "passive", id, lv: 0 });
     }
+    // 家系の札（その家系で出撃した時だけ）。パッシブの枠は使わない
+    if (this.lineageLv < this.lineage.card.max) opts.push({ kind: "lineage", id: this.lineage.card.id, lv: this.lineageLv });
     return opts;
   }
 
@@ -648,6 +678,10 @@ export class RunSim {
       const extra = R.wbonus > 0 ? `\nさらに${W.name}のダメージ +${Math.round(R.wbonus * 100)}%` : "";
       return { k: head, n: W.name, d: (lv > 0 ? weaponLevelText(c.id, to) : W.desc) + extra };
     }
+    if (c.kind === "lineage") {
+      const L = this.lineage.card;
+      return { k: c.lv > 0 ? `${this.lineage.name}の札 Lv${c.lv} → ${c.lv + 1}` : `${this.lineage.name}の札`, n: L.name, d: L.fmt.replace("{v}", String(Math.round(L.per * R.pmul))) };
+    }
     if (c.kind === "passive") {
       const P = D.passives[c.id];
       const head = c.lv > 0 ? `パッシブ Lv${c.lv} → ${c.lv + 1}` : "パッシブを追加";
@@ -669,6 +703,9 @@ export class RunSim {
         this.weapons[c.id] = Math.min(maxlv, lv + R.wlv);
         if (R.wbonus > 0) this.wbonus[c.id] = (this.wbonus[c.id] ?? 0) + R.wbonus;
       }
+    } else if (c.kind === "lineage") {
+      this.lineageLv++;
+      this.lpow += R.pmul;
     } else if (c.kind === "passive") {
       this.passives[c.id] = (this.passives[c.id] ?? 0) + 1;
       this.ppow[c.id] = this.pw(c.id) + R.pmul;
@@ -690,7 +727,8 @@ export class RunSim {
       return `${this.weaponName(id)}${id === this.mainWeapon ? "(メイン)" : ""} Lv${this.weapons[id]}${b > 0 ? ` +${Math.round(b * 100)}%` : ""}`;
     });
     const p = Object.keys(this.passives).map((id) => `${D.passives[id].name} Lv${this.passives[id]}`);
-    return `武器: ${w.join("・")}　/　パッシブ(${p.length}/${D.passive_slots}): ${p.length ? p.join("・") : "なし"}`;
+    const l = this.lineageLv > 0 ? `　/　${this.lineage.card.name} Lv${this.lineageLv}` : "";
+    return `武器: ${w.join("・")}　/　パッシブ(${p.length}/${D.passive_slots}): ${p.length ? p.join("・") : "なし"}${l}`;
   }
 
   // ---------------------------------------------------------------- save bridge
@@ -699,6 +737,7 @@ export class RunSim {
       t: this.t, hp: this.hp, max_hp: this.maxHp, level: this.level, xp: this.xp,
       weapons: { ...this.weapons }, passives: { ...this.passives }, ppow: { ...this.ppow }, wbonus: { ...this.wbonus }, evolved: { ...this.evolved },
       kills: this.kills, boss_kills: this.bossKills, boss_spawned: this.bossSpawned, elite_idx: this.eliteIdx, spawn_acc: this.spawnAcc,
+      lineage_lv: this.lineageLv, lpow: this.lpow,
     };
   }
 
@@ -717,6 +756,8 @@ export class RunSim {
     this.bossKills = c.boss_kills;
     this.eliteIdx = c.elite_idx;
     this.spawnAcc = c.spawn_acc;
+    this.lineageLv = c.lineage_lv ?? 0;
+    this.lpow = c.lpow ?? 0;
     this.lastCheckpoint = this.t;
     this.rng.advance(Math.floor(this.t * 3)); // 乱数列を経過時間ぶん進めて、同じ seed の流れに乗せる
     if (c.boss_spawned) this.spawnBoss();
@@ -728,6 +769,7 @@ export class RunSim {
       run_id: this.run_id, seed: this.seed, mode: this.mode, t: this.t, run_len: this.runLen, main_weapon: this.mainWeapon,
       weapons: { ...this.weapons }, passives: { ...this.passives }, ppow: { ...this.ppow }, wbonus: { ...this.wbonus }, evolved: { ...this.evolved },
       level: this.level, kills: this.kills, boss_kills: this.bossKills, death_cause: this.deathCause, ghost_id: this.ghostId, heirloom_id: this.heirloomId,
+      lineage_id: this.lineage.id,
     };
   }
 

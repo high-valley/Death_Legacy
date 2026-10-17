@@ -2,7 +2,7 @@
 //   亡霊の保管・入れ替え / 死亡した主人公から亡霊を作る / 供物と祭壇・書庫 / 形見 /
 //   出撃予約 → チェックポイント → ラン終了処理（冪等）
 // 亡霊と形見の状態: stored → reserved（出撃中）→ consumed / 使用済み。異常終了しても reserved のまま残り、同じランを再開できる。
-import type { Balance, RunMode, Tier } from "../data/types.ts";
+import type { Balance, Lineage, RunMode, Tier } from "../data/types.ts";
 import type { CardMods, GhostRecord, Heirloom, HeirOption, RunRecord, RunResult, SaveData, Snapshot, Summary } from "./records.ts";
 import type { SaveRepository } from "./saveRepository.ts";
 
@@ -69,9 +69,11 @@ export class MetaService {
     }
     this.S.ghost_seq += 1;
     const pp = sm.ppow;
+    const lin = this.lineage(sm.lineage_id);
+    const house = lin.id === this.D.lineages[0].id ? "" : `${lin.name}・`;
     return {
       ghost_id: uuid(), origin_run_id: sm.run_id, created_at: now(),
-      display_name: `第${this.S.ghost_seq}代・${this.D.weapons[wid].name}の${tr.name}`,
+      display_name: `第${this.S.ghost_seq}代・${house}${this.D.weapons[wid].name}の${tr.name}`,
       survival_seconds: Math.floor(sm.t), run_length: Math.floor(sm.run_len), tier_id: tr.id,
       primary_weapon_id: wid, weapon_level: wlv, evolved: !!sm.evolved[wid],
       passive_id: pid, passive_level: pid ? sm.passives[pid] ?? 0 : 0,
@@ -81,7 +83,7 @@ export class MetaService {
         attack_speed: 1 + 0.1 * (pp.haste ?? 0),
         area: 1 + 0.12 * (pp.area ?? 0),
       },
-      data_version: this.D.data_version, status: "stored",
+      data_version: this.D.data_version, lineage_id: lin.id, status: "stored",
     };
   }
 
@@ -209,10 +211,45 @@ export class MetaService {
     return true;
   }
 
+  // ================================================================ lineages
+  lineage(id: string): Lineage {
+    return this.D.lineages.find((l) => l.id === id) ?? this.D.lineages[0];
+  }
+
+  lineageUnlocked(id: string): boolean {
+    return this.D.lineages[0].id === id || this.S.lineages.includes(id);
+  }
+
+  /** 解放条件の進み具合（解放済み・条件なしは null） */
+  unlockProgress(l: Lineage): { cur: number; need: number } | null {
+    const u = l.unlock;
+    if (!u) return null;
+    const p = this.S.progress;
+    if (u.type === "weapon_level") return { cur: Math.min(u.level, p.best_weapon_level[u.weapon] ?? 0), need: u.level };
+    return { cur: Math.min(u.count, p.companion_runs), need: u.count };
+  }
+
+  /** 条件を満たした家系を解放し、新しく解放した id を返す */
+  private checkUnlocks(): string[] {
+    const out: string[] = [];
+    for (const l of this.D.lineages) {
+      if (this.lineageUnlocked(l.id)) continue;
+      const pr = this.unlockProgress(l);
+      if (pr && pr.cur >= pr.need) {
+        this.S.lineages.push(l.id);
+        out.push(l.id);
+      }
+    }
+    return out;
+  }
+
   // ================================================================ sortie / settlement
   /** 出撃確定の瞬間に保存。亡霊・形見は reserved になり、異常終了しても複製されない */
-  reserve(runId: string, seed: number, mode: RunMode, weapon: string, ghostId: string, heirId: string): boolean {
+  reserve(runId: string, seed: number, mode: RunMode, weapon: string, ghostId: string, heirId: string, lineageId = "nameless"): boolean {
     if (this.S.active_run) return false;
+    if (!this.lineageUnlocked(lineageId)) return false; // 未解放の家系では出撃できない
+    const lin = this.lineage(lineageId);
+    if (lin.weapon) weapon = lin.weapon;
     let g: GhostRecord | null = null, h: Heirloom | null = null;
     if (ghostId) {
       g = this.getGhost(ghostId);
@@ -224,7 +261,7 @@ export class MetaService {
     }
     if (g) { g.status = "reserved"; g.reserved_by_run = runId; }
     if (h) { h.status = "reserved"; h.reserved_by_run = runId; }
-    this.S.active_run = { run_id: runId, seed, mode, weapon, ghost_id: ghostId, heirloom_id: heirId, started_at: now(), checkpoint: null };
+    this.S.active_run = { run_id: runId, seed, mode, weapon, ghost_id: ghostId, heirloom_id: heirId, lineage_id: lin.id, started_at: now(), checkpoint: null };
     this.repo.write();
     return true;
   }
@@ -245,7 +282,7 @@ export class MetaService {
       run_id: sm.run_id, seed: sm.seed, mode: sm.mode, duration_seconds: Math.floor(sm.t), result: res,
       selected_ghost_id: sm.ghost_id, player_build: { weapons: sm.weapons, passives: sm.passives }, player_level: sm.level,
       kills: sm.kills, boss_kills: sm.boss_kills, ended_at: ended, consumed_ghost: "", new_ghost_id: "", new_ghost_pending: false,
-      used_heirloom: "", offerings: 0, generation: 0,
+      used_heirloom: "", offerings: 0, generation: 0, lineage_id: sm.lineage_id, unlocked_lineages: [],
     };
     // ① 同行亡霊は結果にかかわらず消費
     if (sm.ghost_id) {
@@ -273,6 +310,10 @@ export class MetaService {
     }
     if (res === "boss_cleared") s.progress.clears += 1;
     s.progress.runs += 1;
+    // 家系の解放条件の記録 → 解放判定
+    if (sm.ghost_id) s.progress.companion_runs += 1;
+    for (const id in sm.weapons) s.progress.best_weapon_level[id] = Math.max(s.progress.best_weapon_level[id] ?? 0, sm.weapons[id]);
+    out.unlocked_lineages = this.checkUnlocks();
     // ③ 世代交代: 供物・形見の候補・世代数
     const of = D.offerings;
     const frac = Math.min(1, sm.t / sm.run_len);
@@ -322,7 +363,7 @@ export class MetaService {
       run_id: ar.run_id, seed: ar.seed, mode: ar.mode, t: cp?.t ?? 0, run_len: this.D.run_length[ar.mode],
       main_weapon: ar.weapon, weapons: cp?.weapons ?? { [ar.weapon]: 1 }, passives: cp?.passives ?? {}, ppow: cp?.ppow ?? {},
       wbonus: cp?.wbonus ?? {}, evolved: cp?.evolved ?? {}, level: cp?.level ?? 1, kills: cp?.kills ?? 0,
-      boss_kills: 0, death_cause: "", ghost_id: ar.ghost_id, heirloom_id: ar.heirloom_id ?? "",
+      boss_kills: 0, death_cause: "", ghost_id: ar.ghost_id, heirloom_id: ar.heirloom_id ?? "", lineage_id: ar.lineage_id ?? "nameless",
     };
     return this.settle(sm, "retired");
   }

@@ -20,8 +20,12 @@
 - 供物と祭壇・書庫（t_offerings_once, t_alloc_limits, t_seal_excludes, t_affinity_raises_rate）
 - 形見（t_heirloom_flow, t_heirloom_crash_resume, t_shelf_capacity）
 
+### フェーズ2（家系の解放）
+- 無名（最初から）/ 火守（炎魔法をLv5まで育てる）/ 墓守（亡霊を連れて出撃したランを3回終える）
+- 特性・弱点・専用カード（`tests/lineage.test.ts`）。数値は `data/balance.json` の `lineages`
+- 画面のつくり直し（納骨堂の2段組・位牌パネル・戦闘HUD）
+
 ## 次
-- **フェーズ2**: 家系の解放（無名・火守・墓守）
 - **フェーズ3**: 亡霊の3択（連れていく / 喰らう / 弔う）と穢れ・怨霊
 - 拠点（納骨堂）の施設の発展
 - 難度調整（人のプレイ感想を元に `data/balance.json` で）
