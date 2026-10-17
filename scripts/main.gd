@@ -86,6 +86,8 @@ func _web_bench() -> void:
 	if not Platform.is_web:
 		return
 	var q: Variant = JavaScriptBridge.eval("location.search", true)
+	if q is String and "fps" in q:
+		Settings.debug_hud = true   # ?fps: 普段のプレイ中に FPS などを表示（スマホでの確認用）
 	if not (q is String and "bench" in q):
 		return
 	_start_load_test()
