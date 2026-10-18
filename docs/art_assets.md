@@ -18,6 +18,19 @@
 | `ground.webp` | 512×512・**継ぎ目なし** | 戦闘の地面（敷き詰め） | 真上から見た石畳や墓地の土。暗く、模様は控えめ（敵が見えにくくならないように） |
 | `portrait_<武器>_1.webp` | 400×480（5:6） | **主人公の絵**（出撃準備で武器＝主人公を選ぶ・戦闘中の左上） | 胸から上の人物画。武器ごとに1人。亡霊には人の絵を使わない（霊光と紋で表す） |
 
+## 戦闘中のキャラの絵（スプライト）
+透過PNG（背景なし）・全身・右向き。サイズはばらばらでよい（こちらで縮小する）。無い絵は丸や図形の仮表示のまま。
+| ファイル名 | 内容 |
+|---|---|
+| `sprite_hero_<武器>.png` | 主人公7人（sword / bow / spear / axe / fire / ice / thunder）。肖像と同じ人物 |
+| `sprite_ghost.png` | 亡霊（共通1枚）。半透明・等級の色の光は画面側で付ける |
+| `sprite_enemy_chaser.png` | 亡者（ゆっくり追ってくる雑魚） |
+| `sprite_enemy_charger.png` | 突進鬼（突っ込んでくる） |
+| `sprite_enemy_shooter.png` | 呪術師（弾を撃つ） |
+| `sprite_enemy_elite.png` | 墓暴き（大きめの精鋭） |
+| `sprite_enemy_wraith.png` | 怨霊 |
+| `sprite_enemy_boss.png` | 冥王（ボス） |
+
 ## 肖像の名前の付け方
 - `<武器>` は `sword`（剣）/ `bow`（弓）/ `fire`（炎の魔導書）/ `ice`（氷の魔導書）/ `thunder`（雷の魔導書）/ `spear`（槍）/ `axe`（斧）
 - 例: `portrait_sword_1.webp`, `portrait_sword_2.webp`, `portrait_bow_1.webp` …

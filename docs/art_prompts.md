@@ -224,3 +224,33 @@ Modest, practical clothing that fully covers the chest.
 3. 戦闘の地面
 4. 納骨堂の背景
 5. リザルト背景2枚・ロゴ
+
+
+---
+
+## 戦闘中のキャラ（スプライト）
+**1人ずつ新しいチャット**で、見本の画面イメージと（主人公は）その人物の肖像を添付してから貼る。
+### 共通（毎回の先頭）
+```
+透過PNG（背景なし）で、ゲーム用のキャラクター素材を1体だけ作ってください。
+
+2D game character sprite for a top-down action game, anime dark fantasy style, clean bold outlines, rich colors.
+Full body, three-quarter top-down view, facing right, standing in a dynamic idle pose, slightly chibi proportions (about 3 heads tall).
+Transparent background, single character only, no ground, no shadow, no text, no frame, centered with a little margin.
+```
+### 主人公（添付した肖像と同じ人物に）
+- `sprite_hero_sword`: `The red-haired swordswoman from the attached portrait, holding a longsword.`
+- `sprite_hero_bow`: `The freckled red-haired huntress from the attached portrait, holding a shortbow.`
+- `sprite_hero_fire`: `The dark-skinned sorceress with gold-beaded braids from the attached portrait, holding a glowing red grimoire.`
+- `sprite_hero_ice`: `The silver-haired sorceress from the attached portrait, holding a frosty blue grimoire.`
+- `sprite_hero_thunder`: `The violet-haired male mage from the attached portrait, holding a grimoire crackling with purple lightning.`
+- `sprite_hero_spear`: `The blond knight with a winged silver helm from the attached portrait, holding a tall spear.`
+- `sprite_hero_axe`: `The red-bearded warrior from the attached portrait, holding a double-bladed axe.`
+### 亡霊・敵
+- `sprite_ghost`: `A translucent pale-cyan ghost knight spirit, faceless glowing eyes, tattered spectral cloak fading into wisps at the bottom.`
+- `sprite_enemy_chaser`: `A shambling undead corpse in rotten rags, grey-green skin, hunched, arms reaching forward.`
+- `sprite_enemy_charger`: `A muscular horned demon brute with dark red skin, lowering its head ready to charge.`
+- `sprite_enemy_shooter`: `A hooded cultist sorcerer in purple robes holding a bone staff with a glowing violet orb.`
+- `sprite_enemy_elite`: `A huge grave robber ogre with a rusty shovel and a lantern, patched leather, olive-yellow tones.`
+- `sprite_enemy_wraith`: `A screaming violet wraith, skeletal face, long claws, body of torn shadowy cloth.`
+- `sprite_enemy_boss`: `The Lord of the Underworld: a towering armored lich king with a crimson crown, glowing red eyes, flowing black cape, holding a great scythe.`

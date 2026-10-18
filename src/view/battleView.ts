@@ -100,10 +100,21 @@ export class BattleView {
     for (const gm of sim.gems) if (vis(gm.x, gm.y, 4)) ctx.rect(gm.x - 3, gm.y - 3, 6, 6);
     ctx.fill();
 
-    // 敵: 色ごとに並べて描く（塗り色の切り替えを減らす。重なりの多い大きな1図形にするとかえって遅い）
+    // 敵: 絵（art/sprite_enemy_<種類>）があれば絵、無ければ色ごとに並べて丸を描く
     for (const b of this.buckets.values()) b.length = 0;
     for (const e of sim.enemies) {
       if (!vis(e.x, e.y, e.r)) continue;
+      const im = this.sprite(`sprite_enemy_${e.kind}`);
+      if (im) {
+        this.drawSprite(ctx, im, e.x, e.y, e.r * 2.7, h.x < e.x);
+        if (e.flash > 0 || e.freezeT > 0 || e.slowT > 0) {
+          ctx.globalAlpha = e.flash > 0 ? 0.55 : 0.35;
+          ctx.fillStyle = e.flash > 0 ? "#ffffff" : "#9fdcff";
+          ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        continue;
+      }
       const col = e.flash > 0 ? "#ffffff" : e.freezeT > 0 ? "#cdeeff" : e.slowT > 0 ? "#7fb2cf" : e.def.color;
       let b = this.buckets.get(col);
       if (!b) { b = []; this.buckets.set(col, b); }
@@ -141,13 +152,21 @@ export class BattleView {
     }
 
     for (const g of sim.ghosts) this.drawGhost(ctx, sim, g);
-    // 主人公
+    // 主人公（art/sprite_hero_<武器> があれば絵。左右の向きは移動方向で反転）
     const blink = h.iframe > 0 && Math.floor(sim.t * 30) % 2 === 0;
     ctx.globalAlpha = blink ? 0.4 : 1;
-    ctx.fillStyle = h.flash > 0 ? "#ffffff" : C.bone;
-    ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, 7); ctx.fill();
-    ctx.fillStyle = C.candle;
-    ctx.beginPath(); ctx.arc(h.x + h.fx * 6, h.y + h.fy * 6, 3.5, 0, 7); ctx.fill();
+    const him = this.sprite(`sprite_hero_${sim.mainWeapon}`);
+    if (Math.abs(h.fx) > 0.2) this.heroLeft = h.fx < 0;
+    if (him) {
+      ctx.fillStyle = "rgba(0,0,0,.35)";
+      ctx.beginPath(); ctx.ellipse(h.x, h.y + h.r * 1.1, h.r * 1.2, h.r * 0.45, 0, 0, 7); ctx.fill();
+      this.drawSprite(ctx, him, h.x, h.y - h.r * 0.6, h.r * 4.2, this.heroLeft);
+    } else {
+      ctx.fillStyle = h.flash > 0 ? "#ffffff" : C.bone;
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, 7); ctx.fill();
+      ctx.fillStyle = C.candle;
+      ctx.beginPath(); ctx.arc(h.x + h.fx * 6, h.y + h.fy * 6, 3.5, 0, 7); ctx.fill();
+    }
     ctx.globalAlpha = 1;
 
     // 矢
@@ -280,8 +299,40 @@ export class BattleView {
     ctx.fill();
   }
 
+  private sprites = new Map<string, string | null>();
+  private heroLeft = false;
+
+  /** art/ の絵（読み込み前・無い時は null） */
+  private sprite(key: string): HTMLImageElement | null {
+    let src = this.sprites.get(key);
+    if (src === undefined) { src = Art.file(key); this.sprites.set(key, src); }
+    return src ? Art.image(src) : null;
+  }
+
+  /** 縦横比を保って、高さ size で中央に描く。flip で左右反転 */
+  private drawSprite(ctx: CanvasRenderingContext2D, im: HTMLImageElement, x: number, y: number, size: number, flip: boolean): void {
+    const w = (size * im.naturalWidth) / im.naturalHeight;
+    if (flip) {
+      ctx.save(); ctx.translate(x, y); ctx.scale(-1, 1);
+      ctx.drawImage(im, -w / 2, -size / 2, w, size);
+      ctx.restore();
+    } else {
+      ctx.drawImage(im, x - w / 2, y - size / 2, w, size);
+    }
+  }
+
   private drawGhost(ctx: CanvasRenderingContext2D, sim: RunSim, g: Companion): void {
     const tier = sim.D.tiers.find((t) => t.id === g.rec.tier_id) ?? sim.D.tiers[0];
+    const gim = this.sprite(`sprite_ghost_${g.rec.primary_weapon_id}`) ?? this.sprite("sprite_ghost");
+    if (gim) {
+      // 亡霊は半透明に、等級の色の光をまとわせる
+      ctx.save();
+      ctx.globalAlpha = 0.55 + 0.3 * sim.ghostUnlock();
+      ctx.shadowColor = tier.color; ctx.shadowBlur = 14;
+      this.drawSprite(ctx, gim, g.x, g.y - 6, 40 + Math.sin(g.phase * 2) * 1.5, sim.hero.x < g.x);
+      ctx.restore();
+      return;
+    }
     ctx.globalAlpha = 0.45 + 0.25 * sim.ghostUnlock();
     ctx.fillStyle = "#d9fff8";
     ctx.beginPath();
