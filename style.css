@@ -456,3 +456,9 @@ kbd { display: inline-block; min-width: 24px; padding: 1px 6px; border: 1px soli
 @media (max-width: 720px) { .res-grid { grid-template-columns: 1fr; } .fate-row { grid-template-columns: auto 1fr; } .res-buttons button { flex: 1; min-width: 0; } }
 @media (max-height: 520px) { .res-head h1 { font-size: 40px; } .res-stats dt, .res-stats dd { padding: 4px; } .res-stats dd { font-size: 15px; } }
 @media (max-width: 480px) { .ghost-row { grid-template-columns: 56px minmax(0, 1fr); } .ghost-row .chip { display: none; } .portrait { width: 56px; height: 66px; } .hub-head .purses { margin-left: 0; } }
+
+/* 背景の絵がある画面は、板を少し透かして絵を見せる */
+.ov-hub .backdrop, .ov-result .backdrop { opacity: .6; }
+.ov-hub .backdrop::after, .ov-result .backdrop::after { background: radial-gradient(ellipse at 50% 40%, rgba(7,9,12,.15), rgba(7,9,12,.75)); }
+.hub-panel, .result-panel { background: linear-gradient(180deg, rgba(20,25,32,.62), rgba(10,13,18,.72)); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+.hub-panel .frame, .result-panel .frame { background: linear-gradient(180deg, rgba(20,25,32,.86), rgba(11,14,19,.9)); }
