@@ -84,6 +84,25 @@ Same art style and lighting for every portrait in this series.
 ```
 等級（残響〜伝説の英霊）の色の枠と光は画面側で付けるので、人物の色は自由でよい。
 
+### 顔を描き分けるコツ（女性キャラが同じ顔になる時）
+- **1人ごとに新しいチャット**で作り、毎回スタイルの見本画像を添付する（同じチャットだと前の顔を引き継ぎやすい）
+- 下の「女性キャラの描き分け」から1つ選び、人物プロンプトの後ろにつける。年齢・顔の形・目の形・肌の色・表情・髪型を**具体的に**変えるのが効く
+- 「前の人物とは顔立ちをまったく変えて」と日本語で添えるのもよい
+
+**描き分けの指定（例）**
+```
+Give her a clearly distinct face, not the default anime heroine face:
+[タイプの説明をここに入れる]
+Modest, practical clothing that fully covers the chest.
+```
+| タイプ | 入れる説明 |
+|---|---|
+| 元気な狩人 | late teens, round face, freckles, sun-tanned skin, big bright green eyes, short messy auburn hair in a small ponytail, wide confident grin |
+| 気高い年長者 | woman in her mid-30s, long oval face with high cheekbones, deep brown skin, narrow heavy-lidded amber eyes, black hair in many thin braids with gold beads, calm knowing smile |
+| 歴戦の老魔女 | elderly woman around 65, wrinkles and laugh lines, sharp pale grey eyes, thin lips, white hair tied in a tight bun, stern but kind expression |
+| 無骨な女傭兵 | woman around 30, square jaw, broad shoulders, a scar across the eyebrow, very short undercut dark hair, small fierce eyes, serious frown |
+| 物静かな東方の剣士 | woman in her late 20s, slim face, monolid dark eyes, straight black hair in a high ponytail, light olive skin, composed neutral expression |
+
 ### 剣（sword）
 - `portrait_sword_1`
   ```
@@ -107,6 +126,12 @@ Same art style and lighting for every portrait in this series.
   A calm young woman archer with long silver hair and violet eyes, dark blue hooded cloak with silver embroidery,
   holding a slender longbow, moonlight on her face.
   ```
+- `portrait_bow_3`（描き分け版・元気な狩人）
+  ```
+  A young huntress archer, late teens, round face with freckles, sun-tanned skin, big bright green eyes,
+  short messy auburn hair in a small ponytail, wide confident grin, practical brown leather hood and jerkin,
+  a shortbow over her shoulder and a quiver of feathered arrows. Modest, practical clothing that fully covers the chest.
+  ```
 - `portrait_bow_2`
   ```
   A young male archer with messy dark green hair, grey-green leather armor, a quiver of faintly glowing arrows over the shoulder,
@@ -114,10 +139,12 @@ Same art style and lighting for every portrait in this series.
   ```
 
 ### 炎の魔導書（fire）
-- `portrait_fire_1`
+- `portrait_fire_1`（描き分け版・気高い年長者）
   ```
-  A young sorceress with long black hair streaked with crimson and a thin gold circlet, black and crimson robes with gold embroidery,
-  holding an open ancient grimoire in one hand; glowing red runes and small flames rise from its pages and light her face.
+  A sorceress in her mid-30s with a long oval face and high cheekbones, deep brown skin, narrow heavy-lidded amber eyes,
+  black hair in many thin braids with gold beads, a calm knowing smile, high-collared black and crimson robes with gold embroidery,
+  holding an open ancient grimoire; glowing red runes and small flames rise from its pages and light her face.
+  Modest clothing that fully covers the chest.
   ```
 - `portrait_fire_2`
   ```
@@ -131,6 +158,11 @@ Same art style and lighting for every portrait in this series.
   A calm young sorceress with long silver-white hair and pale blue eyes, white and deep blue robes with silver embroidery,
   an open grimoire in her hands with frost spreading from its pages, small ice crystals and snowflakes floating around her.
   ```
+- `portrait_ice_3`（描き分け版・歴戦の老魔女）
+  ```
+  An elderly frost witch around 65, wrinkles and laugh lines, sharp pale grey eyes, thin lips, white hair tied in a tight bun,
+  stern but kind expression, heavy deep blue robes with a fur collar, frost spreading from an open grimoire in her gloved hands.
+  ```
 - `portrait_ice_2`
   ```
   A pale young scholar with short silver hair and round glasses, high-collared dark navy coat with frost on the shoulders,
@@ -142,6 +174,12 @@ Same art style and lighting for every portrait in this series.
   ```
   A confident young woman mage with short violet hair and golden eyes, dark purple coat with silver buckles,
   a grimoire open in one hand with crackling violet lightning arcing between its pages and her fingertips.
+  ```
+- `portrait_thunder_3`（描き分け版・無骨な女傭兵）
+  ```
+  A battle mage woman around 30 with a square jaw, broad shoulders and a scar across her eyebrow, very short dark undercut hair,
+  small fierce yellow eyes, serious frown, worn black leather coat with steel pauldrons,
+  a battered grimoire chained to her belt with violet lightning crackling from it. Modest, practical clothing.
   ```
 - `portrait_thunder_2`
   ```
