@@ -170,10 +170,13 @@ Modest, practical clothing that fully covers the chest.
   ```
 
 ### 雷の魔導書（thunder）
-- `portrait_thunder_1`
+- `portrait_thunder_1`（男性）
   ```
-  A confident young woman mage with short violet hair and golden eyes, dark purple coat with silver buckles,
-  a grimoire open in one hand with crackling violet lightning arcing between its pages and her fingertips.
+  A sharp-featured young man around 25 with an angular face and thin straight eyebrows, light olive skin,
+  piercing golden eyes, messy medium-length violet hair falling over one eye, a faint confident smirk,
+  high-collared dark purple coat with silver buckles and a short cape,
+  an open grimoire in one hand with crackling violet lightning arcing from its pages to his fingertips.
+  Masculine face and build, clearly male.
   ```
 - `portrait_thunder_3`（描き分け版・無骨な女傭兵）
   ```
