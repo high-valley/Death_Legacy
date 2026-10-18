@@ -40,18 +40,39 @@ export class World {
     return new RunSim(D, this.meta.runOpts(this.repo.data.active_run!));
   }
 
-  die(r: RunSim | null, at = -1): RunRecord {
+  /** 死亡して終了。frags を省略すると、亡霊になれるだけの未練の欠片を持って死ぬ */
+  die(r: RunSim | null, at = -1, frags = -1): RunRecord {
     if (!r) throw new Error("出撃できていない");
     if (at >= 0) r.t = at;
+    r.fragments = frags >= 0 ? frags : Math.max(r.fragments, D.ghost_birth.fragments);
     r.hp = 0;
     r.end("player_death");
     return this.meta.settle(r.summary(), "player_death")!;
   }
 }
 
+/** 簡易ボットのカード選び: 武器 → ビルドに合うタグのパッシブ → 攻撃系 → その他（人の選び方に近づける） */
+export function botPick(r: RunSim): ReturnType<RunSim["rollChoices"]>[number] {
+  const cs = r.rollChoices();
+  const pts = r.tagPoints();
+  const score = (c: (typeof cs)[number]): number => {
+    if (c.kind === "weapon") return 100 + (c.rar === "LR" ? 50 : 0);
+    if (c.kind === "sigil") return 70;
+    if (c.kind === "passive") {
+      const t = D.passives[c.id].tag;
+      if (t && (pts[t] ?? 0) > 0) return 60 + (c.lv > 0 ? 5 : 0);
+      if (["might", "haste", "area", "vigor"].includes(c.id)) return 50;
+      return t ? 10 : 30;
+    }
+    if (c.kind === "lineage") return 40;
+    return 0;
+  };
+  return cs.slice().sort((a, b) => score(b) - score(a))[0];
+}
+
 /** 簡易ボット: 近い敵から逃げ、弾をよけ、経験値を拾う */
 export function botStep(r: RunSim): void {
-  if (r.pending > 0) r.applyChoice(r.rollChoices()[0]);
+  if (r.pending > 0) r.applyChoice(botPick(r));
   const h = r.hero;
   let mx = 0, my = 0;
   const norm = (x: number, y: number): [number, number] => { const l = Math.hypot(x, y) || 1; return [x / l, y / l]; };

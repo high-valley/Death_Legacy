@@ -3,6 +3,7 @@
 export interface Tier { id: string; name: string; from: number; mult: number; rank: string; color: string }
 /** 武器の段階（グレード）。lv 以上で持ち替え、evo はレジェンドレアで進化した最終段階。数値は武器の基本値への倍率 */
 export interface WeaponGrade {
+  branch?: "a" | "b";  // Lv3 で選ぶ道
   lv?: number; evo?: boolean; name: string; desc: string; cd: number; dmg: number;
   range?: number; arc?: number; dirs?: number; count?: number; pierce?: number; speed?: number;
   radius?: number; burn?: number; length?: number; width?: number; size?: number;
@@ -10,12 +11,18 @@ export interface WeaponGrade {
   chain?: number;    // 雷: 1筋で当たる敵の数
 }
 export interface Weapon {
-  name: string; desc: string; cd: number; damage: number; per_level: number; grades: WeaponGrade[];
+  name: string; desc: string; cd: number; damage: number; per_level: number; grades: WeaponGrade[]; tags: string[];
   range?: number; speed?: number; radius?: number; burn?: number; tick?: number; length?: number; width?: number; size?: number;
   slow?: number; slow_time?: number;   // 氷: 移動速度の倍率と時間
   jump?: number;                       // 雷: 飛び移れる距離
 }
-export interface Passive { name: string; per: number; fmt: string }
+export interface Passive { name: string; per: number; fmt: string; tag?: string }
+
+/** タグ（属性）とセット効果。mods はそのタグの武器（霊は亡霊）にかかる */
+export interface TagSet { at: number; text: string; mods: Record<string, number> }
+export interface TagDef { name: string; color: string; sets: TagSet[] }
+export interface Sigil { id: string; tier: number; name: string; desc: string; need?: string }
+export interface Curse { id: string; name: string; desc: string; mods: Record<string, number> }
 export interface Rarity { id: RarityId; name: string; weight: number; color: string; wlv: number; wbonus: number; pmul: number; evolve?: boolean }
 export type RarityId = "N" | "R" | "SR" | "UR" | "LR";
 export interface EnemyDef {
@@ -43,6 +50,7 @@ export interface Lineage {
 /** 祭壇の樹の節。effect の値は開いた節の分だけ足し合わせる */
 export interface TreeEffect {
   altar?: number; affinity_pts?: number; seal_slots?: number; ghost_atk?: number;
+  ghost_slots?: number; sigil_tier?: number; curses?: number;
   devour_bonus?: number; taint_resist?: number; mourn_bonus?: number;
 }
 export interface TreeNode {
@@ -63,7 +71,7 @@ export interface Balance {
   solo_xp_bonus: number;
   tiers: Tier[];
   ghost_unlock: [number, number][];
-  player: { hp: number; speed: number; radius: number; dash_speed: number; dash_time: number; dash_cd: number; hit_iframe: number; pickup: number };
+  player: { weapon_mult: number; hp: number; speed: number; radius: number; dash_speed: number; dash_time: number; dash_cd: number; hit_iframe: number; pickup: number };
   xp: { base: number; per_level: number };
   weapons: Record<string, Weapon>;
   weapon_max_level: number;
@@ -87,6 +95,14 @@ export interface Balance {
   };
   checkpoint_interval: number;
   lineages: Lineage[];
+  tags: Record<string, TagDef>;
+  tag_points: { hero_weapon: number; ghost_weapon: number; ghost_spirit: number; passive_level: number };
+  sigils: Sigil[];
+  sigil_chance: number;
+  curses: Curse[];
+  curse_chance: number;
+  ghost_slots: { base: number; max: number };
+  ghost_birth: { fragments: number; min_survival: number; drops: Record<string, number> };
 }
 
 export type RunMode = "full" | "short";

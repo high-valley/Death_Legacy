@@ -259,11 +259,11 @@ class Game {
     s.showDamage = true;
     this.endTimer = 1.3;
     this.setState("play");
-    if (s.ghost) {
-      this.hud.toast(`${s.ghost.rec.display_name}が付き従う`);
+    if (s.ghosts.length) {
+      this.hud.toast(s.ghosts.length > 1 ? "2体の亡霊が付き従う" : `${s.ghosts[0].rec.display_name}が付き従う`);
       this.sfx.play("ghost");
-    } else if (s.devour) {
-      this.hud.toast(`${s.devour.rec.display_name}を喰らった`);
+    } else if (s.devours.length) {
+      this.hud.toast(`${s.devours[0].rec.display_name}を喰らった`);
       this.sfx.play("ghost");
     }
   }
@@ -271,12 +271,12 @@ class Game {
   private sortie(r: SortieRequest): void {
     const rid = uuid();
     // 出撃確定の瞬間に予約を保存（亡霊・形見は reserved）
-    if (!this.meta.reserve(rid, r.seed, r.mode, r.weapon, r.ghostId, r.heirId, r.lineage, r.ghostMode)) {
+    if (!this.meta.reserve(rid, r.seed, r.mode, r.weapon, r.ghosts, r.heirId, r.lineage)) {
       this.toHub();
       return;
     }
     const s = new RunSim(this.D, this.meta.runOpts(this.meta.S.active_run!));
-    this.menus.hub.ghost = "";
+    this.menus.hub.ghosts = [];
     this.menus.hub.heir = "";
     if (r.heirId) this.hud.toast("形見を身につけた");
     this.begin(s);
@@ -377,15 +377,17 @@ class Game {
   /** ?demo: 見本データ（亡霊3体・怨霊1体・形見・供物・樹）。本物のセーブとは別の場所に作る */
   private seedDemo(): void {
     this.repo.wipe();
-    const ws = ["bow", "fire", "sword", "bow"];
-    for (let k = 0; k < 4; k++) {
+    const ws = ["bow", "fire", "ice", "sword", "bow"];
+    for (let k = 0; k < 5; k++) {
       const rid = uuid();
       this.meta.reserve(rid, k, "short", ws[k], "", "");
       const r = new RunSim(this.D, { run_id: rid, seed: k, mode: "short", weapon: ws[k] });
-      r.t = [100, 150, 172, 120][k];
+      r.t = [100, 150, 172, 120, 110][k];
       r.weapons[r.mainWeapon] = 4;
+      r.branch[r.mainWeapon] = k % 2 ? "b" : "a";
       r.passives = { haste: 2 };
       r.ppow = { haste: 3 };
+      r.fragments = 2;
       r.kills = 300 + k * 200;
       r.hp = 0;
       r.end("player_death");
@@ -394,9 +396,9 @@ class Game {
     }
     const d = this.repo.data;
     d.ghosts[d.ghosts.length - 1].status = "wraith";   // 喰らわれて怨霊になった例
-    d.offerings.earned += 12;
+    d.offerings.earned += 24;
     d.progress.total_survival += 300;
-    d.tree = ["rar1", "aff1", "soul1"];
+    d.tree = ["rar1", "aff1", "soul1", "soul2", "twin", "lore1"];   // 見本: 亡霊2体・刻印の書架まで開いた状態
     d.alloc = { affinity: { fire: 2 }, seals: [] };
     this.repo.data.lineages = ["nameless", "firekeeper"];
     this.repo.data.progress.companion_runs = 1;

@@ -4,7 +4,7 @@
 // ブラウザでは localStorage、テストではメモリ、将来の Steam 版（Electron）ではファイルに差し替える。
 import type { SaveData } from "./records.ts";
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** localStorage と同じ形の保存先 */
 export interface KV {
@@ -54,7 +54,12 @@ export function migrate(d: SaveData): SaveData {
   }
   if (!Array.isArray(d.lineages) || d.lineages.length === 0) d.lineages = ["nameless"];
   if (d.active_run && !d.active_run.lineage_id) d.active_run.lineage_id = "nameless";
-  if (d.active_run && !d.active_run.ghost_mode) d.active_run.ghost_mode = "bring";
+  // v2 → v3: 出撃中の亡霊を ghosts 配列に（亡霊は消費しない仕様に変わった。すでに消費済みのものはそのまま）
+  if (d.active_run && !Array.isArray(d.active_run.ghosts)) {
+    const old = d.active_run as unknown as { ghost_id?: string; ghost_mode?: "bring" | "devour" };
+    d.active_run.ghosts = old.ghost_id ? [{ id: old.ghost_id, mode: old.ghost_mode ?? "bring" }] : [];
+    delete old.ghost_id; delete old.ghost_mode;
+  }
   if (!Array.isArray(d.tree)) d.tree = [];
   d.schema_version = SCHEMA_VERSION;
   return d;

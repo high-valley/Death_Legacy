@@ -480,3 +480,30 @@ kbd { display: inline-block; min-width: 24px; padding: 1px 6px; border: 1px soli
 @media (max-height: 520px) { .heroes { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 6px; } .hero-card .hn { font-size: 11px; } }
 /* 亡霊の紋は少し透かして霊らしく */
 .portrait.spirit .ph { opacity: .85; animation: none; }
+
+/* タグ（属性）の小さな札 */
+.tag { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border: 1px solid color-mix(in srgb, var(--tg) 60%, transparent); border-radius: 3px;
+  font: 600 11px var(--f-serif); color: var(--tg); background: color-mix(in srgb, var(--tg) 10%, #0b0e12); white-space: nowrap; }
+.tag b { font-weight: 700; color: var(--bone); }
+.sets { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 12px; color: var(--bone); }
+.sets li { display: flex; gap: 8px; align-items: center; }
+.resonance .row { gap: 6px; }
+.build-side .tags { gap: 4px; }
+.build-side .sets { font-size: 11px; }
+.build-list li.g .icon { color: var(--soul); border-color: rgba(127,227,220,.5); }
+.build-list li.s .icon { color: var(--soul); }
+.build-list li.c .icon { color: var(--blood); }
+
+/* 連れていく亡霊（最大2体） */
+.party { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.party .chosen { margin-bottom: 0; }
+.party .seg.rites { margin: 4px 0 0; }
+.party .seg.rites button { padding: 4px 10px; min-height: 32px; font-size: 13px; }
+
+/* レベルアップ: タグ・分岐・刻印・呪い */
+.lv-card .ctag { position: absolute; right: 10px; top: 8px; }
+.lv-card.branch-card { box-shadow: inset 0 0 0 1px rgba(0,0,0,.6), inset 0 0 0 4px rgba(240,210,140,.18), 0 0 22px rgba(240,210,140,.15); }
+.lv-card.sigil-card { background: linear-gradient(180deg, #123030 0%, #0d1015 60%); }
+.lv-card.curse-card { background: linear-gradient(180deg, #3a1214 0%, #0d1015 60%); }
+.lv-card.curse-card .d { color: #f0c4c5; }
+@media (max-height: 520px) { .party { grid-template-columns: 1fr 1fr; } .party .chosen .small { display: none; } .party .chosen { gap: 8px; padding: 8px; } }

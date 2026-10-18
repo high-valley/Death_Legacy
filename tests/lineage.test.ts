@@ -42,13 +42,13 @@ test("火守: 魔導書を最大Lvまで育てると解放され、魔導書固�
 test("墓守: 亡霊を連れたランを3回終えると解放。亡霊の解放が1段階早く、単独の経験値ボーナスがない", () => {
   const w = new World();
   for (let i = 0; i < 4; i++) {
-    w.die(w.sortie("", "", "short", "sword", 10 + i), 40);
+    w.die(w.sortie("", "", "short", "sword", 10 + i), 60);
     w.meta.resolveHeirloom(-1);
   }
   const outs = [];
   for (let i = 0; i < 3; i++) {
     const gid = w.meta.storedGhosts()[0].ghost_id;
-    outs.push(w.die(w.sortie(gid, "", "short", "sword", 20 + i), 40));
+    outs.push(w.die(w.sortie(gid, "", "short", "sword", 20 + i), 60));
     w.meta.resolveHeirloom(-1);
   }
   assert.deepEqual(outs[1].unlocked_lineages, []);
@@ -88,12 +88,12 @@ test("無名は形見が1Lv強くなる。亡霊の名前に家系が入る", ()
   const h = w.meta.storedHeirs()[0];
   assert.equal(h.level, 2);
   const r2 = w.sortie("", h.heir_id, "short", "sword", 41)!;
-  assert.equal(r2.weapons.bow, 3, "形見 Lv2 + 無名の効果 1");
+  assert.equal(r2.weapons.sword, 3, "形見 Lv2 + 無名の効果 1（主人公の武器に乗る）");
   w.repo.data.lineages.push("firekeeper");
-  w.die(r2, 50);
+  w.die(r2, 60);
   w.meta.resolveHeirloom(-1);
   const f = w.sortie("", "", "short", "fire", 42, "firekeeper")!;
-  w.die(f, 50);
+  w.die(f, 60);
   const names = w.meta.storedGhosts().map((g) => g.display_name);
   assert.ok(names.some((n) => n.includes("火守・")), names.join(" / "));
   assert.ok(names.some((n) => !n.includes("・無名")), "無名は名前に入れない");

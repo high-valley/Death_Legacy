@@ -22,10 +22,10 @@ test("剣は Lv で 短剣 → ロングソード → グレートソード、�
   assert.equal(gradeIndex(W, 5, true), 3);
 });
 
-test("どの武器も4段階で、名前が重ならない", () => {
+test("どの武器も Lv1 → Lv3（道2つ）→ Lv5（道2つ）→ 進化 の6段階で、名前が重ならない", () => {
   const names = new Set<string>();
   for (const id of Object.keys(D.weapons)) {
-    assert.equal(D.weapons[id].grades.length, 4, id);
+    assert.equal(D.weapons[id].grades.length, 6, id);
     for (const g of D.weapons[id].grades) {
       assert.ok(!names.has(g.name), g.name);
       names.add(g.name);
@@ -79,6 +79,7 @@ test("斧: 飛んでいって戻ってくる。行きと帰りで2回当たる",
   const e = place(r, 120, 0);
   r.grid.rebuild(r.enemies);
   r.fireWeapon("axe", 1, 0, 0, 1, 0, 1, 1, false, false);
+  r.hero.cds.axe = 999;   // 主人公が次の斧を投げないように
   assert.equal(r.shots.length, 1);
   const s = r.shots[0];
   let hits = 0, prev = e.hp, farthest = 0;
@@ -124,7 +125,7 @@ test("ダメージ数字は描画側が頼んだ時だけ、1ティック12個�
 test("魔導書は炎・氷・雷の3冊に分かれ、それぞれ4段階", () => {
   for (const id of ["fire", "ice", "thunder"]) {
     assert.ok(D.weapons[id].name.endsWith("の魔導書"), id);
-    assert.equal(D.weapons[id].grades.length, 4);
+    assert.equal(D.weapons[id].grades.length, 6);
   }
   assert.equal(weaponGrade(D.weapons.fire, 5, true).name, "エクスプロージョン");
   assert.equal(weaponGrade(D.weapons.ice, 5, true).name, "アブソリュートゼロ");

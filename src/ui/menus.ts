@@ -4,7 +4,7 @@
 import type { Balance, Lineage, RunMode, Tier } from "../data/types.ts";
 import { weaponGrade } from "../data/weapons.ts";
 import type { MetaService } from "../meta/metaService.ts";
-import type { ActiveRun, GhostMode, GhostRecord, RunRecord } from "../meta/records.ts";
+import type { ActiveRun, GhostMode, GhostPick, GhostRecord, RunRecord } from "../meta/records.ts";
 import { Platform } from "../platform.ts";
 import { Settings } from "../settings.ts";
 import { RunSim, type Card } from "../sim/runSim.ts";
@@ -13,7 +13,7 @@ import { fmt } from "../view/hud.ts";
 import { iconSvg } from "../view/icons.ts";
 import { button, h } from "./dom.ts";
 
-export interface SortieRequest { ghostId: string; heirId: string; weapon: string; mode: RunMode; seed: number; lineage: string; ghostMode: GhostMode }
+export interface SortieRequest { ghosts: GhostPick[]; heirId: string; weapon: string; mode: RunMode; seed: number; lineage: string }
 
 const RESULT_NAME: Record<string, string> = { player_death: "死亡", boss_cleared: "クリア", retired: "リタイア" };
 const KANJI = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
@@ -36,7 +36,7 @@ export class Menus {
   readonly root: HTMLElement;
   readonly meta: MetaService;
   readonly D: Balance;
-  hub = { tab: "sortie", ghost: "", ghostMode: "bring" as GhostMode, heir: "", weapon: "sword", mode: "short" as RunMode, seed: 0, lineage: "nameless", node: "" };
+  hub = { tab: "sortie", ghosts: [] as GhostPick[], heir: "", weapon: "sword", mode: "short" as RunMode, seed: 0, lineage: "nameless", node: "" };
   touchMode = false;
   onSortie: (r: SortieRequest) => void = () => {};
   private hotkeys: HTMLButtonElement[] = [];
@@ -102,7 +102,7 @@ export class Menus {
   }
 
   private weaponLabel(g: GhostRecord): string {
-    return weaponGrade(this.D.weapons[g.primary_weapon_id], g.weapon_level, g.evolved).name;
+    return weaponGrade(this.D.weapons[g.primary_weapon_id], g.weapon_level, g.evolved, g.weapon_branch).name;
   }
 
   /** 亡霊の1行（記録庫・入れ替え・リザルト） */
@@ -152,8 +152,8 @@ export class Menus {
       h("button", { type: "button", class: `menu-item${primary ? " primary" : ""}`, onclick: fn }, h("span", { class: "en" }, en), h("span", { class: "ja" }, ja), primary ? h("span", { class: "arrow" }, "→") : null);
     const menu = h("nav", { class: "title-menu" });
     if (active) {
-      const g = active.ghost_id ? this.meta.getGhost(active.ghost_id) : null;
-      menu.append(item("Continue", `中断したランを再開（${fmt(active.checkpoint?.t ?? 0)}・${g ? `${g.display_name}と` : "単独"}）`, on.resume, true),
+      const gs = (active.ghosts ?? []).map((x) => this.meta.getGhost(x.id)).filter((g): g is GhostRecord => !!g);
+      menu.append(item("Continue", `中断したランを再開（${fmt(active.checkpoint?.t ?? 0)}・${gs.length ? `${gs.map((g) => g.display_name.replace(/・.*$/, "")).join("・")}と` : "単独"}）`, on.resume, true),
         item("Abandon", "放棄する（リタイア扱い）", on.abandon));
     } else {
       menu.append(item(S.progress.runs > 0 ? "Continue" : "New Game", S.progress.runs > 0 ? `納骨堂へ・第${kanjiNum(S.progress.generation + 1)}代` : "はじめる", on.hub, true));
@@ -229,39 +229,53 @@ export class Menus {
   private riteText(g: GhostRecord, mode: GhostMode): string {
     if (mode === "devour") {
       const pw = this.meta.devourPower(g);
-      return `力を取り込んで単独で出撃する。与ダメージ +${Math.round(pw.might * 100)}%・最大HP +${Math.round(pw.hp * 100)}%。喰らった亡霊は怨霊になり、のちのランで襲ってくる（穢れ +1）。`;
+      return `力を取り込む。与ダメージ +${Math.round(pw.might * 100)}%・最大HP +${Math.round(pw.hp * 100)}%。喰らった亡霊は怨霊になり、のちのランで襲ってくる（穢れ +1）。`;
     }
-    return "この亡霊を連れて出撃する。レベルが上がるほど本来の力に近づく。出撃後は一度きりで成仏する。";
+    const W = this.D.weapons[g.primary_weapon_id];
+    return `生前の${weaponGrade(W, g.weapon_level, g.evolved, g.weapon_branch).name}で一緒に戦う。ランが終われば保管庫に戻る。`;
   }
 
-  /** 出撃準備: 左＝亡霊の記録庫、中＝出撃する亡霊と支度、右＝これまでの軌跡 */
+  /** タグの小さな札（炎2 など） */
+  private tagChip(tag: string, pts?: number): HTMLElement {
+    const T = this.D.tags[tag];
+    return h("span", { class: "tag", style: `--tg:${T.color}` }, T.name, pts !== undefined ? h("b", {}, String(pts)) : null);
+  }
+
+  /** 出撃準備: 左＝亡霊の記録庫、中＝主人公・連れていく亡霊・支度、右＝これまでの軌跡 */
   private hubSortie(p: HTMLElement, re: () => void): void {
     const D = this.D, meta = this.meta, hub = this.hub, S = meta.S;
     if (!meta.lineageUnlocked(hub.lineage)) hub.lineage = D.lineages[0].id;
     const lin = meta.lineage(hub.lineage);
     const stored = meta.storedGhosts();
-    if (hub.ghost && !stored.some((g) => g.ghost_id === hub.ghost)) hub.ghost = "";
+    const slots = meta.ghostSlots();
+    hub.ghosts = hub.ghosts.filter((x) => stored.some((g) => g.ghost_id === x.id)).slice(0, slots);
     const heirs = meta.shelfUnlocked() ? meta.storedHeirs() : [];
     if (hub.heir && !heirs.some((x) => x.heir_id === hub.heir)) hub.heir = "";
     const weapon = lin.weapon ?? hub.weapon;
-    const gsel = hub.ghost ? meta.getGhost(hub.ghost) : null;
-    const mode: GhostMode = gsel ? hub.ghostMode : "bring";
+    const picks = hub.ghosts.map((x) => ({ ...x, g: meta.getGhost(x.id)! }));
     const wr = meta.wraiths();
     const gen = S.progress.generation + 1;
+    const toggle = (id: string): void => {
+      const i = hub.ghosts.findIndex((x) => x.id === id);
+      if (i >= 0) hub.ghosts.splice(i, 1);
+      else if (hub.ghosts.length < slots) hub.ghosts.push({ id, mode: "bring" });
+      else if (slots === 1) hub.ghosts = [{ id, mode: "bring" }];
+      re();
+    };
 
     // ── 左: 亡霊の記録庫
     const list = h("div", { class: "ghost-list" });
-    for (const g of stored) list.append(this.ghostCard(g, hub.ghost === g.ghost_id, () => { hub.ghost = hub.ghost === g.ghost_id ? "" : g.ghost_id; re(); }));
-    if (stored.length === 0) list.append(h("div", { class: "empty" }, "まだ亡霊はいない。死ねば、その生き様が最初の亡霊になる。"));
+    for (const g of stored) list.append(this.ghostCard(g, hub.ghosts.some((x) => x.id === g.ghost_id), () => toggle(g.ghost_id)));
+    if (stored.length === 0) list.append(h("div", { class: "empty" }, "まだ亡霊はいない。未練の欠片を集め、ランの3割以上を生き延びて倒れた者だけが亡霊になる。"));
     const archive = h("section", { class: "frame archive", "data-scroll": "archive" },
       this.frameHead("亡霊の記録庫", `${stored.length} / ${D.vault_capacity}`),
-      h("p", { class: "flavor" }, "ここで眠るのは、かつてのあなたたち。そして、これからの仲間たち——"),
+      h("p", { class: "flavor" }, `ここで眠るのは、かつてのあなたたち。連れていっても減らない。一度に${slots}体まで${slots < D.ghost_slots.max ? "（祭壇の樹「双魂の契り」で2体）" : ""}。`),
       list);
 
-    // ── 中: 出撃する亡霊と支度
+    // ── 中: 主人公・連れていく亡霊・支度
     const center = h("section", { class: "frame sortie", "data-scroll": "sortie" });
     center.append(this.frameHead(`第${kanjiNum(gen)}代の出撃`, lin.name, "sword"));
-    // 主人公（＝初期武器）を絵で選ぶ。武器は育つと持ち替える（剣なら 短剣 → ロングソード → …）
+    // 主人公（＝武器）を絵で選ぶ。武器は育つと持ち替える
     const heroes = h("div", { class: "heroes" });
     for (const id of Object.keys(D.weapons)) {
       const W = D.weapons[id], src = Art.hero(id), locked = !!lin.weapon && lin.weapon !== id;
@@ -270,35 +284,52 @@ export class Menus {
         h("span", { class: "hn" }, iconSvg(id), W.name)));
     }
     const WS = D.weapons[weapon];
+    const pa = WS.grades.filter((g) => !g.evo && g.branch === "a").map((g) => g.name).join(" → ");
+    const pb = WS.grades.filter((g) => !g.evo && g.branch === "b").map((g) => g.name).join(" → ");
     center.append(h("div", { class: "section" },
-      h("h4", {}, lin.weapon ? `主人公（${lin.name}は${WS.name}）` : "主人公　選んだ人物の武器で出撃する"),
+      h("h4", {}, lin.weapon ? `主人公（${lin.name}は${WS.name}）` : "主人公　使える武器は1種類"),
       heroes,
-      h("p", { class: "small hero-desc" }, h("b", {}, WS.name), `　${WS.desc}。育てると ${WS.grades.map((g) => g.name).join(" → ")}`)));
+      h("p", { class: "small hero-desc" }, h("b", {}, WS.name), `　${WS.desc}。`, this.tagChip(WS.tags[0])),
+      h("p", { class: "small hero-desc" }, `${WS.grades[0].name} → Lv3で道を選ぶ（${pa}／${pb}）→ 進化 ${WS.grades[WS.grades.length - 1].name}`)));
     if (wr.length > 0) {
       center.append(h("div", { class: "notice taint" },
         h("b", {}, `穢れ ${wr.length}`),
-        h("span", { class: "small" }, `敵のHP +${Math.round(meta.taintHpBonus() * 100)}%。ランの途中で怨霊「${wr[0].display_name}」が現れる。倒せば祓える（供物 +${D.rites.wraith.purify_offerings}）。`)));
+        h("span", { class: "small" }, `敵のHP +${Math.round(meta.taintHpBonus() * 100)}%。ランの途中で怨霊「${wr[0].display_name}」が現れる。倒せば祓える（供物 +${D.rites.wraith.purify_offerings}・未練の欠片 +${D.ghost_birth.drops.wraith ?? 0}）。`)));
     }
-    const chosen = h("div", { class: `chosen ${gsel ? mode : "solo"}` },
-      this.portrait(gsel, "big"),
-      h("div", { class: "cbody" },
-        h("span", { class: "clabel" }, gsel ? (mode === "devour" ? "喰らう亡霊" : "出撃する亡霊") : "出撃する亡霊"),
-        h("span", { class: "cname" }, gsel ? gsel.display_name : "誰も連れていかない"),
-        h("p", { class: "small" }, gsel ? this.riteText(gsel, mode)
-          : `左の記録庫から亡霊を選ぶと、連れていける。単独なら亡霊は温存され${lin.mods.solo_xp === -1 ? "る" : `、経験値 +${Math.round(D.solo_xp_bonus * 100)}%`}。`)));
-    center.append(chosen);
-    if (gsel) {
+    // 連れていく亡霊（最大 slots 体）
+    const party = h("div", { class: "party" });
+    for (let i = 0; i < slots; i++) {
+      const x = picks[i];
+      if (!x) {
+        party.append(h("div", { class: "chosen solo" }, this.portrait(null, "big"),
+          h("div", { class: "cbody" }, h("span", { class: "clabel" }, `${i + 1}体目`), h("span", { class: "cname" }, "空き"),
+            h("p", { class: "small" }, i === 0 ? `記録庫から選ぶ。誰も連れていかなければ単独（経験値 +${Math.round(D.solo_xp_bonus * 100 * (1 + (lin.mods.solo_xp ?? 0)))}%）。` : "2体目も選べる。"))));
+        continue;
+      }
       const seg = h("div", { class: "seg rites" });
       for (const [id, name] of [["bring", "連れていく"], ["devour", "喰らう"]] as const) {
-        seg.append(h("button", { type: "button", "aria-pressed": String(mode === id), onclick: () => { hub.ghostMode = id; re(); } }, name));
+        seg.append(h("button", { type: "button", "aria-pressed": String(x.mode === id), onclick: () => { hub.ghosts[i].mode = id; re(); } }, name));
       }
-      const n = meta.mournOfferings(gsel);
+      const n = meta.mournOfferings(x.g);
       seg.append(h("button", {
-        type: "button", "aria-pressed": "false", onclick: () => this.showConfirm(`${gsel.display_name}を弔う`,
-          `いますぐ成仏させ、供物 +${n} を得る。弔った亡霊は戻らない。`, () => { meta.mourn(gsel.ghost_id); hub.ghost = ""; re(); }, re, "弔う"),
-      }, `弔う（供物 +${n}）`));
-      center.append(seg);
+        type: "button", "aria-pressed": "false", onclick: () => this.showConfirm(`${x.g.display_name}を弔う`,
+          `いますぐ成仏させ、供物 +${n} を得る。弔った亡霊は戻らない。`, () => { meta.mourn(x.id); hub.ghosts = hub.ghosts.filter((y) => y.id !== x.id); re(); }, re, "弔う"),
+      }, `弔う（+${n}）`));
+      party.append(h("div", { class: `chosen ${x.mode}` }, this.portrait(x.g, "big"),
+        h("div", { class: "cbody" },
+          h("span", { class: "clabel" }, x.mode === "devour" ? "喰らう亡霊" : `${i + 1}体目・連れていく`),
+          h("span", { class: "cname" }, x.g.display_name),
+          h("p", { class: "small" }, this.riteText(x.g, x.mode)),
+          seg)));
     }
+    center.append(h("div", { class: "section" }, h("h4", {}, `連れていく亡霊　${picks.length} / ${slots}`), party));
+    // 共鳴の見込み（主人公の武器＋連れていく亡霊のタグ）
+    const preview = new RunSim(D, { weapon, lineage: lin.id, ghosts: picks.filter((x) => x.mode === "bring").map((x) => x.g) });
+    const pts = preview.tagPoints(), sets = preview.activeSets();
+    center.append(h("div", { class: "section resonance" },
+      h("h4", {}, "共鳴　同じタグを集めるとセット効果（2・4・6）"),
+      h("div", { class: "row" }, ...Object.keys(pts).map((t) => this.tagChip(t, pts[t]))),
+      sets.length ? h("ul", { class: "sets" }, ...sets.map((st) => h("li", {}, this.tagChip(st.tag, st.at), st.text))) : h("p", { class: "small faint" }, "まだセット効果はない。レベルアップでタグ付きのパッシブを取ると伸ばせる。")));
     // 家系
     const houses = h("div", { class: "picks houses" });
     for (const l of D.lineages) houses.append(this.houseCard(l, hub.lineage === l.id, () => { hub.lineage = l.id; re(); }));
@@ -327,28 +358,29 @@ export class Menus {
     seedIn.addEventListener("change", () => { const n = Number.parseInt(seedIn.value, 10); if (Number.isFinite(n)) hub.seed = n; });
     center.append(h("div", { class: "section" }, h("h4", {}, "ランの長さ"), h("div", { class: "row" }, mseg, h("label", { class: "row seed" }, "seed", seedIn))));
 
-    // 出撃ボタン（単独 / 亡霊と）
+    // 出撃ボタン
     const hsel = hub.heir ? meta.getHeir(hub.heir) : null;
+    const devours = picks.filter((x) => x.mode === "devour");
     const go = (withGhost: boolean): void => {
       const n = Number.parseInt(seedIn.value, 10);
       const seed = Number.isFinite(n) ? n : Math.floor(Math.random() * 1_000_000);
       hub.seed = Math.floor(Math.random() * 1_000_000);
-      const g = withGhost ? gsel : null;
-      const req: SortieRequest = { ghostId: g ? g.ghost_id : "", heirId: hub.heir, weapon, mode: hub.mode, seed, lineage: hub.lineage, ghostMode: g ? mode : "bring" };
-      if (g || hsel) {
-        const title = g ? (mode === "devour" ? `${g.display_name}を喰らって出撃する` : `${g.display_name}を連れて出撃する`) : "形見を身につけて出撃する";
-        const body = g && mode === "devour"
-          ? "出撃した時点で喰らうことが確定する。喰らった亡霊は怨霊となり、次のランから襲ってくる。倒せば祓える。"
-          : "出撃した時点で使用が確定し、ランが終わると（勝っても負けても）消える。途中でアプリを閉じても、次に開いた時に同じランから再開できる。";
-        this.showConfirm(title, body, () => this.onSortie(req), re);
+      const gs = withGhost ? hub.ghosts.map((x) => ({ ...x })) : [];
+      const req: SortieRequest = { ghosts: gs, heirId: hub.heir, weapon, mode: hub.mode, seed, lineage: hub.lineage };
+      if (devours.length > 0 && withGhost) {
+        this.showConfirm(`${devours.map((x) => x.g.display_name).join("と")}を喰らって出撃する`,
+          "出撃した時点で喰らうことが確定する。喰らった亡霊は怨霊となり、次のランから襲ってくる。倒せば祓える。", () => this.onSortie(req), re);
+      } else if (hsel) {
+        this.showConfirm("形見を身につけて出撃する", "形見はこのランで使い切る。連れていく亡霊は、ランが終われば保管庫に戻る。", () => this.onSortie(req), re);
       } else {
         this.onSortie(req);
       }
     };
     const goRow = h("div", { class: "go-row" },
       h("button", { type: "button", class: "go solo", onclick: () => go(false) }, h("b", {}, "単独出撃"), h("small", {}, "亡霊なしで挑む")),
-      h("button", { type: "button", class: `go with ${mode}`, disabled: !gsel, onclick: () => go(true) },
-        h("b", {}, mode === "devour" ? "喰らって出撃" : "亡霊と出撃"), h("small", {}, gsel ? (mode === "devour" ? "怨霊になる（穢れ +1）" : "出撃後は一度きりで成仏") : "記録庫から1体選ぶ")));
+      h("button", { type: "button", class: `go with ${devours.length ? "devour" : "bring"}`, disabled: picks.length === 0, onclick: () => go(true) },
+        h("b", {}, devours.length && devours.length === picks.length ? "喰らって出撃" : "亡霊と出撃"),
+        h("small", {}, picks.length === 0 ? "記録庫から選ぶ" : devours.length ? "喰らった亡霊は怨霊になる" : "ランが終われば保管庫に戻る")));
 
     // ── 右: これまでの軌跡
     const trail = h("section", { class: "frame trail", "data-scroll": "trail" }, this.frameHead("これまでの軌跡", "", "clock"));
@@ -356,7 +388,8 @@ export class Menus {
     if (runs.length === 0) trail.append(h("div", { class: "empty" }, "まだ記録はない。"));
     for (const r of runs) {
       const res = r.result === "boss_cleared" ? "clear" : r.result === "player_death" ? "dead" : "retired";
-      const who = r.devoured ? `${r.devoured}を喰らう` : r.consumed_ghost ? `${r.consumed_ghost}と` : "単独";
+      const comp = r.companions?.length ? r.companions : r.consumed_ghost ? [r.consumed_ghost] : [];
+      const who = r.devoured ? `${r.devoured}を喰らう` : comp.length ? `${comp.map((n) => n.replace(/^(第\d+代)・.*$/, "$1")).join("・")}と` : "単独";
       trail.append(h("div", { class: `trail-item ${res}` },
         h("div", { class: "tl" }, h("span", { class: "num" }, `#${String(r.generation).padStart(3, "0")}`), h("span", { class: "num t" }, fmt(r.duration_seconds))),
         h("div", { class: "tw" }, `Lv${r.player_level}・撃破${r.kills}`),
@@ -487,21 +520,31 @@ export class Menus {
 
   /** カードのアイコン名 */
   private cardIcon(c: Card): string {
-    return c.kind === "heal" ? "heal" : c.id;
+    if (c.kind === "heal") return "heal";
+    if (c.kind === "sigil") return "might";
+    if (c.kind === "curse") return "ghost";
+    return c.id;
   }
 
-  /** いまの持ち物（レベルアップ・ポーズの右側） */
+  /** いまの持ち物とセット効果（レベルアップ・ポーズの右側） */
   private buildList(sim: RunSim): HTMLElement {
     const D = sim.D;
     const ul = h("ul", { class: "build-list" });
     for (const id of Object.keys(sim.weapons)) {
       const b = sim.wbonus[id] ?? 0;
-      ul.append(h("li", { class: "w" }, iconSvg(id), h("span", { class: "bn" }, sim.weaponName(id), h("small", {}, `Lv${sim.weapons[id]}${b > 0 ? `・+${Math.round(b * 100)}%` : ""}${id === sim.mainWeapon ? "・メイン" : ""}`))));
+      ul.append(h("li", { class: "w" }, iconSvg(id), h("span", { class: "bn" }, sim.weaponName(id), h("small", {}, `Lv${sim.weapons[id]}${b > 0 ? `・+${Math.round(b * 100)}%` : ""}`))));
     }
+    for (const g of sim.ghosts) ul.append(h("li", { class: "g" }, iconSvg(g.rec.primary_weapon_id), h("span", { class: "bn" }, g.rec.display_name.replace(/^(第\d+代)・.*$/, "$1の亡霊"), h("small", {}, weaponGrade(D.weapons[g.rec.primary_weapon_id], g.rec.weapon_level, g.rec.evolved, g.rec.weapon_branch).name))));
     for (const id of Object.keys(sim.passives)) ul.append(h("li", {}, iconSvg(id), h("span", { class: "bn" }, D.passives[id].name, h("small", {}, `Lv${sim.passives[id]}`))));
     if (sim.lineageLv > 0) ul.append(h("li", { class: "l" }, iconSvg(sim.lineage.card.id), h("span", { class: "bn" }, sim.lineage.card.name, h("small", {}, `Lv${sim.lineageLv}`))));
+    for (const id of sim.sigils) ul.append(h("li", { class: "s" }, iconSvg("might"), h("span", { class: "bn" }, D.sigils.find((x) => x.id === id)?.name ?? id, h("small", {}, "刻印"))));
+    for (const id of sim.curses) ul.append(h("li", { class: "c" }, iconSvg("ghost"), h("span", { class: "bn" }, D.curses.find((x) => x.id === id)?.name ?? id, h("small", {}, "呪い"))));
+    const pts = sim.tagPoints(), sets = sim.activeSets();
     return h("aside", { class: "frame build-side" }, h("h4", {}, "現在のビルド"), ul,
-      h("p", { class: "small faint" }, `武器 ${Object.keys(sim.weapons).length} / ${D.sub_weapon_slots + 1}・パッシブ ${Object.keys(sim.passives).length} / ${D.passive_slots}`));
+      h("p", { class: "small faint" }, `パッシブ ${Object.keys(sim.passives).length} / ${D.passive_slots}`),
+      h("h4", {}, "共鳴"),
+      h("div", { class: "row tags" }, ...Object.keys(pts).map((t) => this.tagChip(t, pts[t]))),
+      sets.length ? h("ul", { class: "sets" }, ...sets.map((st) => h("li", {}, this.tagChip(st.tag, st.at), st.text))) : h("p", { class: "small faint" }, "同じタグを2つ集めるとセット効果"));
   }
 
   showLevel(sim: RunSim, choices: Card[], onPick: (c: Card) => void): void {
@@ -510,19 +553,26 @@ export class Menus {
     choices.forEach((c, i) => {
       const R = sim.rarity(c.rar), d = sim.describe(c);
       const aff = sim.cardMods.affinity?.[c.id] ?? 0;
-      const b = h("button", { type: "button", class: `lv-card r-${c.rar}${c.kind === "lineage" ? " house-card" : ""}`, style: `--rc:${R.color}`, onclick: () => onPick(c) },
+      const tag = sim.cardTag(c);
+      const special = c.kind === "sigil" ? " sigil-card" : c.kind === "curse" ? " curse-card" : c.branch ? ` branch-card br-${c.branch}` : c.kind === "lineage" ? " house-card" : "";
+      const color = c.kind === "sigil" ? "#7fe3dc" : c.kind === "curse" ? "#d65a5e" : R.color;
+      const ribbon = c.kind === "sigil" ? "刻印" : c.kind === "curse" ? "呪い" : c.branch ? `${R.name}・道${c.branch === "a" ? "一" : "二"}` : R.name;
+      const b = h("button", { type: "button", class: `lv-card r-${c.rar}${special}`, style: `--rc:${color}`, onclick: () => onPick(c) },
         this.touchMode ? null : h("span", { class: "key" }, String(i + 1)),
+        tag ? h("span", { class: "ctag" }, this.tagChip(tag)) : null,
         h("span", { class: "gem" }, iconSvg(this.cardIcon(c))),
         h("span", { class: "n" }, d.n),
         h("span", { class: "what" }, d.k),
         h("span", { class: "d" }, d.d),
         aff > 0 ? h("span", { class: "aff" }, `縁 ${"●".repeat(aff)}`) : null,
-        h("span", { class: "ribbon" }, R.name));
+        h("span", { class: "ribbon" }, ribbon));
       cards.append(b);
       this.hotkeys.push(b);
     });
+    const branchNow = choices.some((c) => c.branch);
     p.append(
-      h("header", { class: "lv-head" }, h("h2", {}, "レベルアップ"), h("p", {}, `レベル ${sim.level - sim.pending + 1}　新たな力を選択してください`)),
+      h("header", { class: "lv-head" }, h("h2", {}, branchNow ? "武器の道を選ぶ" : "レベルアップ"),
+        h("p", {}, branchNow ? "ここで選んだ道は、このランの最後まで続く" : `レベル ${sim.level - sim.pending + 1}　新たな力を選択してください`)),
       h("div", { class: "lv-body" }, cards, this.buildList(sim)));
     if (!this.touchMode) p.append(h("p", { class: "keys" }, h("kbd", {}, "1"), h("kbd", {}, "2"), h("kbd", {}, "3"), " で選択"));
     this.guard(this.hotkeys);
@@ -589,7 +639,7 @@ export class Menus {
     const bd = backdrop(res === "boss_cleared" ? "result_clear" : "result_death");
     if (bd) p.before(bd);
     const head = {
-      player_death: ["YOU DIED", "しかし、あなたの戦いは無駄ではなかった。新たな亡霊が、ここに刻まれる。"],
+      player_death: ["YOU DIED", out?.new_ghost_id ? "しかし、あなたの戦いは無駄ではなかった。新たな亡霊が、ここに刻まれる。" : "未練なき魂は、亡霊として留まれなかった。"],
       boss_cleared: ["SURVIVED", "冥王を討ち、生還した。供物にクリアの分が加わる。"],
       retired: ["RETIRED", "撤退した。亡霊も形見も残らない。"],
       "": ["", ""],
@@ -599,7 +649,7 @@ export class Menus {
     // 左: 記録 / 右: 新しい亡霊
     const rows: [string, string][] = [
       ["生存時間", fmt(sim.t)], ["撃破数", sim.kills.toLocaleString()], ["ボス撃破数", String(sim.bossKills)], ["到達レベル", String(sim.level)],
-      ["使用武器", sim.weaponName(sim.mainWeapon)], ["家系", sim.lineage.name], ["獲得した供物", out ? `+${out.offerings}` : "—"],
+      ["使用武器", sim.weaponName(sim.mainWeapon)], ["未練の欠片", `${sim.fragments} / ${D.ghost_birth.fragments}`], ["家系", sim.lineage.name], ["獲得した供物", out ? `+${out.offerings}` : "—"],
     ];
     const tbl = h("dl", { class: "res-stats" });
     for (const [k, v] of rows) tbl.append(h("dt", {}, k), h("dd", { class: "num" }, v));
@@ -618,6 +668,15 @@ export class Menus {
                 h("dt", {}, "生存時間"), h("dd", { class: "num" }, fmt(ng.survival_seconds)),
                 h("dt", {}, "攻撃補正"), h("dd", {}, `×${ng.stat_snapshot.attack_mult.toFixed(2)}`),
                 h("dt", {}, "継承武器"), h("dd", {}, `${this.weaponLabel(ng)} Lv${ng.weapon_level}`)))));
+      } else {
+        const B = D.ghost_birth;
+        right.append(h("h4", {}, "亡霊になれなかった"),
+          h("div", { class: "nb" }, this.portrait(null, "big"),
+            h("div", {},
+              h("p", { class: "small" }, out?.ghost_failed === "time"
+                ? `生き延びた時間が短すぎた。亡霊になるには、ランの${Math.round(B.min_survival * 100)}%（${fmt(sim.runLen * B.min_survival)}）以上を生き延びる必要がある。`
+                : `未練が足りなかった（未練の欠片 ${sim.fragments} / ${B.fragments}）。欠片は墓暴きや怨霊を倒すと手に入る。`),
+              h("p", { class: "small faint" }, "その魂は、静かに消えた。"))));
       }
     } else {
       right.append(h("h4", {}, res === "boss_cleared" ? "生還" : "リタイア"),
@@ -625,14 +684,15 @@ export class Menus {
     }
     p.append(h("div", { class: "res-grid" }, h("section", { class: "frame" }, tbl), right));
 
-    // 連れていった亡霊の運命・知らせ
-    const fate = out?.consumed_ghost || out?.devoured ? (sim.ghost?.rec ?? sim.devour?.rec ?? null) : null;
-    if (fate) {
-      p.append(h("section", { class: "frame fate" }, h("h4", {}, "連れて行った亡霊の運命"),
-        h("div", { class: "fate-row" }, this.portrait(fate, "small"),
-          h("span", { class: "gname" }, fate.display_name),
-          out?.devoured ? h("span", { class: "chip taint" }, "怨霊化") : h("span", { class: "chip gone" }, "成仏"),
-          h("span", { class: "small mute" }, out?.devoured ? "喰らわれ、怨霊となって次からのランで襲ってくる。" : "あなたと共に戦い、その魂は消えた。"))));
+    // 連れていった亡霊の行方・知らせ
+    const comp = sim.ghosts.map((g) => g.rec), dv = sim.devours.map((d) => d.rec);
+    if (comp.length || dv.length) {
+      const sec = h("section", { class: "frame fate" }, h("h4", {}, "連れて行った亡霊"));
+      for (const g of comp) sec.append(h("div", { class: "fate-row" }, this.portrait(g, "small"), h("span", { class: "gname" }, g.display_name),
+        h("span", { class: "chip" }, "帰還"), h("span", { class: "small mute" }, "共に戦い、記録庫へ戻った。")));
+      for (const g of dv) sec.append(h("div", { class: "fate-row" }, this.portrait(g, "small"), h("span", { class: "gname" }, g.display_name),
+        h("span", { class: "chip taint" }, "怨霊化"), h("span", { class: "small mute" }, "喰らわれ、怨霊となって次からのランで襲ってくる。")));
+      p.append(sec);
     }
     for (const id of out?.unlocked_lineages ?? []) {
       const l = meta.lineage(id);

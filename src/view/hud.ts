@@ -1,7 +1,8 @@
 // 戦闘HUD（表示専用）。キャンバスの上に重ねて描く。
 // 左上: 紋章・HP・経験値・Lv / 中央上: 残り時間・ボスと怨霊のHP / 右上: ミニマップ・撃破数
 // 左下: 武器スロット（段階の色）とパッシブ / 下: 同行する亡霊の札 / 右下（PC）: 回避キー
-import { gradeIndex } from "../data/weapons.ts";
+import { gradeIndex, weaponGrade } from "../data/weapons.ts";
+import type { GhostRecord } from "../meta/records.ts";
 import type { RunSim } from "../sim/runSim.ts";
 import { Art } from "./art.ts";
 import { drawIcon } from "./icons.ts";
@@ -104,6 +105,12 @@ export class Hud {
     ctx.textAlign = "left";
     ctx.font = `600 ${small ? 12 : 13}px ${SERIF}`; ctx.fillStyle = C.bone;
     ctx.fillText(`Lv. ${sim.level}`, pad, ey + er + 12);
+    // 未練の欠片（足りていれば魂の色）
+    {
+      const need = D.ghost_birth.fragments, f = sim.fragments, ok = f >= need && sim.t >= sim.runLen * D.ghost_birth.min_survival;
+      ctx.font = `11px ${SERIF}`; ctx.fillStyle = f >= need ? C.soul : C.dim;
+      ctx.fillText(`未練 ${f}/${need}${ok ? "・亡霊になれる" : ""}`, pad, ey + er + 28);
+    }
     const ready = h.dashCd <= 0;
     if (!touch) {
       ctx.font = `12px ${FONT}`; ctx.fillStyle = ready ? C.candle : C.dim;
@@ -161,7 +168,7 @@ export class Hud {
         sx += ss + gap;
         continue;
       }
-      const lv = sim.weapons[id], gi = gradeIndex(D.weapons[id], lv, !!sim.evolved[id]);
+      const lv = sim.weapons[id], gi = gradeIndex(D.weapons[id], lv, !!sim.evolved[id]);   // 段階の高さで枠の色
       const col = GRADE_COLORS[Math.min(gi, GRADE_COLORS.length - 1)];
       plate(ctx, sx, sy, ss, ss, col);
       if (gi >= 2) { ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 10; rrect(ctx, sx, sy, ss, ss, 4); ctx.strokeStyle = col; ctx.stroke(); ctx.restore(); }
@@ -182,36 +189,61 @@ export class Hud {
       px += ps + 4;
     }
 
-    // ── 下: 同行する亡霊（喰らった時はその力）
-    const cw = small ? 196 : 240, chh = small ? 50 : 62;
-    const cx = touch ? W / 2 - cw / 2 : W - pad - cw - 128, cy = H - pad - chh;
-    const rec = sim.ghost?.rec ?? sim.devour?.rec ?? null;
-    if (rec && cx > px + 8) {
-      const tier = D.tiers.find((t) => t.id === rec.tier_id) ?? D.tiers[0];
-      plate(ctx, cx, cy, cw, chh, sim.devour ? "rgba(183,139,224,.6)" : "rgba(134,224,210,.5)");
-      const ps2 = chh - 10;
-      {   // 亡霊は人の絵ではなく、等級の色の霊光と紋で表す
+    // 共鳴（タグの点数。セット効果が出ている数字は明るく）
+    {
+      const pts = sim.tagPoints();
+      let tx = pad, ty = sy - 16;
+      ctx.textAlign = "left"; ctx.font = `600 ${small ? 10 : 11}px ${SERIF}`;
+      for (const t of Object.keys(pts)) {
+        const T = D.tags[t], n = pts[t], on = T.sets.some((st) => n >= st.at);
+        const label = `${T.name}${n}`, w = ctx.measureText(label).width + 10;
+        rrect(ctx, tx, ty - 8, w, 16, 3);
+        ctx.fillStyle = on ? "rgba(10,13,18,.9)" : "rgba(10,13,18,.6)"; ctx.fill();
+        ctx.strokeStyle = on ? T.color : "rgba(255,255,255,.12)"; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = on ? T.color : C.dim;
+        ctx.fillText(label, tx + 5, ty + 1);
+        tx += w + 4;
+      }
+    }
+
+    // ── 下: 同行する亡霊（最大2体）。喰らった時はその力
+    const cw = small ? 176 : 220, chh = small ? 46 : 56;
+    const cards: { rec: GhostRecord; devour: boolean }[] = [
+      ...sim.ghosts.map((g) => ({ rec: g.rec, devour: false })),
+      ...sim.devours.map((d) => ({ rec: d.rec, devour: true })),
+    ].slice(0, 2);
+    const total = cards.length * cw + (cards.length - 1) * 6;
+    let cx = touch ? W / 2 - total / 2 : W - pad - total - 128;
+    const cy = H - pad - chh;
+    if (cards.length && cx > px + 8) {
+      for (const { rec, devour } of cards) {
+        const tier = D.tiers.find((t) => t.id === rec.tier_id) ?? D.tiers[0];
+        plate(ctx, cx, cy, cw, chh, devour ? "rgba(183,139,224,.6)" : "rgba(134,224,210,.5)");
+        const ps2 = chh - 10;
+        // 亡霊は人の絵ではなく、等級の色の霊光と紋で表す
         const g = ctx.createRadialGradient(cx + 5 + ps2 / 2, cy + 5 + ps2 * 0.4, 2, cx + 5 + ps2 / 2, cy + 5 + ps2 / 2, ps2 * 0.7);
         g.addColorStop(0, tier.color); g.addColorStop(1, "rgba(0,0,0,0)");
         rrect(ctx, cx + 5, cy + 5, ps2, ps2, 3); ctx.fillStyle = "#0b0e13"; ctx.fill();
         ctx.globalAlpha = 0.55; ctx.fillStyle = g; ctx.fill(); ctx.globalAlpha = 1;
         drawIcon(ctx, "ghost", cx + 5 + ps2 / 2, cy + 5 + ps2 / 2, ps2 * 0.6, "rgba(230,240,240,.85)");
-        drawIcon(ctx, rec.primary_weapon_id, cx + ps2 - 4, cy + ps2 - 4, ps2 * 0.32, tier.color);
+        drawIcon(ctx, rec.primary_weapon_id, cx + ps2 - 2, cy + ps2 - 2, ps2 * 0.32, tier.color);
+        ctx.textAlign = "left";
+        const tx = cx + ps2 + 12;
+        ctx.font = `600 ${small ? 11 : 12}px ${SERIF}`; ctx.fillStyle = devour ? C.taint : tier.color;
+        let name = rec.display_name;
+        while (ctx.measureText(name).width > cw - ps2 - 20 && name.length > 4) name = name.slice(0, -2) + "…";
+        ctx.fillText(name, tx, cy + 13);
+        ctx.font = `10px ${FONT}`; ctx.fillStyle = C.dim;
+        if (devour) {
+          ctx.fillText(`喰らった力　与ダメ +${Math.round(sim.devourMight * 100)}%`, tx, cy + chh / 2 + 2);
+        } else {
+          const u = sim.setMods(["spirit"]).ghost_full ? 1 : sim.ghostUnlock();
+          ctx.fillText(`${weaponGrade(D.weapons[rec.primary_weapon_id], rec.weapon_level, rec.evolved, rec.weapon_branch).name}　解放 ${Math.round(u * 100)}%`, tx, cy + chh / 2 + 2);
+          bar(ctx, tx, cy + chh - 11, cw - ps2 - 22, 4, u, C.soul, "rgba(134,224,210,.3)");
+        }
+        cx += cw + 6;
       }
-      ctx.textAlign = "left";
-      const tx = cx + ps2 + 14;
-      ctx.font = `600 ${small ? 12 : 13}px ${SERIF}`; ctx.fillStyle = sim.devour ? C.taint : tier.color;
-      let name = rec.display_name;
-      while (ctx.measureText(name).width > cw - ps2 - 22 && name.length > 4) name = name.slice(0, -2) + "…";
-      ctx.fillText(name, tx, cy + 14);
-      ctx.font = `11px ${FONT}`; ctx.fillStyle = C.dim;
-      if (sim.devour) {
-        ctx.fillText(`喰らった力　与ダメージ +${Math.round(sim.devour.might * 100)}%`, tx, cy + chh / 2 + 2);
-      } else {
-        ctx.fillText(`生存時間 ${fmt(rec.survival_seconds)}　解放 ${Math.round(sim.ghostUnlock() * 100)}%`, tx, cy + chh / 2 + 2);
-        bar(ctx, tx, cy + chh - 12, cw - ps2 - 24, 4, sim.ghostUnlock(), C.soul, "rgba(134,224,210,.3)");
-      }
-    } else if (!rec && !small) {
+    } else if (!cards.length && !small) {
       ctx.textAlign = touch ? "center" : "right";
       ctx.font = `11px ${FONT}`; ctx.fillStyle = C.dim;
       ctx.fillText(`単独出撃　経験値 +${Math.round(D.solo_xp_bonus * 100 * (1 + sim.mod("solo_xp")))}%`, touch ? W / 2 : W - pad - 128, H - pad - 8);
@@ -279,9 +311,9 @@ export class Hud {
       ctx.fillStyle = e.kind === "boss" ? "#ff5a5f" : e.kind === "wraith" ? C.taint : "#e0d36a";
       ctx.beginPath(); ctx.arc(cx + dx, cy + dy, e.kind === "boss" ? 4 : 3, 0, 7); ctx.fill();
     }
-    if (sim.ghost) {
-      ctx.fillStyle = C.soul;
-      ctx.beginPath(); ctx.arc(cx + (sim.ghost.x - h.x) * k, cy + (sim.ghost.y - h.y) * k, 2.2, 0, 7); ctx.fill();
+    ctx.fillStyle = C.soul;
+    for (const g of sim.ghosts) {
+      ctx.beginPath(); ctx.arc(cx + (g.x - h.x) * k, cy + (g.y - h.y) * k, 2.2, 0, 7); ctx.fill();
     }
     // 主人公（向きのわかる三角）
     const a = Math.atan2(h.fy, h.fx);

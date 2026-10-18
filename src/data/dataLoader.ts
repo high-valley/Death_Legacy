@@ -28,7 +28,7 @@ export function loadBalance(raw: unknown): Loaded {
 
   const D = raw as Balance;
   if (!need(raw, ["schema_version", "data_version", "run_length", "vault_capacity", "tiers", "ghost_unlock", "player", "xp", "weapons", "evolve_min_level",
-    "passives", "rarities", "maxed_weapon_bonus", "offerings", "altar", "library", "tree", "rites", "shelf", "enemies", "spawn", "checkpoint_interval", "lineages"], "balance")) {
+    "passives", "rarities", "maxed_weapon_bonus", "offerings", "altar", "library", "tree", "rites", "shelf", "enemies", "spawn", "checkpoint_interval", "lineages", "tags", "tag_points", "sigils", "sigil_chance", "curses", "curse_chance", "ghost_slots", "ghost_birth"], "balance")) {
     return { D, errors };
   }
   // 等級は生存割合の昇順で、最初は0から
@@ -39,26 +39,34 @@ export function loadBalance(raw: unknown): Loaded {
     prev = t.from;
   });
   if (D.tiers.length > 0 && D.tiers[0].from !== 0) errors.push("tiers[0].from は 0");
-  need(D.player, ["hp", "speed", "radius", "dash_speed", "dash_time", "dash_cd", "hit_iframe", "pickup"], "player");
+  need(D.player, ["weapon_mult", "hp", "speed", "radius", "dash_speed", "dash_time", "dash_cd", "hit_iframe", "pickup"], "player");
   for (const id of Object.keys(D.weapons)) {
-    if (!need(D.weapons[id], ["name", "desc", "cd", "damage", "per_level", "grades"], `weapons.${id}`)) continue;
-    // 段階: Lv1 から始まり lv は昇順・最大Lv以下、最後の1つだけが進化（evo）
+    if (!need(D.weapons[id], ["name", "desc", "cd", "damage", "per_level", "grades", "tags"], `weapons.${id}`)) continue;
+    for (const t of D.weapons[id].tags) if (!(t in D.tags)) errors.push(`weapons.${id}: タグ '${t}' が tags にない`);
+    // 段階: Lv1 から始まり lv は最大Lv以下、最後の1つだけが進化（evo）。道（branch）は a と b が同じLvにそろう
     const gs = D.weapons[id].grades;
-    let plv = 0;
     gs.forEach((g, i) => {
       need(g, ["name", "desc", "cd", "dmg"], `weapons.${id}.grades[${i}]`);
       const last = i === gs.length - 1;
       if (last !== !!g.evo) errors.push(`weapons.${id}: 進化（evo）は最後の段階に1つだけ（LRで進化できない）`);
       if (!last) {
         const lv = g.lv ?? 0;
-        if (i === 0 && lv !== 1) errors.push(`weapons.${id}: 最初の段階は lv 1`);
-        if (lv <= plv || lv > D.weapon_max_level) errors.push(`weapons.${id}: 段階の lv は昇順で ${D.weapon_max_level} 以下`);
-        plv = lv;
+        if (i === 0 && (lv !== 1 || g.branch)) errors.push(`weapons.${id}: 最初の段階は lv 1（道なし）`);
+        if (lv < 1 || lv > D.weapon_max_level) errors.push(`weapons.${id}: 段階の lv は 1〜${D.weapon_max_level}`);
+        if (g.branch && g.branch !== "a" && g.branch !== "b") errors.push(`weapons.${id}: branch は a / b`);
       }
     });
+    for (const lv of new Set(gs.filter((g) => g.branch).map((g) => g.lv))) {
+      const at = gs.filter((g) => g.lv === lv);
+      if (!at.some((g) => g.branch === "a") || !at.some((g) => g.branch === "b")) errors.push(`weapons.${id}: Lv${lv} に道 a と b の両方が必要`);
+    }
     if (gs.length < 2) errors.push(`weapons.${id}: 段階は2つ以上`);
   }
-  for (const id of Object.keys(D.passives)) need(D.passives[id], ["name", "per", "fmt"], `passives.${id}`);
+  for (const id of Object.keys(D.passives)) {
+    need(D.passives[id], ["name", "per", "fmt"], `passives.${id}`);
+    const t = D.passives[id].tag;
+    if (t && isDict(D.tags) && !(t in D.tags)) errors.push(`passives.${id}: タグ '${t}' が tags にない`);
+  }
   const rarIds: string[] = [];
   for (const r of D.rarities) {
     if (need(r, ["id", "name", "weight", "color", "wlv", "wbonus", "pmul"], "rarities")) {
@@ -93,7 +101,7 @@ export function loadBalance(raw: unknown): Loaded {
   // 祭壇の樹: 根は1つ（費用0・親なし）、親は先に定義された節、レア度の合計は altar.max 以下
   const nids = new Set<string>();
   let altarSum = 0;
-  const effKeys = ["altar", "affinity_pts", "seal_slots", "ghost_atk", "devour_bonus", "taint_resist", "mourn_bonus"];
+  const effKeys = ["altar", "affinity_pts", "seal_slots", "ghost_atk", "devour_bonus", "taint_resist", "mourn_bonus", "ghost_slots", "sigil_tier", "curses"];
   D.tree.forEach((n, i) => {
     if (!need(n, ["id", "name", "x", "y", "cost", "parents", "desc", "effect"], `tree[${i}]`)) return;
     if (nids.has(n.id)) errors.push(`tree: id '${n.id}' が重複`);
@@ -112,6 +120,24 @@ export function loadBalance(raw: unknown): Loaded {
     if (!(D.rites.wraith.at > 0 && D.rites.wraith.at < 1)) errors.push("rites.wraith.at は 0〜1");
   }
   if (!isDict(D.enemies.wraith) || D.enemies.wraith.ai !== "wraith") errors.push("enemies.wraith（ai: wraith）が必要");
+  // タグとセット効果・刻印・呪い・亡霊の枠と誕生条件
+  const MODS = ["dmg", "cd", "area", "burn", "explode", "slow_t", "freeze", "shatter", "chain", "nodecay", "count", "pierce", "length", "ghost_atk", "ghost_cd", "ghost_full"];
+  for (const [t, def] of Object.entries(D.tags)) {
+    if (!need(def, ["name", "color", "sets"], `tags.${t}`)) continue;
+    let pa = 0;
+    for (const st of def.sets) {
+      if (!(st.at > pa)) errors.push(`tags.${t}: sets の at は昇順`);
+      pa = st.at;
+      for (const k of Object.keys(st.mods)) if (!MODS.includes(k)) errors.push(`tags.${t}: 知らない効果 '${k}'`);
+    }
+  }
+  need(D.tag_points, ["hero_weapon", "ghost_weapon", "ghost_spirit", "passive_level"], "tag_points");
+  const SIG = ["ember_step", "soul_drain", "iron_vow", "greed", "frost_thorn", "executioner", "ghost_echo", "storm_heart"];
+  for (const sg of D.sigils) if (need(sg, ["id", "tier", "name", "desc"], "sigils") && !SIG.includes(sg.id)) errors.push(`sigils: '${sg.id}' の効果がコードにない`);
+  const CUR = ["might", "max_hp", "haste", "xp", "enemy_speed", "dmg_taken", "area", "dash_cd"];
+  for (const c of D.curses) if (need(c, ["id", "name", "desc", "mods"], "curses")) for (const k of Object.keys(c.mods)) if (!CUR.includes(k)) errors.push(`curses.${c.id}: 知らない効果 '${k}'`);
+  if (need(D.ghost_slots, ["base", "max"], "ghost_slots") && !(D.ghost_slots.base >= 1 && D.ghost_slots.max >= D.ghost_slots.base)) errors.push("ghost_slots: 1 <= base <= max");
+  need(D.ghost_birth, ["fragments", "min_survival", "drops"], "ghost_birth");
   for (const [lv, u] of D.ghost_unlock) if (!(lv >= 1 && u > 0 && u <= 1)) errors.push("ghost_unlock は [レベル, 0〜1]");
   return { D, errors };
 }

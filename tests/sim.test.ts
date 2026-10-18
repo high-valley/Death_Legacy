@@ -85,9 +85,10 @@ test("レア度でパッシブ効果・武器Lvが変わる", () => {
 });
 
 test("封印したカードは新規取得の候補に出ない", () => {
-  const r = new RunSim(D, { run_id: "x", seed: 1, mode: "short", weapon: "sword", card_mods: { altar: 0, affinity: {}, seals: ["bow", "swift"] } });
+  const r = new RunSim(D, { run_id: "x", seed: 1, mode: "short", weapon: "sword", card_mods: { altar: 0, affinity: {}, seals: ["swift"] } });
   const ids = r.cardPool().map((o) => o.id);
-  assert.ok(!ids.includes("bow") && !ids.includes("swift") && ids.includes("fire"));
+  assert.ok(!ids.includes("swift") && ids.includes("might"));
+  assert.deepEqual(r.cardPool().filter((o) => o.kind === "weapon").map((o) => o.id), ["sword"], "武器カードは主人公の武器だけ");
 });
 
 test("縁で出現率が上がる", () => {

@@ -4,9 +4,9 @@
 import { RngStreams } from "../core/rng.ts";
 import { SpatialGrid, pushPair } from "../core/spatialGrid.ts";
 import type { Balance, EnemyDef, Lineage, Rarity, RarityId, RunMode } from "../data/types.ts";
-import { weaponGrade } from "../data/weapons.ts";
+import { branchLevel, weaponGrade, type Branch } from "../data/weapons.ts";
 export { gradeIndex, weaponGrade } from "../data/weapons.ts";
-import type { CardMods, GhostMode, GhostRecord, Heirloom, RunResult, Snapshot, Summary } from "../meta/records.ts";
+import type { CardMods, GhostPick, GhostRecord, Heirloom, RunResult, Snapshot, Summary } from "../meta/records.ts";
 
 export const STEP = 1 / 60;
 const TAU = Math.PI * 2;
@@ -52,9 +52,13 @@ export class Companion {
   rec: GhostRecord;       // 保管データのコピー（元データは触らない）
   x = -40; y = 20;
   cd = 0;
+  echoCd = 0;             // 刻印「霊の共鳴」で主人公の武器を撃つ間隔
   phase = 0;
-  constructor(rec: GhostRecord) {
+  slot = 0;               // 何体目か（並ぶ位置）
+  constructor(rec: GhostRecord, slot = 0) {
     this.rec = rec;
+    this.slot = slot;
+    this.phase = slot * 2.1;
   }
 }
 
@@ -79,8 +83,8 @@ export type SimEvent =
   | { type: "toast"; text: string }
   | { type: "shake"; amount: number };
 
-export type CardKind = "weapon" | "passive" | "lineage" | "heal";
-export interface Card { kind: CardKind; id: string; lv: number; rar: RarityId }
+export type CardKind = "weapon" | "passive" | "lineage" | "heal" | "sigil" | "curse";
+export interface Card { kind: CardKind; id: string; lv: number; rar: RarityId; branch?: Branch }
 type Option = Omit<Card, "rar">;
 
 export interface RunOpts {
@@ -89,12 +93,14 @@ export interface RunOpts {
   mode?: RunMode;
   weapon?: string;
   lineage?: string;
-  ghost?: GhostRecord | null;
+  ghost?: GhostRecord | null;        // 1体だけ連れていく時の書き方（ghosts と同じ）
+  ghosts?: GhostRecord[];           // 連れていく亡霊（最大2体）
   heirloom?: Heirloom | null;
   card_mods?: CardMods;
   checkpoint?: Snapshot | null;
   /** 喰らった亡霊（同行はしない。力だけを取り込む） */
   devour?: Devour | null;
+  devours?: Devour[];
   /** このランに現れる怨霊 */
   wraith?: GhostRecord | null;
   /** 穢れによる敵HPの増分（0.12 = +12%） */
@@ -132,11 +138,16 @@ export class RunSim {
   readonly lineage: Lineage;
   lineageLv = 0;     // 家系の札の取得回数
   lpow = 0;          // 家系の札の効果量（レア度込み）
-  ghostId = "";
   heirloomId = "";
   solo: boolean;
-  ghostMode: GhostMode = "bring";
-  devour: Devour | null = null;
+  devours: Devour[] = [];
+  /** 喰らった力の合計 */
+  devourMight = 0;
+  fragments = 0;                             // 未練の欠片
+  branch: Record<string, Branch> = {};       // 武器ごとに選んだ道
+  sigils: string[] = [];                     // 刻印
+  curses: string[] = [];                     // 呪い
+  private soulKills = 0;
   wraithRec: GhostRecord | null = null;
   wraith: Foe | null = null;
   wraithSpawned = false;
@@ -171,7 +182,7 @@ export class RunSim {
   private dmgThisTick = 0;
 
   readonly hero = new Hero();
-  ghost: Companion | null = null;
+  ghosts: Companion[] = [];
   enemies: Foe[] = [];
   shots: Shot[] = [];
   eshots: EShot[] = [];
@@ -196,18 +207,20 @@ export class RunSim {
     this.maxHp = Math.round(D.player.hp * (1 + (this.lineage.mods.max_hp ?? 0)));
     this.hp = this.maxHp;
     this.weapons[this.mainWeapon] = 1;
-    if (o.ghost) {
-      this.ghost = new Companion(structuredClone(o.ghost));
-      this.ghostId = o.ghost.ghost_id;
+    const gs = [...(o.ghosts ?? []), ...(o.ghost ? [o.ghost] : [])];
+    gs.forEach((g, i) => this.ghosts.push(new Companion(structuredClone(g), i)));
+    const dv = [...(o.devours ?? []), ...(o.devour ? [o.devour] : [])];
+    let hpUp = 0;
+    for (const d of dv) {
+      this.devours.push({ rec: structuredClone(d.rec), might: d.might, hp: d.hp });
+      this.devourMight += d.might;
+      hpUp += d.hp;
     }
-    if (o.devour && !this.ghost) {
-      this.devour = { rec: structuredClone(o.devour.rec), might: o.devour.might, hp: o.devour.hp };
-      this.ghostId = o.devour.rec.ghost_id;
-      this.ghostMode = "devour";
-      this.maxHp = Math.round(this.maxHp * (1 + this.devour.hp));
+    if (hpUp > 0) {
+      this.maxHp = Math.round(this.maxHp * (1 + hpUp));
       this.hp = this.maxHp;
     }
-    this.solo = this.ghost === null && this.devour === null;
+    this.solo = this.ghosts.length === 0 && this.devours.length === 0;
     if (o.wraith) this.wraithRec = structuredClone(o.wraith);
     this.taintHp = Math.max(0, o.taint_hp ?? 0);
     if (o.heirloom) {
@@ -221,7 +234,8 @@ export class RunSim {
     const cap = h.type === "weapon" ? this.D.weapon_max_level : this.D.passive_max_level;
     const lv = Math.min(cap, h.level + (this.lineage.mods.heir_level_bonus ?? 0));
     if (h.type === "weapon") {
-      this.weapons[h.id] = Math.max(this.weapons[h.id] ?? 0, lv);
+      // 主人公は武器1種なので、武器の形見は「いまの武器のLv」になる
+      this.weapons[this.mainWeapon] = Math.max(this.weapons[this.mainWeapon] ?? 0, lv);
     } else {
       this.passives[h.id] = lv;
       this.ppow[h.id] = lv;
@@ -247,9 +261,91 @@ export class RunSim {
   progress(): number { return Math.min(1, this.t / this.runLen); }
   xpNeed(): number { return this.D.xp.base + this.level * this.D.xp.per_level; }
   pw(id: string): number { return this.ppow[id] ?? 0; }
-  mightMul(): number { return (1 + 0.12 * this.pw("might")) * (1 + (this.devour?.might ?? 0)); }
-  hasteMul(): number { return 1 / (1 + 0.1 * this.pw("haste")); }
-  areaMul(): number { return 1 + 0.12 * this.pw("area"); }
+  mightMul(): number { return (1 + 0.12 * this.pw("might")) * (1 + this.devourMight) * (1 + this.curseMod("might")); }
+  hasteMul(): number { return 1 / ((1 + 0.1 * this.pw("haste")) * (1 + this.curseMod("haste"))); }
+  areaMul(): number { return (1 + 0.12 * this.pw("area")) * (1 + this.curseMod("area")); }
+
+  /** 先頭の同行亡霊（1体目） */
+  get ghost(): Companion | null { return this.ghosts[0] ?? null; }
+  /** 先頭の喰らった亡霊 */
+  get devour(): Devour | null { return this.devours[0] ?? null; }
+
+  has(sigil: string): boolean { return this.sigils.includes(sigil); }
+
+  curseMod(key: string): number {
+    let v = 0;
+    for (const id of this.curses) v += this.D.curses.find((c) => c.id === id)?.mods[key] ?? 0;
+    return v;
+  }
+
+  // ---------------------------------------------------------------- tags / sets
+  private tagCache: Record<string, number> | null = null;
+  private modCache = new Map<string, Record<string, number>>();
+
+  /** タグの点数: 主人公の武器 2 / 亡霊の武器 1（＋霊 1）/ タグ付きパッシブ 1Lvにつき 1 */
+  tagPoints(): Record<string, number> {
+    if (this.tagCache) return this.tagCache;
+    const D = this.D, P = D.tag_points, out: Record<string, number> = {};
+    const add = (t: string, n: number): void => { out[t] = (out[t] ?? 0) + n; };
+    for (const t of D.weapons[this.mainWeapon].tags) add(t, P.hero_weapon);
+    for (const g of this.ghosts) {
+      for (const t of D.weapons[g.rec.primary_weapon_id]?.tags ?? []) add(t, P.ghost_weapon);
+      add("spirit", P.ghost_spirit);
+    }
+    for (const id in this.passives) {
+      const t = D.passives[id]?.tag;
+      if (t) add(t, P.passive_level * this.passives[id]);
+    }
+    return (this.tagCache = out);
+  }
+
+  /** いま効いているセット効果（タグごと） */
+  activeSets(): { tag: string; at: number; text: string }[] {
+    const pts = this.tagPoints(), out: { tag: string; at: number; text: string }[] = [];
+    for (const [t, def] of Object.entries(this.D.tags)) for (const st of def.sets) if ((pts[t] ?? 0) >= st.at) out.push({ tag: t, at: st.at, text: st.text });
+    return out;
+  }
+
+  /** タグたちにかかるセット効果の合計 */
+  setMods(tags: string[]): Record<string, number> {
+    const key = tags.join(",");
+    const c = this.modCache.get(key);
+    if (c) return c;
+    const pts = this.tagPoints(), out: Record<string, number> = {};
+    for (const t of tags) {
+      const def = this.D.tags[t];
+      if (!def) continue;
+      for (const st of def.sets) if ((pts[t] ?? 0) >= st.at) for (const k in st.mods) out[k] = (out[k] ?? 0) + st.mods[k];
+    }
+    this.modCache.set(key, out);
+    return out;
+  }
+
+  /** どのタグでもよいので、効いている特別な効果の合計（爆発・凍結時の追加ダメージなど） */
+  anySet(key: string): number {
+    return this.setMods(Object.keys(this.D.tags))[key] ?? 0;
+  }
+
+  private dirtyTags(): void {
+    this.tagCache = null;
+    this.modCache.clear();
+  }
+
+  /** タグ付きパッシブの倍率（例: 熾火の心臓 → 炎のダメージ） */
+  private tagPassiveMul(tags: string[]): number {
+    let m = 1;
+    for (const id in this.passives) {
+      const P = this.D.passives[id];
+      if (P.tag && P.tag !== "spirit" && tags.includes(P.tag)) m *= 1 + (P.per / 100) * this.pw(id);
+    }
+    return m;
+  }
+
+  /** 亡霊の攻撃倍率（祭壇の樹・家系・霊媒・霊のセット） */
+  ghostAtkMul(): number {
+    const sp = this.setMods(["spirit"]);
+    return (1 + this.mod("ghost_atk")) * (1 + (this.cardMods.ghost_atk ?? 0)) * (1 + (this.D.passives.medium.per / 100) * this.pw("medium")) * (1 + (sp.ghost_atk ?? 0));
+  }
 
   /** 亡霊の解放率。墓守は1段階早い */
   ghostUnlock(): number {
@@ -270,16 +366,19 @@ export class RunSim {
   }
 
   weaponName(id: string): string {
-    return weaponGrade(this.D.weapons[id], this.weapons[id] ?? 1, !!this.evolved[id]).name;
+    return weaponGrade(this.D.weapons[id], this.weapons[id] ?? 1, !!this.evolved[id], this.branch[id]).name;
   }
 
   // ---------------------------------------------------------------- weapons
   /** プレイヤーと亡霊が同じ武器コードを使う。武器ごとの形は段階（グレード）の数値で決まる */
-  fireWeapon(id: string, lv: number, ox: number, oy: number, fx: number, fy: number, dmgMul: number, area: number, isGhost: boolean, evo: boolean): boolean {
+  fireWeapon(id: string, lv: number, ox: number, oy: number, fx: number, fy: number, dmgMul: number, area: number, isGhost: boolean, evo: boolean,
+    branch: Branch | "" = "", owner: { x: number; y: number } | null = null): boolean {
     const W = this.D.weapons[id];
-    const g = weaponGrade(W, lv, evo);
+    const g = weaponGrade(W, lv, evo, branch);
+    const m = this.setMods(W.tags);   // セット効果（同じタグの武器なら主人公・亡霊どちらにも効く）
+    area *= 1 + (m.area ?? 0);
     const tgt = this.grid.nearest(ox, oy, 520);
-    const dmg = W.damage * dmgMul * g.dmg * (1 + W.per_level * (lv - 1));
+    const dmg = W.damage * dmgMul * g.dmg * (1 + W.per_level * (lv - 1)) * (1 + (m.dmg ?? 0)) * this.tagPassiveMul(W.tags);
     // 狙う向き（敵がいなければ向いている方）
     let dx = fx, dy = fy;
     if (tgt) {
@@ -303,11 +402,11 @@ export class RunSim {
       }
     } else if (id === "bow") {
       if (!tgt) return false;
-      const n = g.count ?? 1;
+      const n = (g.count ?? 1) + (m.count ?? 0);
       const sp = (W.speed ?? 560) * (g.speed ?? 1);
       for (let i = 0; i < n; i++) {
         const a = a0 + (i - (n - 1) / 2) * (n > 3 ? 0.12 : 0.16);
-        this.shots.push({ x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg, pierce: g.pierce ?? 0, life: 1, ghost: isGhost, hit: new Set(), rad: 4, kind: "arrow" });
+        this.shots.push({ x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg, pierce: (g.pierce ?? 0) + (m.pierce ?? 0), life: 1, ghost: isGhost, hit: new Set(), rad: 4, kind: "arrow" });
       }
     } else if (id === "fire") {
       if (!tgt) return false;
@@ -317,7 +416,7 @@ export class RunSim {
         const at = i === 0 || this.enemies.length === 0 ? tgt : this.enemies[this.rng.misc.randi(this.enemies.length)];
         this.zones.push({
           x: at.x, y: at.y, r: (W.radius ?? 68) * area * (g.radius ?? 1) * (1 + 0.05 * (lv - 1)) * (1 + fa),
-          dmg, life: (W.burn ?? 2.6) * (g.burn ?? 1) * (1 + fb), tick: 0, ghost: isGhost,
+          dmg, life: (W.burn ?? 2.6) * (g.burn ?? 1) * (1 + fb) * (1 + (m.burn ?? 0)), tick: 0, ghost: isGhost,
         });
       }
     } else if (id === "ice") {
@@ -330,14 +429,16 @@ export class RunSim {
         const a = n >= 8 ? a0 + i * spread : a0 + (i - (n - 1) / 2) * spread;
         this.shots.push({
           x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg, pierce: g.pierce ?? 0, life: 1.1, ghost: isGhost, hit: new Set(),
-          rad: 6, kind: "ice", slow: W.slow ?? 0.5, slowT: W.slow_time ?? 1.5, freeze: g.freeze ?? 0,
+          rad: 6, kind: "ice", slow: W.slow ?? 0.5, slowT: (W.slow_time ?? 1.5) * (1 + (m.slow_t ?? 0)), freeze: (g.freeze ?? 0) + (m.freeze ?? 0),
         });
       }
     } else if (id === "thunder") {
       // 雷: 近い敵に落ち、そこから近くの敵へ次々に飛び移る（1回ごとに少し弱まる）
       if (!tgt) return false;
       const range = (W.range ?? 340) * area, jump = (W.jump ?? 150) * area;
-      const bolts = g.count ?? 1, chain = g.chain ?? 2;
+      const storm = this.has("storm_heart");
+      const bolts = g.count ?? 1, chain = (g.chain ?? 2) + (m.chain ?? 0) + (storm ? 1 : 0);
+      const decay = m.nodecay || storm ? 1 : 0.85;
       const struck = new Set<Foe>();
       for (let b = 0; b < bolts; b++) {
         let cur: Foe | null = b === 0 ? tgt : null;
@@ -353,7 +454,7 @@ export class RunSim {
           struck.add(cur);
           this.hurt(cur, d);
           pts.push(cur.x, cur.y);
-          d *= 0.85;
+          d *= decay;
           const from: Foe = cur;
           let best: Foe | null = null, bd = jump;
           const list = this.grid.query(from.x, from.y, jump);
@@ -370,7 +471,7 @@ export class RunSim {
     } else if (id === "spear") {
       // 突き: 線分の上にいる敵をすべて貫く
       if (!tgt) return false;
-      const len = (W.length ?? 120) * (g.length ?? 1) * area * (1 + 0.04 * (lv - 1));
+      const len = (W.length ?? 120) * (g.length ?? 1) * area * (1 + 0.04 * (lv - 1)) * (1 + (m.length ?? 0));
       const hw = (W.width ?? 16) * (g.width ?? 1) / 2;
       const dirs = g.dirs ?? 1;
       for (let k = 0; k < dirs; k++) {
@@ -392,12 +493,12 @@ export class RunSim {
       if (!tgt) return false;
       const n = g.count ?? 1;
       const sp = (W.speed ?? 380) * (g.range ?? 1);
-      const owner = isGhost && this.ghost ? this.ghost : this.hero;
+      const back = owner ?? this.hero;
       for (let i = 0; i < n; i++) {
         const a = n >= 4 ? a0 + (i * TAU) / n : a0 + (i - (n - 1) / 2) * 0.5;
         this.shots.push({
           x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg, pierce: 999, life: 1.6, ghost: isGhost, hit: new Set(),
-          rad: (W.size ?? 10) * (g.size ?? 1) * area, kind: "axe", ret: 0.8, spin: 0, owner,
+          rad: (W.size ?? 10) * (g.size ?? 1) * area, kind: "axe", ret: 0.8, spin: 0, owner: back,
         });
       }
     }
@@ -405,9 +506,9 @@ export class RunSim {
   }
 
   /** 武器の攻撃間隔（段階とLvで決まる） */
-  weaponCd(id: string, lv: number, evo: boolean): number {
+  weaponCd(id: string, lv: number, evo: boolean, branch: Branch | "" = ""): number {
     const W = this.D.weapons[id];
-    return W.cd * weaponGrade(W, lv, evo).cd * (1 - 0.05 * (lv - 1));
+    return W.cd * weaponGrade(W, lv, evo, branch).cd * (1 - 0.05 * (lv - 1)) * (1 - (this.setMods(W.tags).cd ?? 0));
   }
 
   /** 氷: 遅くする・凍らせる。ボスと怨霊は凍らず、遅くなるのも半分 */
@@ -420,7 +521,11 @@ export class RunSim {
 
   private hurt(e: Foe, d: number): void {
     if (e.dead) return;
+    if (e.freezeT > 0) d *= 1 + this.anySet("shatter");                       // 氷6: 凍った敵に追加ダメージ
+    if ((e.freezeT > 0 || e.slowT > 0) && this.has("frost_thorn")) d *= 1.3;  // 刻印: 霜の棘
     e.hp -= d;
+    // 刻印: 処刑人（雑魚だけ）
+    if (e.hp > 0 && e.hp < e.maxHp * 0.15 && this.has("executioner") && e.kind !== "boss" && e.kind !== "wraith" && e.kind !== "elite") e.hp = 0;
     e.flash = 0.07;
     if (this.showDamage && this.dmgThisTick < 12) {
       this.dmgThisTick++;
@@ -431,6 +536,7 @@ export class RunSim {
 
   hurtPlayer(d: number, cause: string): void {
     if (this.result !== "" || this.hero.iframe > 0) return;
+    d *= (1 + this.curseMod("dmg_taken")) * (this.has("iron_vow") ? 0.75 : 1);
     this.hp -= d;
     this.hero.iframe = this.D.player.hit_iframe;
     this.hero.flash = 0.15;
@@ -453,8 +559,12 @@ export class RunSim {
     const l = Math.hypot(mx, my);
     if (l > 0.01) { h.dashDx = mx / l; h.dashDy = my / l; } else { h.dashDx = h.fx; h.dashDy = h.fy; }
     h.dashT = this.D.player.dash_time;
-    h.dashCd = this.D.player.dash_cd;
+    h.dashCd = this.D.player.dash_cd * (1 + this.curseMod("dash_cd"));
     h.iframe = Math.max(h.iframe, this.D.player.dash_time + 0.08);
+    if (this.has("ember_step")) {   // 刻印: 残り火の歩み
+      const F = this.D.weapons.fire;
+      this.zones.push({ x: h.x, y: h.y, r: 55, dmg: F.damage * this.mightMul(), life: 3, tick: 0, ghost: false });
+    }
     this.emit({ type: "sfx", name: "dash" });
     return true;
   }
@@ -538,7 +648,7 @@ export class RunSim {
       ux = mx / ml; uy = my / ml;
       h.fx = ux; h.fy = uy;
     }
-    const speed = D.player.speed * (1 + 0.08 * this.pw("swift")) * (1 + this.mod("speed"));
+    const speed = D.player.speed * (1 + 0.08 * this.pw("swift")) * (1 + this.mod("speed")) * (this.has("iron_vow") ? 0.92 : 1);
     if (h.dashT > 0) {
       h.dashT -= dt;
       h.x += h.dashDx * D.player.dash_speed * dt;
@@ -559,11 +669,11 @@ export class RunSim {
           const lv = this.weapons[id];
           // 無名の意地: HPが3割以下の時に与ダメージが上がる
           const grit = this.lineage.card.id === "grit" && this.hp <= this.maxHp * 0.3 ? 1 + this.cardPower() : 1;
-          const ok = this.fireWeapon(id, lv, h.x, h.y, h.fx, h.fy, this.mightMul() * (1 + (this.wbonus[id] ?? 0)) * grit, this.areaMul(), false, !!this.evolved[id]);
-          h.cds[id] = ok ? this.weaponCd(id, lv, !!this.evolved[id]) * this.hasteMul() : 0.2;
+          const ok = this.fireWeapon(id, lv, h.x, h.y, h.fx, h.fy, this.mightMul() * (1 + (this.wbonus[id] ?? 0)) * grit * D.player.weapon_mult, this.areaMul(), false, !!this.evolved[id], this.branch[id] ?? "");
+          h.cds[id] = ok ? this.weaponCd(id, lv, !!this.evolved[id], this.branch[id] ?? "") * this.hasteMul() : 0.2;
         }
       }
-      if (this.ghost) this.ghostUpdate(dt);
+      for (const g of this.ghosts) this.ghostUpdate(g, dt);
     }
 
     for (const s of this.shots) {
@@ -619,6 +729,21 @@ export class RunSim {
       e.dead = true;
       this.kills++;
       if (e.def.xp > 0) this.gems.push({ x: e.x, y: e.y, v: e.def.xp, mag: false });
+      // 未練の欠片（精鋭・怨霊が落とす。死んだ時に足りていれば亡霊になれる）
+      const frag = D.ghost_birth.drops[e.kind] ?? 0;
+      if (frag > 0) {
+        this.fragments += frag;
+        this.emit({ type: "toast", text: `未練の欠片 +${frag}（${this.fragments} / ${D.ghost_birth.fragments}）` });
+      }
+      // 刻印: 吸魂
+      if (this.has("soul_drain") && ++this.soulKills % 20 === 0) this.hp = Math.min(this.maxHp, this.hp + 5);
+      // 炎6: 25% で爆発
+      if (this.anySet("explode") > 0 && e !== this.boss && this.rng.build.randf() < 0.25) {
+        const R = 55, dmgB = D.weapons.fire.damage * 2.5 * this.mightMul();
+        const list = this.grid.query(e.x, e.y, R + 20);
+        for (let i = 0; i < list.length; i++) if (!list[i].dead && Math.hypot(list[i].x - e.x, list[i].y - e.y) < R + list[i].r) this.hurt(list[i], dmgB);
+        this.emit({ type: "fx", kind: "boom", x: e.x, y: e.y, r: R, dur: 0.25 });
+      }
       if (e === this.boss) {
         this.bossKills++;
         this.end("boss_cleared");
@@ -659,8 +784,9 @@ export class RunSim {
     }
     compact(this.eshots, (s) => s.life > 0);
 
-    const pick = D.player.pickup * (1 + 0.25 * this.pw("magnet"));
-    const xpMul = this.solo ? 1 + D.solo_xp_bonus * (1 + this.mod("solo_xp")) : 1;
+    const greed = this.has("greed");
+    const pick = D.player.pickup * (1 + 0.25 * this.pw("magnet")) * (greed ? 1.5 : 1);
+    const xpMul = (this.solo ? 1 + D.solo_xp_bonus * (1 + this.mod("solo_xp")) : 1) * (1 + this.curseMod("xp")) * (greed ? 1.25 : 1);
     let picked = false;
     compact(this.gems, (g) => {
       const ox = h.x - g.x, oy = h.y - g.y;
@@ -689,21 +815,34 @@ export class RunSim {
     this.updateMs = this.updateMs * 0.9 + (performance.now() - t0) * 0.1;
   }
 
-  private ghostUpdate(dt: number): void {
-    const g = this.ghost!, h = this.hero;
+  /** 同行する亡霊: 主人公の後ろ（2体なら左右）について、生前の武器で戦う */
+  private ghostUpdate(g: Companion, dt: number): void {
+    const h = this.hero;
     g.phase += dt;
-    const tx = h.x - h.fx * 46 + Math.cos(g.phase) * 14;
-    const ty = h.y - h.fy * 46 + Math.sin(g.phase * 1.3) * 10;
+    const side = this.ghosts.length > 1 ? (g.slot === 0 ? 1 : -1) : 0;
+    const tx = h.x - h.fx * 46 - h.fy * 30 * side + Math.cos(g.phase) * 14;
+    const ty = h.y - h.fy * 46 + h.fx * 30 * side + Math.sin(g.phase * 1.3) * 10;
     const k = Math.min(1, dt * 5);
     g.x += (tx - g.x) * k;
     g.y += (ty - g.y) * k;
+    const sp = this.setMods(["spirit"]);
+    const unlock = sp.ghost_full ? 1 : this.ghostUnlock();
+    // 鎮魂の鐘・霊4: 亡霊の攻撃間隔が短くなる
+    const bell = (this.lineage.card.id === "bell" ? Math.max(0.4, 1 - this.cardPower()) : 1) * (1 - (sp.ghost_cd ?? 0));
     g.cd -= dt;
     if (g.cd <= 0) {
-      const r = g.rec, s = r.stat_snapshot, wid = r.primary_weapon_id, lv = r.weapon_level;
-      const ok = this.fireWeapon(wid, lv, g.x, g.y, 1, 0, s.attack_mult * this.ghostUnlock() * (1 + this.mod("ghost_atk")) * (1 + (this.cardMods.ghost_atk ?? 0)), s.area, true, !!r.evolved);
-      // 鎮魂の鐘: 亡霊の攻撃間隔が短くなる
-      const bell = this.lineage.card.id === "bell" ? Math.max(0.4, 1 - this.cardPower()) : 1;
-      g.cd = ok ? (this.weaponCd(wid, lv, !!r.evolved) / s.attack_speed) * bell : 0.25;
+      const r = g.rec, s = r.stat_snapshot, wid = r.primary_weapon_id, lv = r.weapon_level, br = r.weapon_branch ?? "";
+      const ok = this.fireWeapon(wid, lv, g.x, g.y, 1, 0, s.attack_mult * unlock * this.ghostAtkMul(), s.area, true, !!r.evolved, br, g);
+      g.cd = ok ? (this.weaponCd(wid, lv, !!r.evolved, br) / s.attack_speed) * bell : 0.25;
+    }
+    // 刻印: 霊の共鳴（主人公の武器を40%の威力で一緒に撃つ）
+    if (this.has("ghost_echo")) {
+      g.echoCd -= dt;
+      if (g.echoCd <= 0) {
+        const id = this.mainWeapon, lv = this.weapons[id];
+        const ok = this.fireWeapon(id, lv, g.x, g.y, h.fx, h.fy, this.mightMul() * 0.4, this.areaMul(), true, !!this.evolved[id], this.branch[id] ?? "", g);
+        g.echoCd = ok ? this.weaponCd(id, lv, !!this.evolved[id], this.branch[id] ?? "") * this.hasteMul() * 1.2 : 0.3;
+      }
     }
   }
 
@@ -713,7 +852,7 @@ export class RunSim {
     const d = Math.max(Math.hypot(ox, oy), 0.001);
     const ux = ox / d, uy = oy / d;
     const def = e.def;
-    const sp = def.speed;
+    const sp = def.speed * (1 + this.curseMod("enemy_speed"));
     e.flash -= dt;
     e.cd -= dt;
     switch (def.ai) {
@@ -796,22 +935,18 @@ export class RunSim {
   }
 
   // ---------------------------------------------------------------- cards
+  /** レベルアップの候補。主人公は武器1種なので武器カードは自分の武器だけ */
   cardPool(): Option[] {
     const D = this.D;
     const opts: Option[] = [];
-    let subs = 0;
-    for (const w in this.weapons) if (w !== this.mainWeapon) subs++;
     const seals = this.cardMods.seals ?? [];
-    for (const id in D.weapons) {
-      const lv = this.weapons[id] ?? 0;
-      if (lv > 0 && (lv < D.weapon_max_level || !this.evolved[id])) opts.push({ kind: "weapon", id, lv });
-      else if (lv === 0 && subs < D.sub_weapon_slots && !seals.includes(id)) opts.push({ kind: "weapon", id, lv: 0 }); // 封印は新規取得だけを止める
-    }
+    const id0 = this.mainWeapon, lv0 = this.weapons[id0] ?? 0;
+    if (lv0 < D.weapon_max_level || !this.evolved[id0]) opts.push({ kind: "weapon", id: id0, lv: lv0 });
     const nPass = Object.keys(this.passives).length;
     for (const id in D.passives) {
       const lv = this.passives[id] ?? 0;
       if (lv > 0 && lv < D.passive_max_level) opts.push({ kind: "passive", id, lv });
-      else if (lv === 0 && nPass < D.passive_slots && !seals.includes(id)) opts.push({ kind: "passive", id, lv: 0 });
+      else if (lv === 0 && nPass < D.passive_slots && !seals.includes(id)) opts.push({ kind: "passive", id, lv: 0 }); // 封印は新規取得だけを止める
     }
     // 家系の札（その家系で出撃した時だけ）。パッシブの枠は使わない
     if (this.lineageLv < this.lineage.card.max) opts.push({ kind: "lineage", id: this.lineage.card.id, lv: this.lineageLv });
@@ -833,14 +968,29 @@ export class RunSim {
     return "N";
   }
 
-  /** 3択。書庫の「縁」で出やすさ、祭壇の段階でレア度の重みが変わる */
+  /** まだ取っていない刻印のうち、いま出せるもの（祭壇の樹の書架で増える） */
+  sigilPool(): string[] {
+    const tier = this.cardMods.sigil_tier ?? 0, pts = this.tagPoints();
+    return this.D.sigils.filter((sg) => sg.tier <= tier && !this.sigils.includes(sg.id)
+      && (!sg.need || (sg.need === "ghost" ? this.ghosts.length > 0 : (pts[sg.need] ?? 0) > 0))).map((sg) => sg.id);
+  }
+
+  /**
+   * 3択。書庫の「縁」とビルドに合うタグで出やすさ、祭壇の段階でレア度の重みが変わる。
+   * 武器が道を選ぶLvに届く時は、道 a / b の2枚に分かれる。まれに刻印・呪い（解放後）が混ざる。
+   */
   rollChoices(): Card[] {
+    const D = this.D;
     const opts = this.cardPool();
-    const out: Card[] = [];
+    let out: Card[] = [];
     const aff = this.cardMods.affinity ?? {};
-    const step = this.D.library.affinity_step;
+    const step = D.library.affinity_step;
+    const pts = this.tagPoints();
     while (out.length < 3 && opts.length > 0) {
-      const ws = opts.map((o) => 1 + (aff[o.id] ?? 0) * step);
+      const ws = opts.map((o) => {
+        const t = o.kind === "passive" ? D.passives[o.id].tag : undefined;
+        return (1 + (aff[o.id] ?? 0) * step) * (t && (pts[t] ?? 0) > 0 ? 2 : 1) * (o.kind === "weapon" ? 1.6 : 1);
+      });
       const total = ws.reduce((a, b) => a + b, 0);
       let r = this.rng.cards.randf() * total;
       let idx = 0;
@@ -851,8 +1001,28 @@ export class RunSim {
       }
       const o = opts.splice(idx, 1)[0];
       let rar = this.rollRarity();
-      if (rar === "LR" && o.kind === "weapon" && (o.lv < this.D.evolve_min_level || this.evolved[o.id])) rar = "UR"; // 進化は育てた所持武器だけ
+      if (rar === "LR" && o.kind === "weapon" && (o.lv < D.evolve_min_level || this.evolved[o.id])) rar = "UR"; // 進化は育てた武器だけ
       out.push({ ...o, rar });
+    }
+    // 道を選ぶ: 武器カードが分岐のLvをまたぐなら a / b の2枚にする
+    const wi = out.findIndex((c) => c.kind === "weapon");
+    if (wi >= 0) {
+      const c = out[wi], W = D.weapons[c.id], bl = branchLevel(W), R = this.rarity(c.rar);
+      if (bl > 0 && !this.branch[c.id] && !(R.evolve && c.lv > 0) && c.lv < bl && c.lv + R.wlv >= bl) {
+        const rest = out.filter((_, i) => i !== wi).slice(0, 1);
+        out = [{ ...c, branch: "a" }, { ...c, branch: "b" }, ...rest];
+      }
+    }
+    // 刻印・呪い（3枚の時だけ、最後の札と入れ替える）
+    if (out.length === 3 && !out.some((c) => c.branch)) {
+      const sp = this.sigilPool();
+      if (sp.length > 0 && this.rng.build.randf() < D.sigil_chance) {
+        out[2] = { kind: "sigil", id: sp[this.rng.build.randi(sp.length)], lv: 0, rar: "UR" };
+      }
+      const cp = D.curses.filter((c) => !this.curses.includes(c.id));
+      if (this.cardMods.curses && cp.length > 0 && this.rng.build.randf() < D.curse_chance) {
+        out[1] = { kind: "curse", id: cp[this.rng.build.randi(cp.length)].id, lv: 0, rar: "SR" };
+      }
     }
     if (out.length === 0) out.push({ kind: "heal", id: "", lv: 0, rar: "N" });
     return out;
@@ -862,23 +1032,31 @@ export class RunSim {
     return this.D.rarities.find((r) => r.id === id) ?? this.D.rarities[0];
   }
 
+  /** カードのタグ（表示用） */
+  cardTag(c: Card): string {
+    if (c.kind === "weapon") return this.D.weapons[c.id].tags[0] ?? "";
+    if (c.kind === "passive") return this.D.passives[c.id].tag ?? "";
+    return "";
+  }
+
   describe(c: Card): { k: string; n: string; d: string } {
     const D = this.D, R = this.rarity(c.rar);
     if (c.kind === "weapon") {
-      const W = D.weapons[c.id], lv = c.lv, maxlv = D.weapon_max_level;
-      const cur = weaponGrade(W, Math.max(1, lv), !!this.evolved[c.id]);
+      const W = D.weapons[c.id], lv = c.lv, maxlv = D.weapon_max_level, br = this.branch[c.id] ?? "";
+      const cur = weaponGrade(W, Math.max(1, lv), !!this.evolved[c.id], br);
       if (R.evolve && lv > 0 && !this.evolved[c.id]) {
         const E = W.grades[W.grades.length - 1];
         return { k: `武器進化 Lv${lv} → ${Math.min(maxlv, lv + 1)}`, n: `${cur.name} → ${E.name}`, d: E.desc };
       }
       if (lv >= maxlv) return { k: "武器 最大Lv", n: cur.name, d: `${cur.name}のダメージ +${Math.round(D.maxed_weapon_bonus[c.rar] * 100)}%` };
       const to = Math.min(maxlv, lv + R.wlv);
-      const next = weaponGrade(W, to, !!this.evolved[c.id]);
       const extra = R.wbonus > 0 ? `\nさらにダメージ +${Math.round(R.wbonus * 100)}%` : "";
-      if (lv === 0) {
-        const head = c.id === this.mainWeapon ? "メイン武器" : `サブ武器を追加（Lv${to}）`;
-        return { k: head, n: next.name, d: `${W.desc}。${next.desc}` + extra };
+      if (c.branch) {
+        const next = weaponGrade(W, to, false, c.branch);
+        const end = weaponGrade(W, maxlv, false, c.branch);
+        return { k: `武器 Lv${lv} → ${to}・道を選ぶ`, n: `${cur.name} → ${next.name}`, d: `${next.desc}${end !== next ? `\nこの先: ${end.name}` : ""}` + extra };
       }
+      const next = weaponGrade(W, to, !!this.evolved[c.id], br);
       if (next !== cur) return { k: `武器 Lv${lv} → ${to}・持ち替え`, n: `${cur.name} → ${next.name}`, d: next.desc + extra };
       return { k: `武器 Lv${lv} → ${to}`, n: cur.name, d: `ダメージ +${Math.round(W.per_level * 100)}%・攻撃間隔が短くなる` + extra };
     }
@@ -889,7 +1067,16 @@ export class RunSim {
     if (c.kind === "passive") {
       const P = D.passives[c.id];
       const head = c.lv > 0 ? `パッシブ Lv${c.lv} → ${c.lv + 1}` : "パッシブを追加";
-      return { k: head, n: P.name, d: P.fmt.replace("{v}", String(Math.round(P.per * R.pmul))) };
+      const tag = P.tag ? `\n${D.tags[P.tag].name}のタグ +1` : "";
+      return { k: head, n: P.name, d: P.fmt.replace("{v}", String(Math.round(P.per * R.pmul))) + tag };
+    }
+    if (c.kind === "sigil") {
+      const sg = D.sigils.find((x) => x.id === c.id)!;
+      return { k: "刻印　ランの終わりまで続く", n: sg.name, d: sg.desc };
+    }
+    if (c.kind === "curse") {
+      const cu = D.curses.find((x) => x.id === c.id)!;
+      return { k: "呪い　強い効果と不利の両方", n: cu.name, d: cu.desc };
     }
     return { k: "全強化済み", n: "回復", d: "HP +30" };
   }
@@ -898,6 +1085,7 @@ export class RunSim {
     const D = this.D, R = this.rarity(c.rar ?? "N"), maxlv = D.weapon_max_level;
     if (c.kind === "weapon") {
       const lv = this.weapons[c.id] ?? 0;
+      if (c.branch && !this.branch[c.id]) this.branch[c.id] = c.branch;
       if (R.evolve && lv > 0 && !this.evolved[c.id]) {
         this.evolved[c.id] = true;
         this.weapons[c.id] = Math.min(maxlv, lv + 1);
@@ -918,6 +1106,18 @@ export class RunSim {
         this.maxHp += add;
         this.hp = Math.min(this.maxHp, this.hp + add);
       }
+      this.dirtyTags();
+    } else if (c.kind === "sigil") {
+      if (!this.sigils.includes(c.id)) this.sigils.push(c.id);
+    } else if (c.kind === "curse") {
+      if (!this.curses.includes(c.id)) {
+        this.curses.push(c.id);
+        const hpMod = D.curses.find((x) => x.id === c.id)?.mods.max_hp ?? 0;
+        if (hpMod) {
+          this.maxHp = Math.max(1, Math.round(this.maxHp * (1 + hpMod)));
+          this.hp = Math.min(this.hp, this.maxHp);
+        }
+      }
     } else {
       this.hp = Math.min(this.maxHp, this.hp + 30);
     }
@@ -928,11 +1128,12 @@ export class RunSim {
     const D = this.D;
     const w = Object.keys(this.weapons).map((id) => {
       const b = this.wbonus[id] ?? 0;
-      return `${this.weaponName(id)}${id === this.mainWeapon ? "(メイン)" : ""} Lv${this.weapons[id]}${b > 0 ? ` +${Math.round(b * 100)}%` : ""}`;
+      return `${this.weaponName(id)} Lv${this.weapons[id]}${b > 0 ? ` +${Math.round(b * 100)}%` : ""}`;
     });
     const p = Object.keys(this.passives).map((id) => `${D.passives[id].name} Lv${this.passives[id]}`);
     const l = this.lineageLv > 0 ? `　/　${this.lineage.card.name} Lv${this.lineageLv}` : "";
-    return `武器: ${w.join("・")}　/　パッシブ(${p.length}/${D.passive_slots}): ${p.length ? p.join("・") : "なし"}${l}`;
+    const sg = this.sigils.length ? `　/　刻印: ${this.sigils.map((id) => D.sigils.find((x) => x.id === id)?.name).join("・")}` : "";
+    return `武器: ${w.join("・")}　/　パッシブ(${p.length}/${D.passive_slots}): ${p.length ? p.join("・") : "なし"}${l}${sg}`;
   }
 
   // ---------------------------------------------------------------- save bridge
@@ -943,6 +1144,7 @@ export class RunSim {
       kills: this.kills, boss_kills: this.bossKills, boss_spawned: this.bossSpawned, elite_idx: this.eliteIdx, spawn_acc: this.spawnAcc,
       lineage_lv: this.lineageLv, lpow: this.lpow,
       wraith_spawned: this.wraithSpawned, wraith_dead: this.wraithDead,
+      fragments: this.fragments, branch: { ...this.branch }, sigils: [...this.sigils], curses: [...this.curses],
     };
   }
 
@@ -963,6 +1165,11 @@ export class RunSim {
     this.spawnAcc = c.spawn_acc;
     this.lineageLv = c.lineage_lv ?? 0;
     this.lpow = c.lpow ?? 0;
+    this.fragments = c.fragments ?? 0;
+    this.branch = { ...(c.branch ?? {}) };
+    this.sigils = [...(c.sigils ?? [])];
+    this.curses = [...(c.curses ?? [])];
+    this.dirtyTags();
     this.lastCheckpoint = this.t;
     this.rng.advance(Math.floor(this.t * 3)); // 乱数列を経過時間ぶん進めて、同じ seed の流れに乗せる
     if (c.boss_spawned) this.spawnBoss();
@@ -974,12 +1181,20 @@ export class RunSim {
     this.emit({ type: "toast", text: "中断したランを再開した" });
   }
 
+  /** 出撃で選んだ亡霊（連れていく / 喰らう） */
+  picks(): GhostPick[] {
+    return [
+      ...this.ghosts.map((g): GhostPick => ({ id: g.rec.ghost_id, mode: "bring" })),
+      ...this.devours.map((d): GhostPick => ({ id: d.rec.ghost_id, mode: "devour" })),
+    ];
+  }
+
   summary(): Summary {
     return {
       run_id: this.run_id, seed: this.seed, mode: this.mode, t: this.t, run_len: this.runLen, main_weapon: this.mainWeapon,
       weapons: { ...this.weapons }, passives: { ...this.passives }, ppow: { ...this.ppow }, wbonus: { ...this.wbonus }, evolved: { ...this.evolved },
-      level: this.level, kills: this.kills, boss_kills: this.bossKills, death_cause: this.deathCause, ghost_id: this.ghostId, heirloom_id: this.heirloomId,
-      lineage_id: this.lineage.id, ghost_mode: this.ghostMode,
+      level: this.level, kills: this.kills, boss_kills: this.bossKills, death_cause: this.deathCause, heirloom_id: this.heirloomId,
+      lineage_id: this.lineage.id, ghosts: this.picks(), fragments: this.fragments, branch: { ...this.branch },
       wraith_id: this.wraithRec?.ghost_id ?? "", wraith_purified: this.wraithDead,
     };
   }

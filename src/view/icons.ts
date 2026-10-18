@@ -55,8 +55,10 @@ export const ICONS: Record<string, Part[]> = {
 };
 
 /** カードやスロットに出すアイコン名（武器・パッシブ・家系の札はそのまま id） */
+const ALIAS: Record<string, string> = { ember: "fire", frost: "ice", volt: "thunder", edge: "sword", point: "spear", hawk: "bow", medium: "ghost" };
 export function iconFor(id: string): string {
-  return ICONS[id] ? id : "heal";
+  const a = ALIAS[id] ?? id;
+  return ICONS[a] ? a : "heal";
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";

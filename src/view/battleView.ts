@@ -1,6 +1,6 @@
 // 戦場の描画。RunSim の状態を読むだけ（書き換えない）。仮アセットなので図形で描く。
 // スマホでも軽く描けるように: 画面外は描かない / 同じ色の敵は続けて描く。
-import type { RunSim, SimEvent } from "../sim/runSim.ts";
+import type { Companion, RunSim, SimEvent } from "../sim/runSim.ts";
 import { Art } from "./art.ts";
 import { C, SERIF } from "./theme.ts";
 
@@ -140,7 +140,7 @@ export class BattleView {
       }
     }
 
-    if (sim.ghost) this.drawGhost(ctx, sim);
+    for (const g of sim.ghosts) this.drawGhost(ctx, sim, g);
     // 主人公
     const blink = h.iframe > 0 && Math.floor(sim.t * 30) % 2 === 0;
     ctx.globalAlpha = blink ? 0.4 : 1;
@@ -280,8 +280,7 @@ export class BattleView {
     ctx.fill();
   }
 
-  private drawGhost(ctx: CanvasRenderingContext2D, sim: RunSim): void {
-    const g = sim.ghost!;
+  private drawGhost(ctx: CanvasRenderingContext2D, sim: RunSim, g: Companion): void {
     const tier = sim.D.tiers.find((t) => t.id === g.rec.tier_id) ?? sim.D.tiers[0];
     ctx.globalAlpha = 0.45 + 0.25 * sim.ghostUnlock();
     ctx.fillStyle = "#d9fff8";

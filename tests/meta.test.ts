@@ -39,19 +39,22 @@ test("t03 単独出撃では保管庫が変わらない", () => {
   assert.equal(JSON.stringify(w.meta.storedGhosts()), before);
 });
 
-test("t04 死亡しても同行亡霊は消費され、使用済みは選べない", () => {
+test("t04 連れていった亡霊は死亡しても保管庫に戻る（減らない）。出撃中は選べない", () => {
   const w = new World();
   w.die(w.sortie("", "", "short", "sword", 1), 60);
   const gid = w.meta.storedGhosts()[0].ghost_id;
   const r = w.sortie(gid, "", "short", "sword", 14);
   assert.equal(w.meta.getGhost(gid)!.status, "reserved");
-  w.die(r, 80);
-  assert.equal(w.meta.getGhost(gid)!.status, "consumed");
-  assert.ok(w.meta.storedGhosts().length === 1 && w.meta.storedGhosts()[0].ghost_id !== gid);
-  assert.equal(w.sortie(gid), null);
+  assert.equal(w.meta.reserve("x", 1, "short", "sword", gid, ""), false, "出撃中に同じ亡霊は選べない");
+  const out = w.die(r, 80);
+  assert.equal(w.meta.getGhost(gid)!.status, "stored");
+  assert.deepEqual(out.companions, [w.meta.getGhost(gid)!.display_name]);
+  assert.equal(w.meta.storedGhosts().length, 2, "元の亡霊＋新しく生まれた亡霊");
+  w.meta.resolveHeirloom(-1);
+  assert.ok(w.sortie(gid), "次のランでもまた連れていける");
 });
 
-test("t05 生還でも同行亡霊は消費、亡霊は生まれない", () => {
+test("t05 生還でも亡霊は戻り、新しい亡霊は生まれない", () => {
   const w = new World();
   w.die(w.sortie("", "", "short", "sword", 1), 60);
   const gid = w.meta.storedGhosts()[0].ghost_id;
@@ -61,7 +64,27 @@ test("t05 生還でも同行亡霊は消費、亡霊は生まれない", () => {
   r.boss!.hp = 0;
   r.step(STEP, 0, 0);
   const out = w.meta.settle(r.summary(), "boss_cleared")!;
-  assert.ok(r.result === "boss_cleared" && w.meta.getGhost(gid)!.status === "consumed" && out.new_ghost_id === "");
+  assert.ok(r.result === "boss_cleared" && w.meta.getGhost(gid)!.status === "stored" && out.new_ghost_id === "");
+});
+
+test("亡霊を2体まで連れていける（双魂の契りを開いてから）", () => {
+  const w = new World();
+  for (let i = 0; i < 2; i++) { w.die(w.sortie("", "", "short", ["fire", "ice"][i], 60 + i), 100); w.meta.resolveHeirloom(-1); }
+  const [a, b] = w.meta.storedGhosts().map((g) => g.ghost_id);
+  const two = [{ id: a, mode: "bring" as const }, { id: b, mode: "bring" as const }];
+  assert.equal(w.meta.ghostSlots(), 1);
+  assert.equal(w.meta.reserve("r1", 1, "short", "sword", two, ""), false, "最初は1体まで");
+  w.repo.data.tree = ["soul1", "soul2", "twin"];
+  assert.equal(w.meta.ghostSlots(), 2);
+  assert.equal(w.meta.reserve("r1", 1, "short", "sword", [{ id: a, mode: "bring" }, { id: a, mode: "bring" }], ""), false, "同じ亡霊を2回は選べない");
+  const r = new RunSim(D, w.meta.runOpts((w.meta.reserve("r2", 2, "short", "thunder", two, ""), w.repo.data.active_run!)));
+  assert.equal(r.ghosts.length, 2);
+  const pts = r.tagPoints();
+  assert.ok(pts.thunder === 2 && pts.fire === 1 && pts.ice === 1 && pts.spirit === 2, JSON.stringify(pts));
+  assert.ok(r.activeSets().some((s) => s.tag === "spirit" && s.at === 2), "亡霊2体で霊2のセット");
+  const out = w.die(r, 30, 0);
+  assert.equal(out.companions!.length, 2);
+  assert.equal(w.meta.storedGhosts().length, 2, "2体とも戻る");
 });
 
 test("t06 亡霊は保管データのコピーで、生前の武器で攻撃する", () => {
@@ -94,7 +117,7 @@ test("t07 終了処理を何度呼んでも重複しない", () => {
   assert.ok(a.offerings > 0);
 });
 
-test("t08 異常終了しても同じランを途中から再開でき、亡霊は1回だけ消費", () => {
+test("t08 異常終了しても同じランを途中から再開でき、亡霊は複製されず最後に保管庫へ戻る", () => {
   const w = new World();
   w.die(w.sortie("", "", "short", "sword", 1), 60);
   const gid = w.meta.storedGhosts()[0].ghost_id;
@@ -107,25 +130,53 @@ test("t08 異常終了しても同じランを途中から再開でき、亡霊�
   const ar = w.repo.data.active_run!;
   assert.ok(ar.run_id === r.run_id && w.meta.getGhost(gid)!.status === "reserved");
   assert.equal(w.repo.data.ghosts.filter((g) => g.ghost_id === gid).length, 1, "亡霊は複製されない");
-  const r2 = new RunSim(D, { run_id: ar.run_id, seed: ar.seed, mode: ar.mode, weapon: ar.weapon, ghost: w.meta.getGhost(ar.ghost_id), card_mods: w.meta.cardMods(), checkpoint: ar.checkpoint });
+  const r2 = w.resume();
   assert.ok(r2.t >= 10 && r2.ghost && r2.ghost.rec.ghost_id === gid, `${r2.t}秒`);
   w.die(r2);
-  assert.equal(w.meta.getGhost(gid)!.status, "consumed");
+  assert.equal(w.meta.getGhost(gid)!.status, "stored");
 });
 
-test("t08b 放棄はリタイア扱いで消費", () => {
+test("t08b 放棄はリタイア扱い。連れていた亡霊は戻る", () => {
   const w = new World();
   w.die(w.sortie("", "", "short", "sword", 1), 60);
   const gid = w.meta.storedGhosts()[0].ghost_id;
   w.sortie(gid, "", "short", "sword", 19);
   const out = w.meta.abandonActive()!;
-  assert.ok(out.result === "retired" && w.meta.getGhost(gid)!.status === "consumed" && w.repo.data.active_run === null);
+  assert.ok(out.result === "retired" && w.meta.getGhost(gid)!.status === "stored" && w.repo.data.active_run === null);
+});
+
+test("亡霊になれるのは、生存時間の最低ラインを超え、未練の欠片が足りている時だけ", () => {
+  const w = new World();
+  const need = D.ghost_birth.fragments, minT = D.run_length.short * D.ghost_birth.min_survival;
+  let out = w.die(w.sortie("", "", "short", "sword", 70), minT - 5, need);
+  assert.ok(out.ghost_failed === "time" && out.new_ghost_id === "", "早すぎる死は亡霊にならない");
+  w.meta.resolveHeirloom(-1);
+  out = w.die(w.sortie("", "", "short", "sword", 71), minT + 10, need - 1);
+  assert.ok(out.ghost_failed === "fragments" && out.new_ghost_id === "", "欠片が足りない");
+  w.meta.resolveHeirloom(-1);
+  out = w.die(w.sortie("", "", "short", "sword", 72), minT + 10, need);
+  assert.ok(out.ghost_failed === "" && out.new_ghost_id !== "");
+  w.meta.resolveHeirloom(-1);
+  const base = w.meta.getGhost(out.new_ghost_id)!;
+  out = w.die(w.sortie("", "", "short", "sword", 73), minT + 10, need + 2);
+  const up = w.meta.getGhost(out.new_ghost_id)!;
+  assert.equal(D.tiers.findIndex((t) => t.id === up.tier_id), D.tiers.findIndex((t) => t.id === base.tier_id) + 2, "余った欠片1つで等級が1段上がる");
+});
+
+test("精鋭（墓暴き）を倒すと未練の欠片が手に入る", () => {
+  const w = new World();
+  const r = w.sortie("", "", "short", "sword", 74)!;
+  const e = r.spawnEnemy("elite");
+  e.hp = 0;
+  r.step(STEP, 0, 0);
+  assert.equal(r.fragments, D.ghost_birth.drops.elite);
+  assert.equal(r.summary().fragments, D.ghost_birth.drops.elite);
 });
 
 test("t09 保管庫が満杯なら pending、入れ替え後も10体", () => {
   const w = new World();
   for (let i = 0; i < 10; i++) {
-    w.die(w.sortie("", "", "short", "sword", 100 + i), 30 + i);
+    w.die(w.sortie("", "", "short", "sword", 100 + i), 60 + i);
     w.meta.resolveHeirloom(-1);
   }
   assert.equal(w.meta.storedGhosts().length, 10);
@@ -171,7 +222,7 @@ test("v1 のセーブ: 祭壇・書庫に払っていた供物は全部戻る", 
     alloc: { altar: 4, affinity: { fire: 2 }, seals: ["bow"] },
   }));
   w.reload();
-  assert.equal(w.repo.data.schema_version, 2);
+  assert.equal(w.repo.data.schema_version, 3);
   assert.deepEqual(w.repo.data.tree, []);
   assert.deepEqual(w.repo.data.alloc, { affinity: {}, seals: [] });
   assert.equal(w.meta.offeringsFree(), 9);
@@ -249,7 +300,7 @@ test("形見: 異常終了後も reserved、再開しても持っていて、1�
   assert.equal(w.meta.getHeir(hid)!.status, "reserved");
   const ar = w.repo.data.active_run!;
   const r3 = new RunSim(D, { run_id: ar.run_id, seed: ar.seed, mode: ar.mode, weapon: ar.weapon, heirloom: w.meta.getHeir(ar.heirloom_id), card_mods: w.meta.cardMods(), checkpoint: ar.checkpoint });
-  assert.ok((r3.weapons.fire ?? 0) >= 1);
+  assert.ok((r3.weapons.sword ?? 0) >= 1, "武器の形見は主人公の武器のLvになる");
   w.die(r3);
   assert.equal(w.meta.getHeir(hid), null);
 });

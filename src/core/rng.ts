@@ -58,12 +58,14 @@ export class RngStreams {
   readonly cards: Rng;   // レベルアップの候補とレア度
   readonly misc: Rng;    // 炎の落下先などのばらつき
   readonly lineage: Rng; // 家系の札（送り火など）の発動判定
+  readonly build: Rng;   // 刻印・呪いカードが候補に混ざるか、炎セットの爆発
 
   constructor(seed: number) {
     this.spawn = new Rng(`${seed}:spawn`);
     this.cards = new Rng(`${seed}:cards`);
     this.misc = new Rng(`${seed}:misc`);
     this.lineage = new Rng(`${seed}:lineage`);
+    this.build = new Rng(`${seed}:build`);
   }
 
   /** 再開時に、経過時間ぶん乱数列を進めて同じ流れに戻す */

@@ -4,6 +4,8 @@ import type { RunMode } from "../data/types.ts";
 // wraith = 喰らわれて怨霊になった（穢れ1つ分）。祓うと purified
 export type GhostStatus = "stored" | "reserved" | "consumed" | "released" | "pending" | "wraith" | "purified";
 export type GhostMode = "bring" | "devour";
+/** 出撃で選んだ亡霊（連れていく / 喰らう） */
+export interface GhostPick { id: string; mode: GhostMode }
 
 export interface GhostRecord {
   ghost_id: string;
@@ -18,6 +20,7 @@ export interface GhostRecord {
   evolved: boolean;
   passive_id: string;
   passive_level: number;
+  weapon_branch?: "a" | "b";
   kills: number;
   boss_kills: number;
   death_cause_id: string;
@@ -45,6 +48,7 @@ export interface Heirloom extends HeirOption {
 export interface CardMods {
   altar: number; affinity: Record<string, number>; seals: string[];
   ghost_atk?: number; devour_bonus?: number; taint_resist?: number;
+  sigil_tier?: number; curses?: boolean;
 }
 /** 縁・封印の割り当て（樹で開いた枠の中で自由に付け外し） */
 export interface Alloc { affinity: Record<string, number>; seals: string[] }
@@ -59,6 +63,7 @@ export interface Snapshot {
   kills: number; boss_kills: number; boss_spawned: boolean; elite_idx: number; spawn_acc: number;
   lineage_lv?: number; lpow?: number;
   wraith_spawned?: boolean; wraith_dead?: boolean;
+  fragments?: number; branch?: Record<string, "a" | "b">; sigils?: string[]; curses?: string[];
 }
 
 /** ラン終了処理（MetaService.settle）に渡す要約 */
@@ -66,16 +71,18 @@ export interface Summary {
   run_id: string; seed: number; mode: RunMode; t: number; run_len: number; main_weapon: string;
   weapons: Record<string, number>; passives: Record<string, number>; ppow: Record<string, number>;
   wbonus: Record<string, number>; evolved: Record<string, boolean>;
-  level: number; kills: number; boss_kills: number; death_cause: string; ghost_id: string; heirloom_id: string;
+  level: number; kills: number; boss_kills: number; death_cause: string; heirloom_id: string;
   lineage_id: string;
-  ghost_mode?: GhostMode;
+  ghosts: GhostPick[];
+  fragments: number;
+  branch: Record<string, "a" | "b">;
   wraith_id?: string; wraith_purified?: boolean;
 }
 
 export interface ActiveRun {
-  run_id: string; seed: number; mode: RunMode; weapon: string; ghost_id: string; heirloom_id: string;
+  run_id: string; seed: number; mode: RunMode; weapon: string; heirloom_id: string;
   lineage_id: string; started_at: string; checkpoint: Snapshot | null;
-  ghost_mode?: GhostMode;   // 無い古いセーブは bring
+  ghosts: GhostPick[];      // v3: 最大2体（古いセーブの ghost_id / ghost_mode は migrate で移す）
   wraith_id?: string;       // このランに現れる怨霊（出撃時に決める）
 }
 
@@ -87,6 +94,10 @@ export interface RunRecord {
   used_heirloom: string; offerings: number; generation: number;
   lineage_id: string; unlocked_lineages: string[];
   ghost_mode?: GhostMode; devoured?: string; purified?: string; wraith_escaped?: string;
+  companions?: string[];                        // 一緒に戦って保管庫へ戻った亡霊
+  devoured_all?: string[];
+  ghost_failed?: "" | "time" | "fragments";     // 亡霊になれなかった理由
+  fragments?: number;
 }
 
 export interface SaveData {
