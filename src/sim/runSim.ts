@@ -259,6 +259,8 @@ export class RunSim {
 
   // ---------------------------------------------------------------- stats
   progress(): number { return Math.min(1, this.t / this.runLen); }
+  /** 雑魚・精鋭の攻撃力は時間で上がる（冥王・怨霊は固定） */
+  dmgScale(): number { return 1 + this.D.spawn.dmg_growth * this.progress(); }
   xpNeed(): number { return this.D.xp.base + this.level * this.D.xp.per_level; }
   pw(id: string): number { return this.ppow[id] ?? 0; }
   mightMul(): number { return (1 + 0.12 * this.pw("might")) * (1 + this.devourMight) * (1 + this.curseMod("might")); }
@@ -882,7 +884,7 @@ export class RunSim {
         if (d < range + 40 && e.cd <= 0) {
           e.cd = def.interval ?? 2.6;
           const bs = def.bullet_speed ?? 190;
-          this.eshots.push({ x: e.x, y: e.y, vx: ux * bs, vy: uy * bs, dmg: def.damage, life: 2.2, cause: "shooter" });
+          this.eshots.push({ x: e.x, y: e.y, vx: ux * bs, vy: uy * bs, dmg: def.damage * this.dmgScale(), life: 2.2, cause: "shooter" });
         }
         break;
       }
@@ -931,7 +933,7 @@ export class RunSim {
     else if (e.slowT > 0) { e.slowT -= dt; k = e.slowMul; }
     e.x += e.vx * dt * k;
     e.y += e.vy * dt * k;
-    if (d < e.r + h.r) this.hurtPlayer(def.damage, e.kind);
+    if (d < e.r + h.r) this.hurtPlayer(def.damage * (e.kind === "boss" || e.kind === "wraith" ? 1 : this.dmgScale()), e.kind);
   }
 
   // ---------------------------------------------------------------- cards

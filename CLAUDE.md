@@ -52,6 +52,6 @@ URL: `?demo`（見本データ・別保存先）`?fps` `?bench` `?lowres`。
 - 毎ティックの処理を増やしたら `npm run bench` と `?bench` で確認。
 
 ## 既知の課題
-- 簡易ボット（武器優先で選ぶ）では3分モード単独で各武器 7〜12/12 クリア。やや易しめの可能性。人が遊んだ感想を聞いてから難度を調整する（`player.weapon_mult`・`spawn.hp_growth`）。
+- 2026-10-18「ぬるい」の感想で強化（hp_growth 3.2・dmg_growth 1.0・出現数増）。簡易ボット（武器優先）で3分モード単独 各武器 4〜8/12 クリア。人が遊んだ感想を聞いてから難度を調整する（`player.weapon_mult`・`spawn.hp_growth`）。
 - 仮アセット（絵はオーナーが用意中。効果音はコード生成）。
 - Steam 版（Electron＋Steamworks）は未着手。入口は `src/platform.ts`。

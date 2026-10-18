@@ -25,7 +25,7 @@
         { "lv": 5, "branch": "b", "name": "エストック",     "desc": "遠くまで鋭く連続で斬る", "cd": 0.38, "dmg": 1.15, "range": 1.45, "arc": 1.1, "dirs": 1 },
         { "evo": true, "name": "デュランダル", "desc": "全周を薙ぎ払う聖剣",                 "cd": 1.1,  "dmg": 2.1, "range": 1.45, "arc": 6.3, "dirs": 1 }
       ] },
-    "bow": { "name": "弓", "desc": "近くの敵を射抜く", "tags": ["shot"], "cd": 0.65, "damage": 12, "speed": 560, "per_level": 0.18,
+    "bow": { "name": "弓", "desc": "近くの敵を射抜く", "tags": ["shot"], "cd": 0.65, "damage": 11, "speed": 560, "per_level": 0.18,
       "grades": [
         { "lv": 1, "name": "ショートボウ",       "desc": "軽く速い矢を1本",                 "cd": 0.85, "dmg": 1.0, "count": 1, "pierce": 0, "speed": 1.0 },
         { "lv": 3, "branch": "a", "name": "ロングボウ",     "desc": "矢が2本・1体を貫通",     "cd": 1.0,  "dmg": 1.1, "count": 2, "pierce": 1, "speed": 1.2 },
@@ -43,7 +43,7 @@
         { "lv": 5, "branch": "b", "name": "メテオ",         "desc": "巨大な火球が1つ。とても広く焼く", "cd": 1.2, "dmg": 2.0, "count": 1, "radius": 1.9, "burn": 1.1 },
         { "evo": true, "name": "エクスプロージョン", "desc": "究極の炎魔法。炎が3か所・広く・長く燃える", "cd": 1.0, "dmg": 1.5, "count": 3, "radius": 1.4, "burn": 1.5 }
       ] },
-    "ice": { "name": "氷の魔導書", "desc": "氷の刃を放ち、当たった敵を遅くする", "tags": ["ice"], "cd": 1.0, "damage": 15, "speed": 430, "slow": 0.5, "slow_time": 1.6, "per_level": 0.2,
+    "ice": { "name": "氷の魔導書", "desc": "氷の刃を放ち、当たった敵を遅くする", "tags": ["ice"], "cd": 0.95, "damage": 21, "speed": 430, "slow": 0.5, "slow_time": 1.6, "per_level": 0.2,
       "grades": [
         { "lv": 1, "name": "アイス",             "desc": "氷の刃を1本。当たった敵を遅くする", "cd": 0.9,  "dmg": 1.0, "count": 1, "pierce": 1 },
         { "lv": 3, "branch": "a", "name": "フロスト",       "desc": "氷の刃が3本に広がる",     "cd": 1.0,  "dmg": 1.1, "count": 3, "pierce": 1 },
@@ -52,7 +52,7 @@
         { "lv": 5, "branch": "b", "name": "グレイシャルランス", "desc": "氷の槍が2本、6体を貫き凍らせる", "cd": 0.95, "dmg": 2.0, "count": 2, "pierce": 6, "freeze": 0.6 },
         { "evo": true, "name": "アブソリュートゼロ", "desc": "究極の氷魔法。全方位へ氷の刃、長く凍らせる", "cd": 1.0, "dmg": 1.5, "count": 12, "pierce": 3, "freeze": 0.9 }
       ] },
-    "thunder": { "name": "雷の魔導書", "desc": "雷が敵から敵へ飛び移る", "tags": ["thunder"], "cd": 1.4, "damage": 15, "range": 340, "jump": 150, "per_level": 0.2,
+    "thunder": { "name": "雷の魔導書", "desc": "雷が敵から敵へ飛び移る", "tags": ["thunder"], "cd": 1.3, "damage": 20, "range": 340, "jump": 150, "per_level": 0.2,
       "grades": [
         { "lv": 1, "name": "サンダー",           "desc": "雷が2体に飛び移る",               "cd": 1.0, "dmg": 1.0, "count": 1, "chain": 2 },
         { "lv": 3, "branch": "a", "name": "ライトニング",   "desc": "雷が4体に飛び移る",       "cd": 1.0, "dmg": 1.1, "count": 1, "chain": 4 },
@@ -61,7 +61,7 @@
         { "lv": 5, "branch": "b", "name": "プラズマ",       "desc": "雷が2筋、とても速く連発", "cd": 0.45, "dmg": 0.95, "count": 2, "chain": 3 },
         { "evo": true, "name": "ジャッジメント", "desc": "究極の雷魔法。雷が3筋、それぞれ8体に", "cd": 0.95, "dmg": 1.55, "count": 3, "chain": 8 }
       ] },
-    "spear": { "name": "槍", "desc": "一直線に突き、並んだ敵をまとめて貫く", "tags": ["pierce"], "cd": 0.85, "damage": 32, "length": 135, "width": 22, "per_level": 0.2,
+    "spear": { "name": "槍", "desc": "一直線に突き、並んだ敵をまとめて貫く", "tags": ["pierce"], "cd": 0.75, "damage": 50, "length": 150, "width": 26, "per_level": 0.2,
       "grades": [
         { "lv": 1, "name": "ショートスピア",     "desc": "まっすぐ素早く突く",              "cd": 0.85, "dmg": 0.9, "length": 1.0, "width": 1.0, "dirs": 1 },
         { "lv": 3, "branch": "a", "name": "パイク",         "desc": "長く遠くまで届く",        "cd": 1.0,  "dmg": 1.15, "length": 1.5, "width": 1.0, "dirs": 1 },
@@ -70,7 +70,7 @@
         { "lv": 5, "branch": "b", "name": "ランス",         "desc": "極太の一撃で遠くまで貫く", "cd": 1.15, "dmg": 2.2, "length": 2.1, "width": 2.2, "dirs": 1 },
         { "evo": true, "name": "グングニル", "desc": "三方を貫く神槍",                       "cd": 1.0,  "dmg": 1.9, "length": 2.4, "width": 1.6, "dirs": 3 }
       ] },
-    "axe": { "name": "斧", "desc": "投げた斧が弧を描いて戻ってくる", "tags": ["slash"], "cd": 1.1, "damage": 24, "speed": 380, "size": 10, "per_level": 0.2,
+    "axe": { "name": "斧", "desc": "投げた斧が弧を描いて戻ってくる", "tags": ["slash"], "cd": 0.9, "damage": 36, "speed": 400, "size": 13, "per_level": 0.2,
       "grades": [
         { "lv": 1, "name": "ハンドアックス",     "desc": "片手斧を1本投げる",               "cd": 1.0,  "dmg": 1.0, "count": 1, "size": 1.0, "range": 1.0 },
         { "lv": 3, "branch": "a", "name": "バトルアックス", "desc": "2本を投げる",             "cd": 1.05, "dmg": 1.2, "count": 2, "size": 1.2, "range": 1.1 },
@@ -197,7 +197,7 @@
     "boss":    { "name": "冥王", "hp": 5200, "speed": 58, "radius": 34, "damage": 20, "xp": 0, "ai": "boss", "color": "#e2555a", "short_hp_mult": 0.65,
                  "slam": { "damage": 18, "radius": 130, "windup": 1.0 }, "nova": { "count": 14, "speed": 170, "damage": 9 }, "cycle": 3.2 }
   },
-  "spawn": { "base_per_sec": 1.0, "per_progress": 7, "max_alive": 300, "hp_growth": 1.9, "shooter_from": 0.15, "charger_from": 0.3,
+  "spawn": { "base_per_sec": 1.4, "per_progress": 9, "max_alive": 300, "hp_growth": 3.2, "dmg_growth": 1.0, "shooter_from": 0.15, "charger_from": 0.3,
              "shooter_share": 0.15, "charger_share": 0.15, "elites_at": [0.3, 0.6, 0.85], "boss_phase_rate": 0.4 },
   "checkpoint_interval": 10,
   "lineages": [
