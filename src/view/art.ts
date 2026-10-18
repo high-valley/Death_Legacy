@@ -29,6 +29,12 @@ export const Art = {
     return list.length ? `art/${list[hash(seed) % list.length]}` : null;
   },
 
+  /** 主人公の絵（武器ごとに1人。portrait_<武器>_1、無ければその武器の最初の1枚） */
+  hero(weapon: string): string | null {
+    const list = FILES.filter((f) => f.startsWith(`portrait_${weapon}_`)).sort();
+    return list.length ? `art/${list[0]}` : null;
+  },
+
   /** キャンバスに描く用（読み込み終わるまでは null） */
   image(src: string | null): HTMLImageElement | null {
     if (!src) return null;

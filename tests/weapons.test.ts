@@ -126,8 +126,9 @@ test("魔導書は炎・氷・雷の3冊に分かれ、それぞれ4段階", () 
     assert.ok(D.weapons[id].name.endsWith("の魔導書"), id);
     assert.equal(D.weapons[id].grades.length, 4);
   }
-  assert.equal(weaponGrade(D.weapons.ice, 5, true).name, "ニブルヘイムの書");
-  assert.equal(weaponGrade(D.weapons.thunder, 3, false).name, "雷の魔導書");
+  assert.equal(weaponGrade(D.weapons.fire, 5, true).name, "エクスプロージョン");
+  assert.equal(weaponGrade(D.weapons.ice, 5, true).name, "アブソリュートゼロ");
+  assert.equal(weaponGrade(D.weapons.thunder, 3, false).name, "ライトニング");
 });
 
 test("氷: 当たった敵が遅くなり、氷河の魔導書なら一瞬凍る。冥王は凍らない", () => {

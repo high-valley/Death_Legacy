@@ -462,3 +462,21 @@ kbd { display: inline-block; min-width: 24px; padding: 1px 6px; border: 1px soli
 .ov-hub .backdrop::after, .ov-result .backdrop::after { background: radial-gradient(ellipse at 50% 40%, rgba(7,9,12,.15), rgba(7,9,12,.75)); }
 .hub-panel, .result-panel { background: linear-gradient(180deg, rgba(20,25,32,.62), rgba(10,13,18,.72)); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
 .hub-panel .frame, .result-panel .frame { background: linear-gradient(180deg, rgba(20,25,32,.86), rgba(11,14,19,.9)); }
+
+/* 主人公（＝初期武器）を絵で選ぶ */
+.heroes { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.hero-card { display: grid; gap: 0; padding: 0; overflow: hidden; text-align: center; font-weight: 400; letter-spacing: 0; background: #0a0d11; border: 1px solid var(--line); }
+.hero-card .hp-img { display: grid; place-items: center; aspect-ratio: 5 / 6; background: radial-gradient(ellipse at 50% 35%, rgba(201,163,90,.18), transparent 70%), #0a0d11; color: var(--faint); overflow: hidden; }
+.hero-card .hp-img img { width: 100%; height: 100%; object-fit: cover; display: block; filter: saturate(.75) brightness(.8); transition: filter .15s; }
+.hero-card .hp-img .ph { width: 44%; height: 44%; }
+.hero-card .hn { display: flex; gap: 4px; align-items: center; justify-content: center; padding: 5px 4px 6px; font: 600 12px var(--f-serif); color: var(--mute); white-space: nowrap; }
+.hero-card .hn .icon { width: 14px; height: 14px; color: var(--gold); }
+.hero-card[aria-pressed="true"] { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold), 0 0 16px rgba(201,163,90,.3); }
+.hero-card[aria-pressed="true"] .hp-img img { filter: none; }
+.hero-card[aria-pressed="true"] .hn { color: var(--gold-hi); background: linear-gradient(180deg, #2a2416, #1a160d); }
+.hero-card:disabled { opacity: .3; }
+.hero-desc { max-width: none; }
+.hero-desc b { color: var(--gold-hi); font-family: var(--f-serif); }
+@media (max-height: 520px) { .heroes { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 6px; } .hero-card .hn { font-size: 11px; } }
+/* 亡霊の紋は少し透かして霊らしく */
+.portrait.spirit .ph { opacity: .85; animation: none; }

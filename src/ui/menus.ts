@@ -87,14 +87,12 @@ export class Menus {
     return h("div", { class: "fhead" }, h("span", { class: "sigil" }, iconSvg(icon)), h("h3", {}, title), sub ? h("span", { class: "fsub" }, sub) : null);
   }
 
-  /** 肖像。絵があれば絵、無ければ等級の色の光と武器の紋 */
+  /** 亡霊の紋（人の絵は使わない）: 等級の色の霊光と、生前の武器の紋 */
   portrait(g: GhostRecord | null, cls = ""): HTMLElement {
     if (!g) return h("div", { class: `portrait empty ${cls}` }, iconSvg("ghost", "icon ph"));
     const tr = this.meta.tier(g.tier_id);
-    const src = Art.portrait(g.primary_weapon_id, g.ghost_id);
-    const el = h("div", { class: `portrait ${cls}`, style: `--tc:${tr.color}` });
-    if (src) el.append(h("img", { src, alt: "", loading: "lazy" }));
-    else el.append(iconSvg("ghost", "icon ph"), iconSvg(g.primary_weapon_id, "icon pw"));
+    const el = h("div", { class: `portrait spirit ${cls}`, style: `--tc:${tr.color}` });
+    el.append(iconSvg("ghost", "icon ph"), iconSvg(g.primary_weapon_id, "icon pw"));
     el.append(h("span", { class: "gen" }, kanjiNum(Number(/第(\d+)代/.exec(g.display_name)?.[1] ?? 0))));
     return el;
   }
@@ -263,6 +261,19 @@ export class Menus {
     // ── 中: 出撃する亡霊と支度
     const center = h("section", { class: "frame sortie", "data-scroll": "sortie" });
     center.append(this.frameHead(`第${kanjiNum(gen)}代の出撃`, lin.name, "sword"));
+    // 主人公（＝初期武器）を絵で選ぶ。武器は育つと持ち替える（剣なら 短剣 → ロングソード → …）
+    const heroes = h("div", { class: "heroes" });
+    for (const id of Object.keys(D.weapons)) {
+      const W = D.weapons[id], src = Art.hero(id), locked = !!lin.weapon && lin.weapon !== id;
+      heroes.append(h("button", { type: "button", class: "hero-card", "aria-pressed": String(weapon === id), disabled: locked, onclick: () => { hub.weapon = id; re(); } },
+        h("span", { class: "hp-img" }, src ? h("img", { src, alt: "", loading: "lazy" }) : iconSvg(id, "icon ph")),
+        h("span", { class: "hn" }, iconSvg(id), W.name)));
+    }
+    const WS = D.weapons[weapon];
+    center.append(h("div", { class: "section" },
+      h("h4", {}, lin.weapon ? `主人公（${lin.name}は${WS.name}）` : "主人公　選んだ人物の武器で出撃する"),
+      heroes,
+      h("p", { class: "small hero-desc" }, h("b", {}, WS.name), `　${WS.desc}。育てると ${WS.grades.map((g) => g.name).join(" → ")}`)));
     if (wr.length > 0) {
       center.append(h("div", { class: "notice taint" },
         h("b", {}, `穢れ ${wr.length}`),
@@ -307,20 +318,14 @@ export class Menus {
       }
       center.append(h("div", { class: "section" }, h("h4", {}, "形見　1つだけ・そのランで使い切り"), hg));
     }
-    // 初期武器・ランの長さ
-    const wseg = h("div", { class: "seg weapons" });
-    for (const id of Object.keys(D.weapons)) {
-      wseg.append(h("button", { type: "button", "aria-pressed": String(weapon === id), disabled: !!lin.weapon && lin.weapon !== id, onclick: () => { hub.weapon = id; re(); } },
-        iconSvg(id), D.weapons[id].grades[0].name));
-    }
+    // ランの長さ
     const mseg = h("div", { class: "seg" });
     for (const [id, name] of [["short", "3分でボス"], ["full", "10分"]] as const) {
       mseg.append(h("button", { type: "button", "aria-pressed": String(hub.mode === id), onclick: () => { hub.mode = id; re(); } }, name));
     }
     const seedIn = h("input", { id: "seedIn", inputmode: "numeric", value: String(hub.seed), size: 8, "aria-label": "seed" });
     seedIn.addEventListener("change", () => { const n = Number.parseInt(seedIn.value, 10); if (Number.isFinite(n)) hub.seed = n; });
-    center.append(h("div", { class: "section" }, h("h4", {}, lin.weapon ? `初期武器（${lin.name}は${D.weapons[lin.weapon].name}）` : "初期武器"), wseg),
-      h("div", { class: "section" }, h("h4", {}, "ランの長さ"), h("div", { class: "row" }, mseg, h("label", { class: "row seed" }, "seed", seedIn))));
+    center.append(h("div", { class: "section" }, h("h4", {}, "ランの長さ"), h("div", { class: "row" }, mseg, h("label", { class: "row seed" }, "seed", seedIn))));
 
     // 出撃ボタン（単独 / 亡霊と）
     const hsel = hub.heir ? meta.getHeir(hub.heir) : null;

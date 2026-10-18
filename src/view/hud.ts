@@ -75,7 +75,18 @@ export class Hud {
     ctx.fillStyle = "rgba(10,13,18,.9)";
     ctx.beginPath(); ctx.arc(ex, ey, er, 0, 7); ctx.fill();
     ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.stroke();
-    drawIcon(ctx, sim.lineage.card.id === "grit" ? "ghost" : sim.lineage.card.id, ex, ey, er * 1.1, GOLD);
+    // 主人公の絵（無ければ家系の紋）
+    const him = Art.image(Art.hero(sim.mainWeapon));
+    if (him) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(ex, ey, er - 1.5, 0, 7); ctx.clip();
+      const s = (er * 2) / Math.min(him.naturalWidth, him.naturalHeight);
+      ctx.drawImage(him, ex - (him.naturalWidth * s) / 2, ey - er * 0.9, him.naturalWidth * s, him.naturalHeight * s);
+      ctx.restore();
+      ctx.beginPath(); ctx.arc(ex, ey, er, 0, 7); ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.stroke();
+    } else {
+      drawIcon(ctx, sim.lineage.card.id === "grit" ? "ghost" : sim.lineage.card.id, ex, ey, er * 1.1, GOLD);
+    }
     const bx = ex + er + 8, bw = Math.min(small ? 200 : 260, W * 0.3), bh = small ? 14 : 16;
     if (this.shownHp < 0 || sim.hp > this.shownHp) this.shownHp = sim.hp;
     else this.shownHp += (sim.hp - this.shownHp) * 0.06;
@@ -179,18 +190,13 @@ export class Hud {
       const tier = D.tiers.find((t) => t.id === rec.tier_id) ?? D.tiers[0];
       plate(ctx, cx, cy, cw, chh, sim.devour ? "rgba(183,139,224,.6)" : "rgba(134,224,210,.5)");
       const ps2 = chh - 10;
-      const im = Art.image(Art.portrait(rec.primary_weapon_id, rec.ghost_id));
-      if (im) {
-        ctx.save(); rrect(ctx, cx + 5, cy + 5, ps2, ps2, 3); ctx.clip();
-        const s = Math.max(ps2 / im.naturalWidth, ps2 / im.naturalHeight);
-        ctx.drawImage(im, cx + 5 + (ps2 - im.naturalWidth * s) / 2, cy + 5, im.naturalWidth * s, im.naturalHeight * s);
-        ctx.restore();
-      } else {
+      {   // 亡霊は人の絵ではなく、等級の色の霊光と紋で表す
         const g = ctx.createRadialGradient(cx + 5 + ps2 / 2, cy + 5 + ps2 * 0.4, 2, cx + 5 + ps2 / 2, cy + 5 + ps2 / 2, ps2 * 0.7);
         g.addColorStop(0, tier.color); g.addColorStop(1, "rgba(0,0,0,0)");
         rrect(ctx, cx + 5, cy + 5, ps2, ps2, 3); ctx.fillStyle = "#0b0e13"; ctx.fill();
         ctx.globalAlpha = 0.55; ctx.fillStyle = g; ctx.fill(); ctx.globalAlpha = 1;
         drawIcon(ctx, "ghost", cx + 5 + ps2 / 2, cy + 5 + ps2 / 2, ps2 * 0.6, "rgba(230,240,240,.85)");
+        drawIcon(ctx, rec.primary_weapon_id, cx + ps2 - 4, cy + ps2 - 4, ps2 * 0.32, tier.color);
       }
       ctx.textAlign = "left";
       const tx = cx + ps2 + 14;
