@@ -90,7 +90,7 @@ export interface Balance {
   shelf: { unlock_generation: number; capacity: number; max_level: number };
   enemies: Record<string, EnemyDef>;
   spawn: {
-    base_per_sec: number; per_progress: number; max_alive: number; hp_growth: number; dmg_growth: number; shooter_from: number; charger_from: number;
+    base_per_sec: number; per_progress: number; max_alive: number; hp_growth: number; dmg_growth: number; full_hp_growth: number; full_dmg_growth: number; full_curve: number; shooter_from: number; charger_from: number;
     shooter_share: number; charger_share: number; elites_at: number[]; boss_phase_rate: number;
   };
   checkpoint_interval: number;

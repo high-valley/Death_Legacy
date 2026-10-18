@@ -57,5 +57,10 @@
 | `portrait_fire_1` | ✅ | 褐色肌の気高い魔導士（描き分け版） |
 | `portrait_spear_1` | ✅ | 金髪の槍騎士 |
 | `portrait_axe_1` | ✅ | 赤ひげの戦士 |
+| `sprite_hero_sword` | ✅ | 赤髪の剣士（ちびキャラ・透過） |
+| `sprite_hero_bow` | ✅ | そばかすの狩人 |
+| `sprite_hero_fire` | ✅ | 褐色肌の炎の魔導士 |
+| `sprite_hero_ice` / `thunder` / `spear` / `axe` | 未 | 同じプロンプトで、見本画像と各肖像を添付して頼む |
+| `sprite_ghost` / `sprite_enemy_*` | 未 | まず亡者（chaser）から |
 
 | `logo` | 未（任意） | |

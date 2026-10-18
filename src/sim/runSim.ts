@@ -260,7 +260,11 @@ export class RunSim {
   // ---------------------------------------------------------------- stats
   progress(): number { return Math.min(1, this.t / this.runLen); }
   /** 雑魚・精鋭の攻撃力は時間で上がる（冥王・怨霊は固定） */
-  dmgScale(): number { return 1 + this.D.spawn.dmg_growth * this.progress(); }
+  dmgScale(): number { return 1 + (this.mode === "full" ? this.D.spawn.full_dmg_growth : this.D.spawn.dmg_growth) * this.growthT(); }
+  /** 敵HPの伸び（10分モードは長いぶん主人公が育つので、大きく伸ばす） */
+  hpGrowth(): number { return this.mode === "full" ? this.D.spawn.full_hp_growth : this.D.spawn.hp_growth; }
+  /** 伸び方の曲線。10分モードは序盤ゆるやか・後半に急（3分時点で3分モードの終盤と同じくらい） */
+  growthT(): number { return this.mode === "full" ? Math.pow(this.progress(), this.D.spawn.full_curve) : this.progress(); }
   xpNeed(): number { return this.D.xp.base + this.level * this.D.xp.per_level; }
   pw(id: string): number { return this.ppow[id] ?? 0; }
   mightMul(): number { return (1 + 0.12 * this.pw("might")) * (1 + this.devourMight) * (1 + this.curseMod("might")); }
@@ -579,7 +583,7 @@ export class RunSim {
     const e = new Foe(kind, def);
     e.x = this.hero.x + Math.cos(a) * d;
     e.y = this.hero.y + Math.sin(a) * d;
-    let scale = (1 + this.D.spawn.hp_growth * this.progress()) * (1 + this.taintHp);
+    let scale = (1 + this.hpGrowth() * this.growthT()) * (1 + this.taintHp);
     if (kind === "boss") scale = this.mode === "short" ? (def.short_hp_mult ?? 1) : 1;
     e.maxHp = def.hp * scale;
     e.hp = e.maxHp;

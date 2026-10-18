@@ -197,7 +197,7 @@
     "boss":    { "name": "冥王", "hp": 5200, "speed": 58, "radius": 34, "damage": 20, "xp": 0, "ai": "boss", "color": "#e2555a", "short_hp_mult": 0.65,
                  "slam": { "damage": 18, "radius": 130, "windup": 1.0 }, "nova": { "count": 14, "speed": 170, "damage": 9 }, "cycle": 3.2 }
   },
-  "spawn": { "base_per_sec": 1.4, "per_progress": 9, "max_alive": 300, "hp_growth": 3.2, "dmg_growth": 1.0, "shooter_from": 0.15, "charger_from": 0.3,
+  "spawn": { "base_per_sec": 1.4, "per_progress": 9, "max_alive": 300, "hp_growth": 3.2, "dmg_growth": 1.0, "full_hp_growth": 36, "full_dmg_growth": 4.0, "full_curve": 2, "shooter_from": 0.15, "charger_from": 0.3,
              "shooter_share": 0.15, "charger_share": 0.15, "elites_at": [0.3, 0.6, 0.85], "boss_phase_rate": 0.4 },
   "checkpoint_interval": 10,
   "lineages": [

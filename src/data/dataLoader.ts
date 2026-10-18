@@ -39,6 +39,7 @@ export function loadBalance(raw: unknown): Loaded {
     prev = t.from;
   });
   if (D.tiers.length > 0 && D.tiers[0].from !== 0) errors.push("tiers[0].from は 0");
+  need(D.spawn, ["base_per_sec", "per_progress", "max_alive", "hp_growth", "dmg_growth", "full_hp_growth", "full_dmg_growth", "full_curve"], "spawn");
   need(D.player, ["weapon_mult", "hp", "speed", "radius", "dash_speed", "dash_time", "dash_cd", "hit_iframe", "pickup"], "player");
   for (const id of Object.keys(D.weapons)) {
     if (!need(D.weapons[id], ["name", "desc", "cd", "damage", "per_level", "grades", "tags"], `weapons.${id}`)) continue;
