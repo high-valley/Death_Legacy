@@ -30,12 +30,12 @@
         { "lv": 5, "name": "ヘビークロスボウ",   "desc": "重い矢が3本・2体を貫通",    "cd": 1.15, "dmg": 1.6, "count": 3, "pierce": 2, "speed": 1.3 },
         { "evo": true, "name": "フェイルノート", "desc": "必中の弓。矢が6本・3体を貫通", "cd": 1.0, "dmg": 1.7, "count": 6, "pierce": 3, "speed": 1.4 }
       ] },
-    "fire": { "name": "炎魔法", "desc": "着弾した場所を焼き続ける", "cd": 2.0, "damage": 7, "radius": 68, "burn": 2.6, "tick": 0.4, "per_level": 0.25,
+    "fire": { "name": "魔導書", "desc": "書から炎を呼び、着弾した場所を焼き続ける", "cd": 2.0, "damage": 7, "radius": 68, "burn": 2.6, "tick": 0.4, "per_level": 0.25,
       "grades": [
-        { "lv": 1, "name": "ファイアボルト",   "desc": "小さな火を落とす",           "cd": 0.9, "dmg": 0.9, "count": 1, "radius": 0.85, "burn": 0.9 },
-        { "lv": 3, "name": "ファイアボール",   "desc": "大きな火の玉",               "cd": 1.0, "dmg": 1.1, "count": 1, "radius": 1.05, "burn": 1.0 },
-        { "lv": 5, "name": "フレイムストーム", "desc": "炎が2か所に落ちる",          "cd": 1.0, "dmg": 1.3, "count": 2, "radius": 1.15, "burn": 1.2 },
-        { "evo": true, "name": "インフェルノ", "desc": "炎が3か所・広く・長く燃える", "cd": 1.0, "dmg": 1.5, "count": 3, "radius": 1.4, "burn": 1.5 }
+        { "lv": 1, "name": "古びた魔導書",     "desc": "小さな火を落とす",           "cd": 0.9, "dmg": 0.9, "count": 1, "radius": 0.85, "burn": 0.9 },
+        { "lv": 3, "name": "炎の魔導書",       "desc": "大きな火の玉を呼ぶ",         "cd": 1.0, "dmg": 1.1, "count": 1, "radius": 1.05, "burn": 1.0 },
+        { "lv": 5, "name": "紅蓮の魔導書",     "desc": "炎が2か所に落ちる",          "cd": 1.0, "dmg": 1.3, "count": 2, "radius": 1.15, "burn": 1.2 },
+        { "evo": true, "name": "レメゲトン", "desc": "伝説の禁書。炎が3か所・広く・長く燃える", "cd": 1.0, "dmg": 1.5, "count": 3, "radius": 1.4, "burn": 1.5 }
       ] },
     "spear": { "name": "槍", "desc": "一直線に突き、並んだ敵をまとめて貫く", "cd": 1.0, "damage": 22, "length": 120, "width": 16, "per_level": 0.2,
       "grades": [
@@ -118,11 +118,11 @@
       "card": { "id": "grit", "name": "無名の意地", "max": 3, "per": 15, "fmt": "HPが3割以下の時、与ダメージ +{v}%" },
       "unlock": null },
     { "id": "firekeeper", "name": "火守", "motto": "火を絶やさぬことが、生きた証",
-      "trait": "炎魔法で出撃。炎の範囲 +20%・燃える時間 +30%",
+      "trait": "魔導書で出撃。炎の範囲 +20%・燃える時間 +30%",
       "weakness": "最大HP −20%",
       "weapon": "fire", "mods": { "fire_area": 0.2, "fire_burn": 0.3, "max_hp": -0.2 },
       "card": { "id": "okuribi", "name": "送り火", "max": 3, "per": 10, "fmt": "敵を倒すと {v}% の確率で小さな炎が残る" },
-      "unlock": { "type": "weapon_level", "weapon": "fire", "level": 5, "text": "炎魔法を最大Lv（5）まで育てる" } },
+      "unlock": { "type": "weapon_level", "weapon": "fire", "level": 5, "text": "魔導書を最大Lv（5）まで育てる" } },
     { "id": "gravekeeper", "name": "墓守", "motto": "死者と共に歩む一族",
       "trait": "亡霊の解放が1段階早い。亡霊の攻撃 +20%",
       "weakness": "単独出撃の経験値ボーナスなし。移動速度 −10%",

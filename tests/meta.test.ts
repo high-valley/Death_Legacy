@@ -78,7 +78,7 @@ test("t06 亡霊は保管データのコピーで、生前の武器で攻撃す�
     r.drainEvents();
     for (const z of r.zones) if (z.ghost) ghostHits++;
   }
-  assert.ok(ghostHits > 0, "亡霊が炎魔法で攻撃する");
+  assert.ok(ghostHits > 0, "亡霊が魔導書で攻撃する");
   assert.equal(r.ghostUnlock(), 0.25);
 });
 

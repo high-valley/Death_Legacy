@@ -13,7 +13,7 @@ test("新しいセーブでは無名だけが使え、未解放の家系では�
   assert.equal(w.repo.data.active_run, null, "失敗した出撃で予約が残らない");
 });
 
-test("火守: 炎魔法を最大Lvまで育てると解放され、炎魔法固定・炎強化・HP減で出撃する", () => {
+test("火守: 魔導書を最大Lvまで育てると解放され、魔導書固定・炎強化・HP減で出撃する", () => {
   const w = new World();
   const r = w.sortie("", "", "short", "fire", 1)!;
   r.weapons.fire = 4;
@@ -27,7 +27,7 @@ test("火守: 炎魔法を最大Lvまで育てると解放され、炎魔法固�
   assert.ok(w.meta.lineageUnlocked("firekeeper"));
   w.meta.resolveHeirloom(-1);
   const f = w.sortie("", "", "short", "sword", 3, "firekeeper")!;
-  assert.equal(f.mainWeapon, "fire", "火守は炎魔法で出撃（選んだ武器より優先）");
+  assert.equal(f.mainWeapon, "fire", "火守は魔導書で出撃（選んだ武器より優先）");
   assert.equal(f.maxHp, Math.round(D.player.hp * 0.8), "最大HP −20%");
   const n = new RunSim(D, { run_id: "n", seed: 3, mode: "short", weapon: "fire" });
   for (const s of [f, n]) {

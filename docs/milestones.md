@@ -21,7 +21,7 @@
 - 形見（t_heirloom_flow, t_heirloom_crash_resume, t_shelf_capacity）
 
 ### フェーズ2（家系の解放）
-- 無名（最初から）/ 火守（炎魔法をLv5まで育てる）/ 墓守（亡霊を連れて出撃したランを3回終える）
+- 無名（最初から）/ 火守（魔導書をLv5まで育てる）/ 墓守（亡霊を連れて出撃したランを3回終える）
 - 特性・弱点・専用カード（`tests/lineage.test.ts`）。数値は `data/balance.json` の `lineages`
 - 画面のつくり直し（納骨堂の2段組・位牌パネル・戦闘HUD）
 

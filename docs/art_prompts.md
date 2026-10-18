@@ -76,8 +76,9 @@ small spiked flourishes, subtle cyan glow behind. Transparent background, nothin
 
 ## 亡霊の肖像 → `portrait_<武器>_<番号>`
 サイズ: 縦長（1024×1536）。各プロンプトの後ろに、この**肖像の共通部分**もつける。
+ChatGPT には日本語で「縦長の画像で、胸から上のアップにしてください。顔を大きく、画面の上のほうに。」と一言添えると、横長の全身絵になりにくい。
 ```
-Bust portrait from the chest up, the face clearly visible and placed in the upper third, looking toward the viewer.
+Vertical portrait orientation. Bust portrait from the chest up, the face clearly visible and placed in the upper third, looking toward the viewer.
 Dark simple background with a soft cyan spirit glow behind the character, a few floating light particles.
 Same art style and lighting for every portrait in this series.
 ```
@@ -112,15 +113,21 @@ Same art style and lighting for every portrait in this series.
   one eye narrowed as if aiming.
   ```
 
-### 炎魔法（fire）
+### 魔導書（fire）
 - `portrait_fire_1`
   ```
-  A red-haired sorceress with a thin circlet of embers, black and crimson robes, a swirling flame floating above her palm,
-  fiery light on her face.
+  A young sorceress with long crimson hair and a thin circlet, black and crimson robes with gold embroidery,
+  holding an open ancient grimoire in one hand; glowing red runes and small flames rise from its pages and light her face.
   ```
 - `portrait_fire_2`
   ```
-  An old male mage with a long white beard and sharp eyes, black robes with gold embroidery, glowing orange fire runes orbiting around him.
+  An old male sage with a long white beard and sharp eyes, dark hooded robes with gold trim,
+  a heavy leather-bound grimoire with metal clasps held against his chest, faint orange rune circles floating behind him.
+  ```
+- `portrait_fire_3`
+  ```
+  A pale young scholar with short silver hair and round glasses, high-collared black coat,
+  a floating grimoire with chains around it opening by itself, cyan and crimson sigils spiraling around the pages.
   ```
 
 ### 槍（spear）
