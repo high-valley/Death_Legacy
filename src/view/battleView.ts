@@ -377,7 +377,8 @@ export class BattleView {
   /** 主人公の絵を、足元を軸にして弾ませ・傾け・踏み込ませて描く */
   private drawHero(ctx: CanvasRenderingContext2D, sim: RunSim, im: HTMLImageElement): void {
     const h = sim.hero, a = this.anim, P = a.pose();
-    const size = h.r * 4.2, w = (size * im.naturalWidth) / im.naturalHeight;
+    // コマ絵は台紙に余白があるので少し大きく描く
+    const size = h.r * (this.frames(`sprite_hero_${sim.mainWeapon}_walk`).length ? 5 : 4.2), w = (size * im.naturalWidth) / im.naturalHeight;
     const footY = h.y + h.r * 1.1;
     // 土ぼこり
     for (const d of this.dust) {
