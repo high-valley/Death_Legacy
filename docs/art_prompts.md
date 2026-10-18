@@ -113,21 +113,40 @@ Same art style and lighting for every portrait in this series.
   one eye narrowed as if aiming.
   ```
 
-### 魔導書（fire）
+### 炎の魔導書（fire）
 - `portrait_fire_1`
   ```
-  A young sorceress with long crimson hair and a thin circlet, black and crimson robes with gold embroidery,
+  A young sorceress with long black hair streaked with crimson and a thin gold circlet, black and crimson robes with gold embroidery,
   holding an open ancient grimoire in one hand; glowing red runes and small flames rise from its pages and light her face.
   ```
 - `portrait_fire_2`
   ```
   An old male sage with a long white beard and sharp eyes, dark hooded robes with gold trim,
-  a heavy leather-bound grimoire with metal clasps held against his chest, faint orange rune circles floating behind him.
+  a heavy leather-bound grimoire with metal clasps held against his chest, faint orange fire rune circles floating behind him.
   ```
-- `portrait_fire_3`
+
+### 氷の魔導書（ice）
+- `portrait_ice_1`
   ```
-  A pale young scholar with short silver hair and round glasses, high-collared black coat,
-  a floating grimoire with chains around it opening by itself, cyan and crimson sigils spiraling around the pages.
+  A calm young sorceress with long silver-white hair and pale blue eyes, white and deep blue robes with silver embroidery,
+  an open grimoire in her hands with frost spreading from its pages, small ice crystals and snowflakes floating around her.
+  ```
+- `portrait_ice_2`
+  ```
+  A pale young scholar with short silver hair and round glasses, high-collared dark navy coat with frost on the shoulders,
+  a floating grimoire bound in chains with an ice-blue sigil glowing on its cover, cold mist around him.
+  ```
+
+### 雷の魔導書（thunder）
+- `portrait_thunder_1`
+  ```
+  A confident young woman mage with short violet hair and golden eyes, dark purple coat with silver buckles,
+  a grimoire open in one hand with crackling violet lightning arcing between its pages and her fingertips.
+  ```
+- `portrait_thunder_2`
+  ```
+  A hooded young man with sharp features and glowing yellow eyes under the hood, black and indigo robes,
+  a worn grimoire with a lightning-bolt emblem on the cover, thin lightning bolts flickering around him.
   ```
 
 ### 槍（spear）

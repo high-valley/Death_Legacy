@@ -6,10 +6,14 @@ export interface WeaponGrade {
   lv?: number; evo?: boolean; name: string; desc: string; cd: number; dmg: number;
   range?: number; arc?: number; dirs?: number; count?: number; pierce?: number; speed?: number;
   radius?: number; burn?: number; length?: number; width?: number; size?: number;
+  freeze?: number;   // 氷: 凍らせる秒数
+  chain?: number;    // 雷: 1筋で当たる敵の数
 }
 export interface Weapon {
   name: string; desc: string; cd: number; damage: number; per_level: number; grades: WeaponGrade[];
   range?: number; speed?: number; radius?: number; burn?: number; tick?: number; length?: number; width?: number; size?: number;
+  slow?: number; slow_time?: number;   // 氷: 移動速度の倍率と時間
+  jump?: number;                       // 雷: 飛び移れる距離
 }
 export interface Passive { name: string; per: number; fmt: string }
 export interface Rarity { id: RarityId; name: string; weight: number; color: string; wlv: number; wbonus: number; pmul: number; evolve?: boolean }

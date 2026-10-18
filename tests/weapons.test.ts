@@ -120,3 +120,61 @@ test("ダメージ数字は描画側が頼んだ時だけ、1ティック12個�
   const n = r.drainEvents().filter((e) => e.type === "dmg").length;
   assert.ok(n > 0 && n <= 12, String(n));
 });
+
+test("魔導書は炎・氷・雷の3冊に分かれ、それぞれ4段階", () => {
+  for (const id of ["fire", "ice", "thunder"]) {
+    assert.ok(D.weapons[id].name.endsWith("の魔導書"), id);
+    assert.equal(D.weapons[id].grades.length, 4);
+  }
+  assert.equal(weaponGrade(D.weapons.ice, 5, true).name, "ニブルヘイムの書");
+  assert.equal(weaponGrade(D.weapons.thunder, 3, false).name, "雷の魔導書");
+});
+
+test("氷: 当たった敵が遅くなり、氷河の魔導書なら一瞬凍る。冥王は凍らない", () => {
+  const r = sim("ice");
+  const e = place(r, 60, 0);
+  e.def = { ...e.def, speed: 100 };
+  r.grid.rebuild(r.enemies);
+  r.fireWeapon("ice", 1, 0, 0, 1, 0, 1, 1, false, false);
+  for (let i = 0; i < 12 && e.slowT === 0; i++) r.step(STEP, 0, 0);
+  assert.ok(e.slowT > 0 && e.freezeT === 0, "Lv1 は遅くなるだけ");
+  const r2 = sim("ice");
+  const f = place(r2, 60, 0);
+  r2.grid.rebuild(r2.enemies);
+  r2.fireWeapon("ice", 5, 0, 0, 1, 0, 1, 1, false, false);
+  for (let i = 0; i < 12 && f.freezeT === 0; i++) r2.step(STEP, 0, 0);
+  assert.ok(f.freezeT > 0, "Lv5 は凍る");
+  const x0 = f.x;
+  r2.step(STEP, 0, 0);
+  assert.equal(f.x, x0, "凍っている間は動かない");
+  const r3 = sim("ice");
+  const b = r3.spawnEnemy("boss", 60);
+  b.x = 60; b.y = 0;
+  r3.grid.rebuild(r3.enemies);
+  r3.fireWeapon("ice", 5, 0, 0, 1, 0, 1, 1, false, false);
+  for (let i = 0; i < 12; i++) r3.step(STEP, 0, 0);
+  assert.ok(b.freezeT === 0 && b.slowT > 0 && b.slowMul > D.weapons.ice.slow!, "冥王は凍らず、遅くなるのも弱い");
+});
+
+test("雷: 近くの敵へ段階の数だけ飛び移り、届かない敵には当たらない", () => {
+  const r = sim("thunder");
+  const chain = [place(r, 80, 0), place(r, 180, 0), place(r, 280, 0), place(r, 380, 0), place(r, 480, 0)];
+  const far = place(r, 1200, 0);
+  r.grid.rebuild(r.enemies);
+  r.fireWeapon("thunder", 1, 0, 0, 1, 0, 1, 1, false, false);
+  assert.equal(chain.filter((e) => e.hp < e.maxHp).length, 2, "稲妻の書は2体");
+  for (const e of chain) e.hp = e.maxHp;
+  r.fireWeapon("thunder", 3, 0, 0, 1, 0, 1, 1, false, false);
+  assert.equal(chain.filter((e) => e.hp < e.maxHp).length, 4, "雷の魔導書は4体");
+  assert.equal(far.hp, far.maxHp);
+  const hit = chain.map((e) => e.maxHp - e.hp);
+  assert.ok(hit[1] < hit[0], "飛び移るたびに少し弱まる");
+});
+
+test("氷と雷でも最後まで遊べる（簡易ボット）", () => {
+  for (const w of ["ice", "thunder"]) {
+    const r = sim(w, 23);
+    for (let i = 0; i < 60 * 90 && r.result === ""; i++) botStep(r);
+    assert.ok(r.kills > 30, `${w}: 撃破 ${r.kills}`);
+  }
+});

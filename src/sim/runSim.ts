@@ -25,6 +25,9 @@ export class Foe {
   st = 0;
   dx = 0; dy = 0; // 突進の向き
   tx = 0; ty = 0; // ボスの叩きつけ地点
+  slowT = 0;      // 氷: 遅くなっている残り時間
+  slowMul = 1;
+  freezeT = 0;    // 氷: 凍って動けない残り時間
   dead = false;
   constructor(kind: string, def: EnemyDef) {
     this.kind = kind;
@@ -58,7 +61,8 @@ export class Companion {
 /** 弾。斧は ret 秒たつと持ち主へ戻る（戻り始めで当たり判定を取り直す） */
 export interface Shot {
   x: number; y: number; vx: number; vy: number; dmg: number; pierce: number; life: number; ghost: boolean; hit: Set<Foe>;
-  rad: number; kind: "arrow" | "axe"; ret?: number; spin?: number; owner?: { x: number; y: number };
+  rad: number; kind: "arrow" | "axe" | "ice"; ret?: number; spin?: number; owner?: { x: number; y: number };
+  slow?: number; slowT?: number; freeze?: number;
 }
 export interface EShot { x: number; y: number; vx: number; vy: number; dmg: number; life: number; cause: string }
 export interface Zone { x: number; y: number; r: number; dmg: number; life: number; tick: number; ghost: boolean }
@@ -69,6 +73,7 @@ export type SimEvent =
   | { type: "fx"; kind: "warn" | "boom"; x: number; y: number; r: number; dur: number }
   | { type: "fx"; kind: "poof"; x: number; y: number; dur: number; color: string }
   | { type: "fx"; kind: "thrust"; x: number; y: number; a: number; len: number; w: number; dur: number; ghost: boolean }
+  | { type: "fx"; kind: "bolt"; pts: number[]; dur: number; ghost: boolean }
   | { type: "dmg"; x: number; y: number; v: number; big: boolean }
   | { type: "sfx"; name: string }
   | { type: "toast"; text: string }
@@ -315,6 +320,53 @@ export class RunSim {
           dmg, life: (W.burn ?? 2.6) * (g.burn ?? 1) * (1 + fb), tick: 0, ghost: isGhost,
         });
       }
+    } else if (id === "ice") {
+      // 氷の刃: 当たった敵を遅くする（段階が上がると一瞬凍らせる）
+      if (!tgt) return false;
+      const n = g.count ?? 1;
+      const sp = W.speed ?? 430;
+      const spread = n >= 8 ? TAU / n : 0.22;
+      for (let i = 0; i < n; i++) {
+        const a = n >= 8 ? a0 + i * spread : a0 + (i - (n - 1) / 2) * spread;
+        this.shots.push({
+          x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg, pierce: g.pierce ?? 0, life: 1.1, ghost: isGhost, hit: new Set(),
+          rad: 6, kind: "ice", slow: W.slow ?? 0.5, slowT: W.slow_time ?? 1.5, freeze: g.freeze ?? 0,
+        });
+      }
+    } else if (id === "thunder") {
+      // 雷: 近い敵に落ち、そこから近くの敵へ次々に飛び移る（1回ごとに少し弱まる）
+      if (!tgt) return false;
+      const range = (W.range ?? 340) * area, jump = (W.jump ?? 150) * area;
+      const bolts = g.count ?? 1, chain = g.chain ?? 2;
+      const struck = new Set<Foe>();
+      for (let b = 0; b < bolts; b++) {
+        let cur: Foe | null = b === 0 ? tgt : null;
+        if (!cur) {
+          const list = this.grid.query(ox, oy, range);
+          const cand = list.filter((e) => !e.dead && !struck.has(e) && Math.hypot(e.x - ox, e.y - oy) < range);
+          if (cand.length === 0) break;
+          cur = cand[this.rng.misc.randi(cand.length)];
+        }
+        const pts = [ox, oy];
+        let d = dmg;
+        for (let k = 0; k < chain && cur; k++) {
+          struck.add(cur);
+          this.hurt(cur, d);
+          pts.push(cur.x, cur.y);
+          d *= 0.85;
+          const from: Foe = cur;
+          let best: Foe | null = null, bd = jump;
+          const list = this.grid.query(from.x, from.y, jump);
+          for (let i = 0; i < list.length; i++) {
+            const e = list[i];
+            if (e.dead || struck.has(e)) continue;
+            const dd = Math.hypot(e.x - from.x, e.y - from.y);
+            if (dd < bd) { bd = dd; best = e; }
+          }
+          cur = best;
+        }
+        this.emit({ type: "fx", kind: "bolt", pts, dur: 0.22, ghost: isGhost });
+      }
     } else if (id === "spear") {
       // 突き: 線分の上にいる敵をすべて貫く
       if (!tgt) return false;
@@ -356,6 +408,14 @@ export class RunSim {
   weaponCd(id: string, lv: number, evo: boolean): number {
     const W = this.D.weapons[id];
     return W.cd * weaponGrade(W, lv, evo).cd * (1 - 0.05 * (lv - 1));
+  }
+
+  /** 氷: 遅くする・凍らせる。ボスと怨霊は凍らず、遅くなるのも半分 */
+  private chill(e: Foe, mul: number, t: number, freeze: number): void {
+    const big = e.kind === "boss" || e.kind === "wraith";
+    e.slowMul = big ? 1 - (1 - mul) / 2 : mul;
+    e.slowT = Math.max(e.slowT, t);
+    if (!big && freeze > 0) e.freezeT = Math.max(e.freezeT, freeze);
   }
 
   private hurt(e: Foe, d: number): void {
@@ -531,6 +591,7 @@ export class RunSim {
         if (s.life <= 0 || e.dead || s.hit.has(e)) continue;
         if (Math.hypot(e.x - s.x, e.y - s.y) < e.r + s.rad) {
           this.hurt(e, s.dmg);
+          if (s.kind === "ice") this.chill(e, s.slow ?? 0.5, s.slowT ?? 1.5, s.freeze ?? 0);
           s.hit.add(e);
           s.pierce--;
           if (s.pierce < 0) s.life = 0;
@@ -726,8 +787,11 @@ export class RunSim {
         break;
       }
     }
-    e.x += e.vx * dt;
-    e.y += e.vy * dt;
+    let k = 1;
+    if (e.freezeT > 0) { e.freezeT -= dt; k = 0; }
+    else if (e.slowT > 0) { e.slowT -= dt; k = e.slowMul; }
+    e.x += e.vx * dt * k;
+    e.y += e.vy * dt * k;
     if (d < e.r + h.r) this.hurtPlayer(def.damage, e.kind);
   }
 

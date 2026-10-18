@@ -104,7 +104,7 @@ export class BattleView {
     for (const b of this.buckets.values()) b.length = 0;
     for (const e of sim.enemies) {
       if (!vis(e.x, e.y, e.r)) continue;
-      const col = e.flash > 0 ? "#ffffff" : e.def.color;
+      const col = e.flash > 0 ? "#ffffff" : e.freezeT > 0 ? "#cdeeff" : e.slowT > 0 ? "#7fb2cf" : e.def.color;
       let b = this.buckets.get(col);
       if (!b) { b = []; this.buckets.set(col, b); }
       b.push(e.x, e.y, e.r);
@@ -161,6 +161,18 @@ export class BattleView {
       }
       ctx.stroke();
     }
+    // 氷の刃（進む向きにとがった菱形）
+    ctx.fillStyle = "#bfe9ff";
+    for (const s of sim.shots) {
+      if (s.kind !== "ice" || !vis(s.x, s.y, 10)) continue;
+      const l = Math.hypot(s.vx, s.vy) || 1, ux = s.vx / l, uy = s.vy / l;
+      ctx.beginPath();
+      ctx.moveTo(s.x + ux * 10, s.y + uy * 10);
+      ctx.lineTo(s.x - uy * 3.5, s.y + ux * 3.5);
+      ctx.lineTo(s.x - ux * 7, s.y - uy * 7);
+      ctx.lineTo(s.x + uy * 3.5, s.y - ux * 3.5);
+      ctx.closePath(); ctx.fill();
+    }
     // 投げ斧（回転する刃）
     for (const s of sim.shots) {
       if (s.kind !== "axe" || !vis(s.x, s.y, s.rad + 4)) continue;
@@ -200,6 +212,18 @@ export class BattleView {
         ctx.lineCap = "round";
         ctx.beginPath(); ctx.moveTo(f.x + ux * 10, f.y + uy * 10); ctx.lineTo(f.x + ux * reach, f.y + uy * reach); ctx.stroke();
         ctx.lineCap = "butt";
+      } else if (f.kind === "bolt") {
+        // 雷: ジグザグの線（毎フレーム少し揺らす）
+        ctx.strokeStyle = f.ghost ? `rgba(143,240,224,${1 - k})` : `rgba(214,196,255,${1 - k})`;
+        ctx.lineWidth = 3 * (1 - k) + 1;
+        ctx.beginPath();
+        ctx.moveTo(f.pts[0], f.pts[1]);
+        for (let i = 2; i < f.pts.length; i += 2) {
+          const px = f.pts[i - 2], py = f.pts[i - 1], qx = f.pts[i], qy = f.pts[i + 1];
+          const mx = (px + qx) / 2 + (Math.random() - 0.5) * 18, my = (py + qy) / 2 + (Math.random() - 0.5) * 18;
+          ctx.lineTo(mx, my); ctx.lineTo(qx, qy);
+        }
+        ctx.stroke();
       } else if (f.kind === "boom") {
         ctx.strokeStyle = `rgba(255,140,120,${1 - k})`;
         ctx.lineWidth = 6;
