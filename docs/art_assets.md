@@ -31,6 +31,10 @@
 | `sprite_enemy_wraith.png` | 怨霊 |
 | `sprite_enemy_boss.png` | 冥王（ボス） |
 
+## 動き（アニメーション）
+- 1枚絵のままでも、コードで動かす（歩くと弾む・左右に揺れる・足元に土ぼこり／剣を振る時はためて踏み込み、残像と三日月の斬撃。`src/view/heroAnim.ts`）。
+- コマ絵があれば自動で使う（無いコマは1枚絵のまま）: `sprite_hero_<武器>_walk_1`〜`_N`（歩き、4コマ目安）、`sprite_hero_<武器>_attack_1`〜`_N`（振り、3コマ目安）。横並びの1枚（スプライトシート）でもらえば、こちらで切り分ける。
+
 ## 肖像の名前の付け方
 - `<武器>` は `sword`（剣）/ `bow`（弓）/ `fire`（炎の魔導書）/ `ice`（氷の魔導書）/ `thunder`（雷の魔導書）/ `spear`（槍）/ `axe`（斧）
 - 例: `portrait_sword_1.webp`, `portrait_sword_2.webp`, `portrait_bow_1.webp` …

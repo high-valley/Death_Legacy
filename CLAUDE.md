@@ -24,7 +24,7 @@
 ## よく使うコマンド
 ```bash
 npm install            # 初回（この作業環境では npm に繋がらないので、ln -s /opt/npm-tools/node_modules node_modules で代用できる）
-npm test               # 単体テスト 70件（Node 22.18+ が TypeScript をそのまま実行）
+npm test               # 単体テスト 74件（Node 22.18+ が TypeScript をそのまま実行）
 npm run typecheck      # tsc --noEmit
 npm run build          # dist/ に書き出し
 npm run dev            # http://localhost:8000
@@ -44,7 +44,7 @@ URL: `?demo`（見本データ・別保存先）`?fps` `?bench` `?lowres`。
 - 乱数は `RngStreams`（spawn / cards / misc / lineage / build）。新しい用途で既存ストリームを使うと seed 再現性が壊れる。`Math.random` は描画の揺れ以外で使わない。
 - バランス値は `data/balance.json`（祭壇の樹は `tree`、3択と怨霊は `rites`）。項目を足したら `src/data/types.ts` と `loadBalance()` の検証にも足す。
 - TypeScript は「型を消すだけで動く」書き方にする（`enum`・引数プロパティ禁止、import は `.ts` 付き）。Node がそのまま実行するため。
-- 武器の段階は `src/data/weapons.ts` の `weaponGrade()`。アイコンは `src/view/icons.ts`（DOM・キャンバス共通）、絵は `src/view/art.ts`。
+- 武器の段階は `src/data/weapons.ts` の `weaponGrade()`。アイコンは `src/view/icons.ts`（DOM・キャンバス共通）、絵は `src/view/art.ts`、主人公の動きは `src/view/heroAnim.ts`。
 - 入力は `InputRouter` / `TouchControls` 経由。スティックは指に付いてくる（`src/input/stick.ts`、テストあり）。
 
 ## 負荷（スマホ）

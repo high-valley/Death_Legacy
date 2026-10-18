@@ -158,7 +158,7 @@ class Game {
       this.acc = 0;
     }
     if (this.state === "loadtest") this.loadTestFrame(dt);
-    this.view.update(dt);
+    this.view.update(dt, this.state === "play" ? this.sim : null);
     this.hud.update(dt);
     this.render();
     requestAnimationFrame((t) => this.frame(t));

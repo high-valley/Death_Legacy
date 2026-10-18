@@ -2,10 +2,14 @@
 // スマホでも軽く描けるように: 画面外は描かない / 同じ色の敵は続けて描く。
 import type { Companion, RunSim, SimEvent } from "../sim/runSim.ts";
 import { Art } from "./art.ts";
+import { HeroAnim } from "./heroAnim.ts";
 import { C, SERIF } from "./theme.ts";
 
-type Fx = Extract<SimEvent, { type: "fx" }> & { t: number };
+type Fx = Extract<SimEvent, { type: "fx" }> & { t: number; side?: number };
+interface Dust { x: number; y: number; vx: number; t: number }
 interface Dmg { x: number; y: number; v: number; big: boolean; t: number }
+
+const ease = (x: number): number => 1 - (1 - x) * (1 - x);
 
 export class BattleView {
   fx: Fx[] = [];
@@ -15,6 +19,8 @@ export class BattleView {
   dmgs: Dmg[] = [];
   private groundSrc = Art.file("ground");
   private groundPat: CanvasPattern | null = null;
+  anim = new HeroAnim();
+  private dust: Dust[] = [];
 
   /** ダメージ数字（多すぎる時は古いものから捨てる） */
   addDmg(e: { x: number; y: number; v: number; big: boolean }): void {
@@ -23,7 +29,14 @@ export class BattleView {
   }
 
   addFx(e: Extract<SimEvent, { type: "fx" }>): void {
-    if (this.fx.length < 260) this.fx.push({ ...e, t: 0 });
+    if (this.fx.length >= 260) return;
+    if (e.kind === "arc") {
+      // 斬撃は描画側で少し長めに見せ、振る回りを交互にする。主人公の剣なら体も振る
+      if (!e.ghost) this.anim.attack(e.a);
+      this.fx.push({ ...e, dur: Math.max(e.dur, 0.28), t: 0, side: e.ghost ? (Math.sin(e.a * 7) > 0 ? 1 : -1) : this.anim.side });
+      return;
+    }
+    this.fx.push({ ...e, t: 0 });
   }
 
   addShake(a: number): void {
@@ -33,10 +46,25 @@ export class BattleView {
   clear(): void {
     this.fx.length = 0;
     this.dmgs.length = 0;
+    this.dust.length = 0;
+    this.anim = new HeroAnim();
     this.shake = 0;
   }
 
-  update(dt: number): void {
+  update(dt: number, sim: RunSim | null = null): void {
+    if (sim) {
+      const h = sim.hero;
+      if (this.anim.update(dt, h.x, h.y, h.fx) && this.dust.length < 24) {
+        const back = this.anim.left ? 1 : -1;
+        this.dust.push({ x: h.x + back * 4, y: h.y + h.r * 1.1, vx: back * (14 + Math.random() * 10), t: 0 });
+      }
+    }
+    let q = 0;
+    for (const d of this.dust) {
+      d.t += dt; d.x += d.vx * dt;
+      if (d.t < 0.45) this.dust[q++] = d;
+    }
+    this.dust.length = q;
     this.shake *= Math.pow(0.85, dt * 60);
     let j = 0;
     for (const f of this.fx) {
@@ -155,12 +183,9 @@ export class BattleView {
     // 主人公（art/sprite_hero_<武器> があれば絵。左右の向きは移動方向で反転）
     const blink = h.iframe > 0 && Math.floor(sim.t * 30) % 2 === 0;
     ctx.globalAlpha = blink ? 0.4 : 1;
-    const him = this.sprite(`sprite_hero_${sim.mainWeapon}`);
-    if (Math.abs(h.fx) > 0.2) this.heroLeft = h.fx < 0;
+    const him = this.heroFrame(sim.mainWeapon);
     if (him) {
-      ctx.fillStyle = "rgba(0,0,0,.35)";
-      ctx.beginPath(); ctx.ellipse(h.x, h.y + h.r * 1.1, h.r * 1.2, h.r * 0.45, 0, 0, 7); ctx.fill();
-      this.drawSprite(ctx, him, h.x, h.y - h.r * 0.6, h.r * 4.2, this.heroLeft);
+      this.drawHero(ctx, sim, him);
     } else {
       ctx.fillStyle = h.flash > 0 ? "#ffffff" : C.bone;
       ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, 7); ctx.fill();
@@ -220,9 +245,7 @@ export class BattleView {
     for (const f of this.fx) {
       const k = f.t / f.dur;
       if (f.kind === "arc") {
-        ctx.strokeStyle = f.ghost ? `rgba(143,240,224,${1 - k})` : `rgba(232,239,233,${1 - k})`;
-        ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (0.75 + 0.25 * k), f.a - f.arc / 2, f.a + f.arc / 2); ctx.stroke();
+        if (vis(f.x, f.y, f.r * 1.1)) this.drawSlash(ctx, f, !f.ghost && !!sim.evolved.sword);
       } else if (f.kind === "thrust") {
         // 槍の突き: 細く伸びる光
         const ux = Math.cos(f.a), uy = Math.sin(f.a), reach = f.len * Math.min(1, k * 2.5);
@@ -300,7 +323,151 @@ export class BattleView {
   }
 
   private sprites = new Map<string, string | null>();
-  private heroLeft = false;
+  private frameKeys = new Map<string, string[]>();
+  private silCache = new WeakMap<HTMLImageElement, HTMLCanvasElement>();
+
+  /** コマ絵の名前一覧（base_1, base_2 … と続く分だけ。無ければ空） */
+  private frames(base: string): string[] {
+    let list = this.frameKeys.get(base);
+    if (!list) {
+      list = [];
+      for (let i = 1; i <= 12 && Art.file(`${base}_${i}`); i++) list.push(`${base}_${i}`);
+      this.frameKeys.set(base, list);
+    }
+    return list;
+  }
+
+  /** 今のコマ: 振り中は _attack_N、歩き中は _walk_N、無ければ1枚絵 */
+  private heroFrame(weapon: string): HTMLImageElement | null {
+    const base = `sprite_hero_${weapon}`, a = this.anim;
+    if (a.atkT >= 0) {
+      const f = this.frames(`${base}_attack`);
+      if (f.length) {
+        const im = this.sprite(f[Math.min(f.length - 1, Math.floor((a.atkT / HeroAnim.ATK) * f.length))]);
+        if (im) return im;
+      }
+    }
+    if (a.move > 0.3) {
+      const f = this.frames(`${base}_walk`);
+      if (f.length) {
+        const im = this.sprite(f[Math.floor(a.walkPh / (Math.PI / 2)) % f.length]);
+        if (im) return im;
+      }
+    }
+    return this.sprite(base);
+  }
+
+  /** 白い影絵（被弾の点滅用。絵ごとに1回だけ作る） */
+  private silhouette(im: HTMLImageElement): HTMLCanvasElement | null {
+    let c = this.silCache.get(im);
+    if (!c && typeof document !== "undefined" && im.naturalWidth > 0) {
+      c = document.createElement("canvas");
+      c.width = im.naturalWidth; c.height = im.naturalHeight;
+      const g = c.getContext("2d");
+      if (!g) return null;
+      g.drawImage(im, 0, 0);
+      g.globalCompositeOperation = "source-in";
+      g.fillStyle = "#fff";
+      g.fillRect(0, 0, c.width, c.height);
+      this.silCache.set(im, c);
+    }
+    return c ?? null;
+  }
+
+  /** 主人公の絵を、足元を軸にして弾ませ・傾け・踏み込ませて描く */
+  private drawHero(ctx: CanvasRenderingContext2D, sim: RunSim, im: HTMLImageElement): void {
+    const h = sim.hero, a = this.anim, P = a.pose();
+    const size = h.r * 4.2, w = (size * im.naturalWidth) / im.naturalHeight;
+    const footY = h.y + h.r * 1.1;
+    // 土ぼこり
+    for (const d of this.dust) {
+      const k = d.t / 0.45;
+      ctx.fillStyle = `rgba(170,160,140,${0.28 * (1 - k)})`;
+      ctx.beginPath(); ctx.arc(d.x, d.y - k * 4, 2.5 + k * 5, 0, 7); ctx.fill();
+    }
+    // 影（跳ねている時は小さく）
+    const lift = Math.min(1, -P.dy / 10);
+    ctx.fillStyle = `rgba(0,0,0,${0.35 - 0.12 * lift})`;
+    ctx.beginPath(); ctx.ellipse(h.x + P.dx * 0.5, footY, h.r * 1.2 * (1 - 0.2 * lift), h.r * 0.45, 0, 0, 7); ctx.fill();
+    const put = (p: typeof P, img: CanvasImageSource): void => {
+      ctx.save();
+      ctx.translate(h.x + p.dx, footY + p.dy);
+      ctx.rotate(p.rot);
+      ctx.scale(p.sx * (a.left ? -1 : 1), p.sy);
+      ctx.drawImage(img, -w / 2, -size + h.r * 0.4, w, size);
+      ctx.restore();
+    };
+    // 振り抜きの残像
+    if (P.swing > 0.05) {
+      const base = ctx.globalAlpha;
+      for (const back of [0.06, 0.03]) {
+        ctx.globalAlpha = base * P.swing * (back > 0.04 ? 0.18 : 0.3);
+        put(a.pose(back), im);
+      }
+      ctx.globalAlpha = base;
+    }
+    put(P, im);
+    if (h.flash > 0) {
+      const sil = this.silhouette(im);
+      if (sil) {
+        const base = ctx.globalAlpha;
+        ctx.globalAlpha = base * 0.65;
+        put(P, sil);
+        ctx.globalAlpha = base;
+      }
+    }
+  }
+
+  /** 三日月形の斬撃。先端が太く、振った跡が細くなって消える */
+  private drawSlash(ctx: CanvasRenderingContext2D, f: Extract<Fx, { kind: "arc" }>, gold: boolean): void {
+    const k = f.t / f.dur, side = f.side ?? 1;
+    const full = f.arc >= 6.2;
+    const span = full ? Math.PI * 2 : f.arc;
+    const start = f.a - side * span / 2;
+    const head = start + side * span * ease(Math.min(1, k / 0.42));
+    const tail = start + side * span * ease(Math.max(0, (k - 0.22) / 0.78));
+    const fade = k < 0.42 ? 1 : 1 - (k - 0.42) / 0.58;
+    if (Math.abs(head - tail) < 0.02 || fade <= 0) return;
+    const R = f.r * (0.92 + 0.08 * Math.min(1, k * 3));
+    const pal = f.ghost ? ["143,240,224", "200,255,245"] : gold ? ["255,180,60", "255,240,190"] : ["225,40,60", "255,200,185"];
+    const shape = (outer: number, thick: number): void => {
+      const N = 18;
+      ctx.beginPath();
+      for (let i = 0; i <= N; i++) {
+        const u = i / N, ang = tail + (head - tail) * u;
+        ctx.lineTo(f.x + Math.cos(ang) * R * outer, f.y + Math.sin(ang) * R * outer);
+      }
+      for (let i = N; i >= 0; i--) {
+        const u = i / N, ang = tail + (head - tail) * u;
+        const rr = R * (outer - thick * u * u);
+        ctx.lineTo(f.x + Math.cos(ang) * rr, f.y + Math.sin(ang) * rr);
+      }
+      ctx.closePath();
+    };
+    const prev = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = `rgba(${pal[0]},${0.42 * fade})`;
+    shape(1.06, 0.72); ctx.fill();
+    ctx.fillStyle = `rgba(${pal[0]},${0.3 * fade})`;
+    shape(1.0, 0.45); ctx.fill();
+    ctx.fillStyle = `rgba(${pal[1]},${0.65 * fade})`;
+    shape(1.0, 0.2); ctx.fill();
+    ctx.fillStyle = `rgba(255,255,255,${0.9 * fade})`;
+    shape(1.0, 0.06); ctx.fill();
+    // 先端の火花（描画だけの揺れなので Math.random でよい）
+    if (k < 0.5) {
+      const hx = f.x + Math.cos(head) * R, hy = f.y + Math.sin(head) * R;
+      ctx.strokeStyle = `rgba(${pal[1]},${0.9 * fade})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const ang = head + side * Math.PI / 2 + (Math.random() - 0.5) * 1.6, l = 6 + Math.random() * 10;
+        ctx.moveTo(hx, hy); ctx.lineTo(hx + Math.cos(ang) * l, hy + Math.sin(ang) * l);
+      }
+      ctx.stroke();
+    }
+    ctx.globalCompositeOperation = prev;
+  }
 
   /** art/ の絵（読み込み前・無い時は null） */
   private sprite(key: string): HTMLImageElement | null {

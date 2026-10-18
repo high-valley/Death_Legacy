@@ -254,3 +254,12 @@ Transparent background, single character only, no ground, no shadow, no text, no
 - `sprite_enemy_elite`: `A huge grave robber ogre with a rusty shovel and a lantern, patched leather, olive-yellow tones.`
 - `sprite_enemy_wraith`: `A screaming violet wraith, skeletal face, long claws, body of torn shadowy cloth.`
 - `sprite_enemy_boss`: `The Lord of the Underworld: a towering armored lich king with a crimson crown, glowing red eyes, flowing black cape, holding a great scythe.`
+
+### コマ絵（任意・動きを細かくしたい時）
+1枚絵と同じチャットで、その絵を添付して頼む。顔や服がコマごとにずれやすいので、ずれたコマは作り直してもらう。
+```
+添付したキャラクターと全く同じ見た目のまま、ゲーム用のアニメーションのコマを横一列に並べた1枚の透過PNGを作ってください。
+Sprite sheet, same character, same outfit, same colors, same size in every frame, facing right, transparent background, frames evenly spaced in one row, no text.
+Row: 4-frame walk cycle (left foot forward, passing, right foot forward, passing).
+```
+振りの時は最後の行を `Row: 3-frame sword slash (wind-up with sword raised behind, mid-swing, follow-through with sword extended forward).` に替える。
