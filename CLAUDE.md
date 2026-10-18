@@ -14,6 +14,8 @@
 - **実装済み（フェーズ1）**: MVP一式（3武器・6パッシブ・3敵種＋冥王・亡霊の生成/予約/消費・保管庫10体と入れ替え・セーブと中断復帰）＋ カードのレア度5段階（N/R/SR/UR/LR、LRは武器進化）＋ 供物（祭壇=レア率、書庫=縁・封印）＋ 形見。
 - **実装済み（フェーズ2）**: 家系の解放（無名・火守・墓守。特性・弱点・専用カード・解放条件、ADR 013）＋ 画面のつくり直し（ADR 014）。
 - **実装済み（フェーズ3）**: 亡霊の3択（連れていく / 喰らう / 弔う）・穢れ・怨霊（ADR 015）＋ 祭壇と書庫を「祭壇の樹」に統合（ADR 016）。
+- **実装済み**: 武器の段階（5武器×4段階・槍と斧、ADR 017）＋ 画面イメージに寄せた作り直しと絵の差し替え口（ADR 018）。
+- **絵はオーナーが用意する**（肖像・背景）。`art/` に決まった名前で置くと自動で入る。一覧は `docs/art_assets.md`。チャットで画像をもらったら名前を付けて `art/` に置く。
 - **次（オーナーと合意済みの順）**:
   - 拠点（納骨堂）の施設が増えていく仕組み
 - 公開URL: https://high-valley.github.io/Death_Legacy/
@@ -21,7 +23,7 @@
 ## よく使うコマンド
 ```bash
 npm install            # 初回（この作業環境では npm に繋がらないので、ln -s /opt/npm-tools/node_modules node_modules で代用できる）
-npm test               # 単体テスト 46件（Node 22.18+ が TypeScript をそのまま実行）
+npm test               # 単体テスト 56件（Node 22.18+ が TypeScript をそのまま実行）
 npm run typecheck      # tsc --noEmit
 npm run build          # dist/ に書き出し
 npm run dev            # http://localhost:8000
@@ -41,6 +43,7 @@ URL: `?demo`（見本データ・別保存先）`?fps` `?bench` `?lowres`。
 - 乱数は `RngStreams`（spawn / cards / misc / lineage）。新しい用途で既存ストリームを使うと seed 再現性が壊れる。`Math.random` は描画の揺れ以外で使わない。
 - バランス値は `data/balance.json`（祭壇の樹は `tree`、3択と怨霊は `rites`）。項目を足したら `src/data/types.ts` と `loadBalance()` の検証にも足す。
 - TypeScript は「型を消すだけで動く」書き方にする（`enum`・引数プロパティ禁止、import は `.ts` 付き）。Node がそのまま実行するため。
+- 武器の段階は `src/data/weapons.ts` の `weaponGrade()`。アイコンは `src/view/icons.ts`（DOM・キャンバス共通）、絵は `src/view/art.ts`。
 - 入力は `InputRouter` / `TouchControls` 経由。スティックは指に付いてくる（`src/input/stick.ts`、テストあり）。
 
 ## 負荷（スマホ）
@@ -49,5 +52,5 @@ URL: `?demo`（見本データ・別保存先）`?fps` `?bench` `?lowres`。
 
 ## 既知の課題
 - 自動ボットでは祭壇0で6回中3回クリア。人が遊んだ感想を聞いてから難度を調整する。
-- 仮アセット（図形・コード生成の効果音）。
+- 仮アセット（絵はオーナーが用意中。効果音はコード生成）。
 - Steam 版（Electron＋Steamworks）は未着手。入口は `src/platform.ts`。

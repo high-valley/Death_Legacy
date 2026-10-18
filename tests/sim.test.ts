@@ -12,7 +12,7 @@ test("balance.json に検証エラーがない", () => {
 
 test("壊れたデータ（進化欠落・レア度不足・ボス欠落）を検出する", () => {
   const raw = JSON.parse(RAW_TEXT);
-  delete raw.evolutions.bow;
+  raw.weapons.bow.grades.pop();
   raw.rarities.pop();
   delete raw.enemies.boss;
   const { errors } = loadBalance(raw);
@@ -69,10 +69,10 @@ test("祭壇で高レア率が上がる", () => {
 
 test("LRで所持武器が進化し、進化済みの武器にLRは出ない", () => {
   const r = new RunSim(D, { run_id: "x", seed: 1, mode: "short", weapon: "sword" });
-  r.weapons.sword = 2;
+  r.weapons.sword = 3;
   r.pending = 1;
-  r.applyChoice({ kind: "weapon", id: "sword", lv: 2, rar: "LR" });
-  assert.ok(r.evolved.sword && r.weapons.sword === 3 && r.weaponName("sword") === "冥剣");
+  r.applyChoice({ kind: "weapon", id: "sword", lv: 3, rar: "LR" });
+  assert.ok(r.evolved.sword && r.weapons.sword === 4 && r.weaponName("sword") === "デュランダル");
   for (let i = 0; i < 200; i++) for (const c of r.rollChoices()) assert.ok(!(c.kind === "weapon" && c.id === "sword" && c.rar === "LR"));
 });
 

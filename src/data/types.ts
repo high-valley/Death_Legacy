@@ -1,7 +1,16 @@
 // data/balance.json の型。バランス値はコードに書かず、すべてここから参照する。
 
-export interface Tier { id: string; name: string; from: number; mult: number; color: string }
-export interface Weapon { name: string; desc: string; cd: number; damage: number; range?: number; arc?: number; speed?: number; radius?: number; burn?: number; tick?: number }
+export interface Tier { id: string; name: string; from: number; mult: number; rank: string; color: string }
+/** 武器の段階（グレード）。lv 以上で持ち替え、evo はレジェンドレアで進化した最終段階。数値は武器の基本値への倍率 */
+export interface WeaponGrade {
+  lv?: number; evo?: boolean; name: string; desc: string; cd: number; dmg: number;
+  range?: number; arc?: number; dirs?: number; count?: number; pierce?: number; speed?: number;
+  radius?: number; burn?: number; length?: number; width?: number; size?: number;
+}
+export interface Weapon {
+  name: string; desc: string; cd: number; damage: number; per_level: number; grades: WeaponGrade[];
+  range?: number; speed?: number; radius?: number; burn?: number; tick?: number; length?: number; width?: number; size?: number;
+}
 export interface Passive { name: string; per: number; fmt: string }
 export interface Rarity { id: RarityId; name: string; weight: number; color: string; wlv: number; wbonus: number; pmul: number; evolve?: boolean }
 export type RarityId = "N" | "R" | "SR" | "UR" | "LR";
@@ -54,13 +63,13 @@ export interface Balance {
   xp: { base: number; per_level: number };
   weapons: Record<string, Weapon>;
   weapon_max_level: number;
+  evolve_min_level: number;   // レジェンドレアで進化できる最低Lv
   sub_weapon_slots: number;
   passives: Record<string, Passive>;
   passive_slots: number;
   passive_max_level: number;
   rarities: Rarity[];
   maxed_weapon_bonus: Record<RarityId, number>;
-  evolutions: Record<string, { name: string; desc: string }>;
   offerings: { per_tenth_survived: number; per_100_kills: number; clear_bonus: number; retire_rate: number };
   altar: { max: number; shift: Record<RarityId, number> };
   library: { affinity_step: number; affinity_max: number };

@@ -2,7 +2,7 @@
 //   node tools/build.mjs          … 本番用（圧縮あり）
 //   node tools/build.mjs --serve  … 開発用（http://localhost:8000 、保存するたびに作り直す）
 import * as esbuild from "esbuild";
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const serve = process.argv.includes("--serve");
 const root = new URL("..", import.meta.url).pathname;
@@ -13,6 +13,10 @@ const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 for (const f of ["style.css", "icon.svg"]) cpSync(root + f, out + f);
+// 絵の素材: art/ に決まった名前で置くと自動で使われる（一覧は docs/art_assets.md）
+const ART_EXT = /\.(webp|jpe?g|png|avif)$/i;
+const art = existsSync(root + "art") ? readdirSync(root + "art").filter((f) => ART_EXT.test(f)).sort() : [];
+if (art.length) cpSync(root + "art", out + "art", { recursive: true, filter: (src) => !/\.md$/i.test(src) });
 // 更新後に古いファイルが残らないよう、読み込むファイル名にビルドごとの印を付ける
 const tag = Date.now().toString(36);
 writeFileSync(out + "index.html", readFileSync(root + "index.html", "utf8")
@@ -27,7 +31,7 @@ const opts = {
   outfile: out + "main.js",
   sourcemap: true,
   minify: !serve,
-  define: { __VERSION__: JSON.stringify(`${version} (${stamp})`) },
+  define: { __VERSION__: JSON.stringify(`${version} (${stamp})`), __ART__: JSON.stringify(art) },
   logLevel: "info",
 };
 

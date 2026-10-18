@@ -27,22 +27,36 @@ export function loadBalance(raw: unknown): Loaded {
   };
 
   const D = raw as Balance;
-  if (!need(raw, ["schema_version", "data_version", "run_length", "vault_capacity", "tiers", "ghost_unlock", "player", "xp", "weapons",
-    "passives", "rarities", "maxed_weapon_bonus", "evolutions", "offerings", "altar", "library", "tree", "rites", "shelf", "enemies", "spawn", "checkpoint_interval", "lineages"], "balance")) {
+  if (!need(raw, ["schema_version", "data_version", "run_length", "vault_capacity", "tiers", "ghost_unlock", "player", "xp", "weapons", "evolve_min_level",
+    "passives", "rarities", "maxed_weapon_bonus", "offerings", "altar", "library", "tree", "rites", "shelf", "enemies", "spawn", "checkpoint_interval", "lineages"], "balance")) {
     return { D, errors };
   }
   // 等級は生存割合の昇順で、最初は0から
   let prev = -1;
   D.tiers.forEach((t, i) => {
-    if (!need(t, ["id", "name", "from", "mult", "color"], `tiers[${i}]`)) return;
+    if (!need(t, ["id", "name", "from", "mult", "rank", "color"], `tiers[${i}]`)) return;
     if (t.from <= prev) errors.push("tiers: from は昇順にする");
     prev = t.from;
   });
   if (D.tiers.length > 0 && D.tiers[0].from !== 0) errors.push("tiers[0].from は 0");
   need(D.player, ["hp", "speed", "radius", "dash_speed", "dash_time", "dash_cd", "hit_iframe", "pickup"], "player");
   for (const id of Object.keys(D.weapons)) {
-    need(D.weapons[id], ["name", "desc", "cd", "damage"], `weapons.${id}`);
-    if (!isDict(D.evolutions) || !(id in D.evolutions)) errors.push(`evolutions に ${id} がない（LRで進化できない）`);
+    if (!need(D.weapons[id], ["name", "desc", "cd", "damage", "per_level", "grades"], `weapons.${id}`)) continue;
+    // 段階: Lv1 から始まり lv は昇順・最大Lv以下、最後の1つだけが進化（evo）
+    const gs = D.weapons[id].grades;
+    let plv = 0;
+    gs.forEach((g, i) => {
+      need(g, ["name", "desc", "cd", "dmg"], `weapons.${id}.grades[${i}]`);
+      const last = i === gs.length - 1;
+      if (last !== !!g.evo) errors.push(`weapons.${id}: 進化（evo）は最後の段階に1つだけ（LRで進化できない）`);
+      if (!last) {
+        const lv = g.lv ?? 0;
+        if (i === 0 && lv !== 1) errors.push(`weapons.${id}: 最初の段階は lv 1`);
+        if (lv <= plv || lv > D.weapon_max_level) errors.push(`weapons.${id}: 段階の lv は昇順で ${D.weapon_max_level} 以下`);
+        plv = lv;
+      }
+    });
+    if (gs.length < 2) errors.push(`weapons.${id}: 段階は2つ以上`);
   }
   for (const id of Object.keys(D.passives)) need(D.passives[id], ["name", "per", "fmt"], `passives.${id}`);
   const rarIds: string[] = [];

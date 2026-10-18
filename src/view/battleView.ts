@@ -1,15 +1,26 @@
 // 戦場の描画。RunSim の状態を読むだけ（書き換えない）。仮アセットなので図形で描く。
 // スマホでも軽く描けるように: 画面外は描かない / 同じ色の敵は続けて描く。
 import type { RunSim, SimEvent } from "../sim/runSim.ts";
-import { C } from "./theme.ts";
+import { Art } from "./art.ts";
+import { C, SERIF } from "./theme.ts";
 
 type Fx = Extract<SimEvent, { type: "fx" }> & { t: number };
+interface Dmg { x: number; y: number; v: number; big: boolean; t: number }
 
 export class BattleView {
   fx: Fx[] = [];
   shake = 0;
   zoom = 1;
   private buckets = new Map<string, number[]>();   // 色 → [x, y, r, x, y, r, ...]
+  dmgs: Dmg[] = [];
+  private groundSrc = Art.file("ground");
+  private groundPat: CanvasPattern | null = null;
+
+  /** ダメージ数字（多すぎる時は古いものから捨てる） */
+  addDmg(e: { x: number; y: number; v: number; big: boolean }): void {
+    if (this.dmgs.length >= 60) this.dmgs.shift();
+    this.dmgs.push({ x: e.x + (Math.random() - 0.5) * 10, y: e.y, v: e.v, big: e.big, t: 0 });
+  }
 
   addFx(e: Extract<SimEvent, { type: "fx" }>): void {
     if (this.fx.length < 260) this.fx.push({ ...e, t: 0 });
@@ -21,6 +32,7 @@ export class BattleView {
 
   clear(): void {
     this.fx.length = 0;
+    this.dmgs.length = 0;
     this.shake = 0;
   }
 
@@ -32,6 +44,12 @@ export class BattleView {
       if (f.t < f.dur) this.fx[j++] = f;
     }
     this.fx.length = j;
+    let k = 0;
+    for (const d of this.dmgs) {
+      d.t += dt;
+      if (d.t < 0.7) this.dmgs[k++] = d;
+    }
+    this.dmgs.length = k;
   }
 
   draw(ctx: CanvasRenderingContext2D, sim: RunSim, W: number, H: number, touch: boolean): void {
@@ -46,26 +64,17 @@ export class BattleView {
     const x0 = h.x - hw, x1 = h.x + hw, y0 = h.y - hh, y1 = h.y + hh;
     const vis = (x: number, y: number, r: number): boolean => x + r > x0 && x - r < x1 && y + r > y0 && y - r < y1;
 
-    // 地面: 格子と墓標（座標から決まる飾り）
-    ctx.strokeStyle = "#151b22";
-    ctx.lineWidth = 1 / z;
-    ctx.beginPath();
-    const g = 96;
-    for (let x = Math.floor(x0 / g) * g; x < x1; x += g) { ctx.moveTo(x, y0); ctx.lineTo(x, y1); }
-    for (let y = Math.floor(y0 / g) * g; y < y1; y += g) { ctx.moveTo(x0, y); ctx.lineTo(x1, y); }
-    ctx.stroke();
-    ctx.fillStyle = "#1c232c";
-    ctx.beginPath();
-    for (let x = Math.floor(x0 / 288) * 288; x < x1; x += 288) {
-      for (let y = Math.floor(y0 / 288) * 288; y < y1; y += 288) {
-        const hh2 = (Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0;
-        if (hh2 % 3) continue;
-        const ox = hh2 % 200, oy = (hh2 >>> 8) % 200;
-        ctx.rect(x + ox, y + oy, 14, 20);
-        ctx.rect(x + ox - 4, y + oy + 4, 22, 5);
-      }
+    // 地面: 絵（art/ground）があれば敷き詰める。無ければ格子と墓標（座標から決まる飾り）
+    if (this.groundSrc && !this.groundPat) {
+      const im = Art.image(this.groundSrc);
+      if (im) this.groundPat = ctx.createPattern(im, "repeat");
     }
-    ctx.fill();
+    if (this.groundPat) {
+      ctx.fillStyle = this.groundPat;
+      ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      ctx.fillStyle = "rgba(8,10,14,.35)";
+      ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    } else this.drawFloor(ctx, x0, x1, y0, y1, z);
 
     // 炎
     ctx.lineWidth = 1.5;
@@ -147,10 +156,24 @@ export class BattleView {
       ctx.strokeStyle = ghost ? C.soul : "#f2e3b3";
       ctx.beginPath();
       for (const s of sim.shots) {
-        if (s.ghost !== ghost) continue;
+        if (s.ghost !== ghost || s.kind !== "arrow") continue;
         ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx * 0.02, s.y - s.vy * 0.02);
       }
       ctx.stroke();
+    }
+    // 投げ斧（回転する刃）
+    for (const s of sim.shots) {
+      if (s.kind !== "axe" || !vis(s.x, s.y, s.rad + 4)) continue;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(s.spin ?? 0);
+      ctx.fillStyle = s.ghost ? C.soul : "#d9d2c0";
+      ctx.beginPath();
+      ctx.moveTo(-s.rad * 0.2, -s.rad); ctx.quadraticCurveTo(s.rad * 1.1, -s.rad * 0.9, s.rad * 0.9, 0);
+      ctx.quadraticCurveTo(s.rad * 1.1, s.rad * 0.9, -s.rad * 0.2, s.rad); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = s.ghost ? C.soul : "#7a5a36"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-s.rad * 1.2, 0); ctx.lineTo(s.rad * 0.4, 0); ctx.stroke();
+      ctx.restore();
     }
     // 敵弾
     for (const boss of [false, true]) {
@@ -169,6 +192,14 @@ export class BattleView {
         ctx.strokeStyle = f.ghost ? `rgba(143,240,224,${1 - k})` : `rgba(232,239,233,${1 - k})`;
         ctx.lineWidth = 4;
         ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (0.75 + 0.25 * k), f.a - f.arc / 2, f.a + f.arc / 2); ctx.stroke();
+      } else if (f.kind === "thrust") {
+        // 槍の突き: 細く伸びる光
+        const ux = Math.cos(f.a), uy = Math.sin(f.a), reach = f.len * Math.min(1, k * 2.5);
+        ctx.strokeStyle = f.ghost ? `rgba(143,240,224,${1 - k})` : `rgba(240,226,190,${1 - k})`;
+        ctx.lineWidth = f.w * (1 - k * 0.6);
+        ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(f.x + ux * 10, f.y + uy * 10); ctx.lineTo(f.x + ux * reach, f.y + uy * reach); ctx.stroke();
+        ctx.lineCap = "butt";
       } else if (f.kind === "boom") {
         ctx.strokeStyle = `rgba(255,140,120,${1 - k})`;
         ctx.lineWidth = 6;
@@ -181,8 +212,48 @@ export class BattleView {
         ctx.globalAlpha = 1;
       }
     }
+    // ダメージ数字
+    if (this.dmgs.length) {
+      ctx.textAlign = "center";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(0,0,0,.7)";
+      for (const d of this.dmgs) {
+        if (!vis(d.x, d.y, 20)) continue;
+        const k = d.t / 0.7;
+        ctx.globalAlpha = k < 0.7 ? 1 : (1 - k) / 0.3;
+        ctx.font = `700 ${d.big ? 17 : 13}px ${SERIF}`;
+        const y = d.y - 8 - k * 22;
+        ctx.strokeText(String(d.v), d.x, y);
+        ctx.fillStyle = d.big ? "#ffb35c" : "#f3eee2";
+        ctx.fillText(String(d.v), d.x, y);
+      }
+      ctx.globalAlpha = 1;
+      ctx.textAlign = "left";
+    }
     ctx.restore();
     ctx.lineWidth = 1;
+  }
+
+  private drawFloor(ctx: CanvasRenderingContext2D, x0: number, x1: number, y0: number, y1: number, z: number): void {
+    ctx.strokeStyle = "#151b22";
+    ctx.lineWidth = 1 / z;
+    ctx.beginPath();
+    const g = 96;
+    for (let x = Math.floor(x0 / g) * g; x < x1; x += g) { ctx.moveTo(x, y0); ctx.lineTo(x, y1); }
+    for (let y = Math.floor(y0 / g) * g; y < y1; y += g) { ctx.moveTo(x0, y); ctx.lineTo(x1, y); }
+    ctx.stroke();
+    ctx.fillStyle = "#1c232c";
+    ctx.beginPath();
+    for (let x = Math.floor(x0 / 288) * 288; x < x1; x += 288) {
+      for (let y = Math.floor(y0 / 288) * 288; y < y1; y += 288) {
+        const hh2 = (Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0;
+        if (hh2 % 3) continue;
+        const ox = hh2 % 200, oy = (hh2 >>> 8) % 200;
+        ctx.rect(x + ox, y + oy, 14, 20);
+        ctx.rect(x + ox - 4, y + oy + 4, 22, 5);
+      }
+    }
+    ctx.fill();
   }
 
   private drawGhost(ctx: CanvasRenderingContext2D, sim: RunSim): void {

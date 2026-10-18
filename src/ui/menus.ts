@@ -1,26 +1,35 @@
-// 戦闘以外の画面: タイトル / 納骨堂（出撃・祭壇の樹・形見の棚）/ 確認 / レベルアップ / ポーズ / 設定 / リザルト。
+// 戦闘以外の画面: タイトル / 納骨堂（出撃準備・祭壇の樹・形見の棚）/ 確認 / レベルアップ / ポーズ / 設定 / リザルト。
 // 画面を開くたびに作り直す（状態は MetaService と hub の選択だけが持つ）。
-// 納骨堂は「左＝誰が行くか（家系・亡霊・形見）」「右＝出撃札（いまの選択のまとめと出撃ボタン）」の2列。
-import type { Balance, Lineage, RunMode } from "../data/types.ts";
+// 見た目は「暗い石と金の飾り枠」。肖像・背景は art/ に絵があれば使い、無ければ図形の仮表示（src/view/art.ts）。
+import type { Balance, Lineage, RunMode, Tier } from "../data/types.ts";
+import { weaponGrade } from "../data/weapons.ts";
 import type { MetaService } from "../meta/metaService.ts";
 import type { ActiveRun, GhostMode, GhostRecord, RunRecord } from "../meta/records.ts";
 import { Platform } from "../platform.ts";
 import { Settings } from "../settings.ts";
 import { RunSim, type Card } from "../sim/runSim.ts";
+import { Art } from "../view/art.ts";
 import { fmt } from "../view/hud.ts";
+import { iconSvg } from "../view/icons.ts";
 import { button, h } from "./dom.ts";
 
 export interface SortieRequest { ghostId: string; heirId: string; weapon: string; mode: RunMode; seed: number; lineage: string; ghostMode: GhostMode }
 
-const RESULT_NAME: Record<string, string> = { player_death: "死亡", boss_cleared: "生還", retired: "リタイア" };
+const RESULT_NAME: Record<string, string> = { player_death: "死亡", boss_cleared: "クリア", retired: "リタイア" };
 const KANJI = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
 
-/** 代数を漢数字に（位牌の縦書き用） */
+/** 代数を漢数字に */
 export function kanjiNum(n: number): string {
   if (n < 10) return KANJI[n];
   if (n < 20) return "十" + (n % 10 ? KANJI[n % 10] : "");
   if (n < 100) return KANJI[Math.floor(n / 10)] + "十" + (n % 10 ? KANJI[n % 10] : "");
   return String(n);
+}
+
+/** 背景の絵（あれば） */
+function backdrop(key: string): HTMLElement | null {
+  const src = Art.file(key);
+  return src ? h("div", { class: "backdrop", style: `background-image:url("${src}")` }) : null;
 }
 
 export class Menus {
@@ -40,10 +49,10 @@ export class Menus {
   }
 
   // ---------------------------------------------------------------- building blocks
-  private open(cls = ""): HTMLElement {
+  private open(cls = "", ovCls = ""): HTMLElement {
     this.hotkeys = [];
     const panel = h("div", { class: `panel ${cls}` });
-    const ov = h("div", { class: "ov" }, panel);
+    const ov = h("div", { class: `ov ${ovCls}` }, panel);
     this.root.replaceChildren(ov);
     this.root.hidden = false;
     return panel;
@@ -66,24 +75,55 @@ export class Menus {
     setTimeout(() => { for (const b of buttons) b.disabled = false; }, 250);
   }
 
-  /** 選べるカード（亡霊・形見・家系など）。onPress が null なら表示だけ */
+  /** 選べるカード（形見・家系など）。onPress が null なら表示だけ */
   private pick(parts: (Node | string | null)[], opts: { edge?: string; pressed?: boolean; onPress?: (() => void) | null; cls?: string }): HTMLElement {
     const style = opts.edge ? `--edge:${opts.edge}` : undefined;
     if (!opts.onPress) return h("div", { class: `pick ${opts.cls ?? ""}`, style }, ...parts);
     return h("button", { type: "button", class: `pick ${opts.cls ?? ""}`, style, "aria-pressed": String(!!opts.pressed), onclick: opts.onPress }, ...parts);
   }
 
+  /** 枠の見出し（紋章＋題＋添え書き） */
+  private frameHead(title: string, sub = "", icon = "ghost"): HTMLElement {
+    return h("div", { class: "fhead" }, h("span", { class: "sigil" }, iconSvg(icon)), h("h3", {}, title), sub ? h("span", { class: "fsub" }, sub) : null);
+  }
+
+  /** 肖像。絵があれば絵、無ければ等級の色の光と武器の紋 */
+  portrait(g: GhostRecord | null, cls = ""): HTMLElement {
+    if (!g) return h("div", { class: `portrait empty ${cls}` }, iconSvg("ghost", "icon ph"));
+    const tr = this.meta.tier(g.tier_id);
+    const src = Art.portrait(g.primary_weapon_id, g.ghost_id);
+    const el = h("div", { class: `portrait ${cls}`, style: `--tc:${tr.color}` });
+    if (src) el.append(h("img", { src, alt: "", loading: "lazy" }));
+    else el.append(iconSvg("ghost", "icon ph"), iconSvg(g.primary_weapon_id, "icon pw"));
+    el.append(h("span", { class: "gen" }, kanjiNum(Number(/第(\d+)代/.exec(g.display_name)?.[1] ?? 0))));
+    return el;
+  }
+
+  private rank(tr: Tier): HTMLElement {
+    return h("span", { class: "rank", style: `--tc:${tr.color}` }, tr.rank);
+  }
+
+  private weaponLabel(g: GhostRecord): string {
+    return weaponGrade(this.D.weapons[g.primary_weapon_id], g.weapon_level, g.evolved).name;
+  }
+
+  /** 亡霊の1行（記録庫・入れ替え・リザルト） */
   ghostCard(g: GhostRecord, pressed: boolean, onPress: (() => void) | null, note = ""): HTMLElement {
     const D = this.D, tr = this.meta.tier(g.tier_id);
-    const wname = g.evolved ? D.evolutions[g.primary_weapon_id].name : D.weapons[g.primary_weapon_id].name;
-    const cause = D.enemies[g.death_cause_id]?.name ?? "不明";
-    return this.pick([
-      h("span", { class: "tier" }, `${tr.name}　攻撃×${tr.mult}`),
-      h("span", { class: "name" }, g.display_name),
-      h("span", { class: "meta" }, `${fmt(g.survival_seconds)} 生存 / ${wname} Lv${g.weapon_level}${g.passive_id ? ` / ${D.passives[g.passive_id].name} Lv${g.passive_level}` : ""}`),
-      h("span", { class: "meta" }, `撃破 ${g.kills}　死因 ${cause}`),
-      note ? h("span", { class: "note" }, note) : null,
-    ], { edge: tr.color, pressed, onPress });
+    const body = [
+      this.portrait(g),
+      h("div", { class: "gbody" },
+        h("div", { class: "gname" }, h("span", {}, g.display_name.replace(/^第\d+代・/, (m) => m)), this.rank(tr)),
+        h("dl", { class: "gstats" },
+          h("dt", {}, "生存時間"), h("dd", { class: "num" }, fmt(g.survival_seconds)),
+          h("dt", {}, "メイン武器"), h("dd", {}, `${this.weaponLabel(g)} Lv${g.weapon_level}`),
+          h("dt", {}, "パッシブ"), h("dd", {}, g.passive_id ? `${D.passives[g.passive_id].name} Lv${g.passive_level}` : "なし")),
+        note ? h("span", { class: "note" }, note) : null),
+      onPress ? h("span", { class: `chip ${pressed ? "on" : ""}` }, pressed ? "選択中" : "待機中") : null,
+    ];
+    const cls = `ghost-row${pressed ? " on" : ""}`;
+    if (!onPress) return h("div", { class: cls, style: `--tc:${tr.color}` }, ...body);
+    return h("button", { type: "button", class: cls, style: `--tc:${tr.color}`, "aria-pressed": String(pressed), onclick: onPress }, ...body);
   }
 
   private houseCard(l: Lineage, pressed: boolean, onPress: () => void): HTMLElement {
@@ -94,8 +134,8 @@ export class Menus {
         h("span", { class: "tier" }, "未解放"),
         h("span", { class: "name" }, l.name),
         h("span", { class: "meta" }, l.unlock?.text ?? ""),
-        pr ? h("span", { class: "meta num" }, `${pr.cur} / ${pr.need}`) : null,
         pr ? h("div", { class: "bar" }, h("i", { style: `width:${(pr.cur / pr.need) * 100}%` })) : null,
+        pr ? h("span", { class: "meta num" }, `${pr.cur} / ${pr.need}`) : null,
       ], { cls: "house locked" });
     }
     return this.pick([
@@ -103,35 +143,39 @@ export class Menus {
       h("span", { class: "motto" }, l.motto),
       h("span", { class: "plus" }, l.trait),
       l.weakness !== "なし" ? h("span", { class: "minus" }, l.weakness) : null,
-    ], { cls: "house", edge: "var(--candle)", pressed, onPress });
+    ], { cls: "house", edge: "var(--gold)", pressed, onPress });
   }
 
   // ---------------------------------------------------------------- title
   showTitle(active: ActiveRun | null, on: { hub: () => void; resume: () => void; abandon: () => void; settings: () => void }): void {
-    const p = this.open("title-screen");
+    const p = this.open("title-screen", "ov-title");
     const S = this.meta.S;
-    const row = h("div", { class: "row" });
+    const item = (en: string, ja: string, fn: () => void, primary = false): HTMLButtonElement =>
+      h("button", { type: "button", class: `menu-item${primary ? " primary" : ""}`, onclick: fn }, h("span", { class: "en" }, en), h("span", { class: "ja" }, ja), primary ? h("span", { class: "arrow" }, "→") : null);
+    const menu = h("nav", { class: "title-menu" });
     if (active) {
       const g = active.ghost_id ? this.meta.getGhost(active.ghost_id) : null;
-      row.append(
-        button(`中断したランを再開（${fmt(active.checkpoint?.t ?? 0)}・${g ? `${g.display_name}と` : "単独"}）`, on.resume, "primary"),
-        button("放棄する", on.abandon, "danger"),
-      );
+      menu.append(item("Continue", `中断したランを再開（${fmt(active.checkpoint?.t ?? 0)}・${g ? `${g.display_name}と` : "単独"}）`, on.resume, true),
+        item("Abandon", "放棄する（リタイア扱い）", on.abandon));
     } else {
-      row.append(button(S.progress.runs > 0 ? `納骨堂へ　第${S.progress.generation + 1}代` : "はじめる", on.hub, "primary"));
+      menu.append(item(S.progress.runs > 0 ? "Continue" : "New Game", S.progress.runs > 0 ? `納骨堂へ・第${kanjiNum(S.progress.generation + 1)}代` : "はじめる", on.hub, true));
     }
-    row.append(button("設定", on.settings, "quiet"));
-    if (Platform.canQuit()) row.append(button("終了", () => Platform.quit(), "quiet"));
+    menu.append(item("Settings", "設定", on.settings));
+    if (Platform.canQuit()) menu.append(item("Quit", "終了", () => Platform.quit()));
+    const logoSrc = Art.file("logo");
+    const scene = backdrop("title") ?? h("div", { class: "scene" }, h("i", { class: "moon" }), h("i", { class: "spire" }), h("i", { class: "graves" }), h("i", { class: "wisp" }));
     const parts: (Node | null)[] = [
-      h("h1", {}, "Death Legacy", h("span", { class: "sub" }, "死してなお、継ぐ")),
-      h("p", { class: "lead" }, "今日の自分が、明日の仲間になる。死んだ主人公は亡霊として残り、次の出撃に一度だけ連れていける。連れていった亡霊は、そのランが終われば成仏する。"),
-      row,
-      active ? h("p", { class: "small" }, "放棄するとリタイア扱いになり、連れていた亡霊と形見は戻らない。") : null,
-      h("p", { class: "help" }, this.touchMode
-        ? "画面をドラッグで移動。攻撃は自動。右下で回避、右上でポーズ。横向きがおすすめ。"
-        : "WASD・矢印キーで移動。攻撃は自動。Space で回避、Esc で一時停止、強化は 1・2・3 でも選べる。"),
-      this.meta.repo.source === "backup" ? h("p", { class: "gold small" }, "セーブが壊れていたため、バックアップから復元した。") : null,
-      h("p", { class: "ver" }, `試作版 ${__VERSION__}`),
+      scene,
+      h("div", { class: "title-left" },
+        logoSrc ? h("img", { class: "logo-img", src: logoSrc, alt: "Death Legacy" }) : h("h1", { class: "logo" }, h("span", {}, "Death"), h("span", {}, "Legacy")),
+        h("p", { class: "tagline" }, "今日の自分が、明日の仲間になる。"),
+        menu,
+        active ? h("p", { class: "small mute" }, "放棄すると、連れていた亡霊と形見は戻らない。") : null,
+        h("p", { class: "help" }, this.touchMode
+          ? "画面をドラッグで移動。攻撃は自動。右下で回避、右上でポーズ。横向きがおすすめ。"
+          : "WASD・矢印キーで移動。攻撃は自動。Space で回避、Esc で一時停止、強化は 1・2・3 でも選べる。"),
+        this.meta.repo.source === "backup" ? h("p", { class: "gold small" }, "セーブが壊れていたため、バックアップから復元した。") : null,
+        h("p", { class: "ver" }, `試作版 ${__VERSION__}`)),
     ];
     for (const n of parts) if (n) p.append(n);
   }
@@ -157,24 +201,26 @@ export class Menus {
 
   showHub(onBack: () => void): void {
     const keep = this.captureScroll();
-    const p = this.open("wide");
+    const p = this.open("wide hub-panel", "ov-hub");
     p.dataset.screen = "hub";
     p.dataset.tab = this.hub.tab;
     const S = this.meta.S;
+    const bd = backdrop("hub");
+    if (bd) p.before(bd);
     const re = (): void => this.showHub(onBack);
     const tabs = h("div", { class: "tabs", role: "tablist" });
-    for (const [id, name, ok] of [["sortie", "出撃", true], ["tree", "祭壇の樹", true], ["shelf", "形見の棚", this.meta.shelfUnlocked()]] as const) {
+    for (const [id, name, ok] of [["sortie", "出撃準備", true], ["tree", "祭壇の樹", true], ["shelf", "形見の棚", this.meta.shelfUnlocked()]] as const) {
       tabs.append(h("button", { type: "button", role: "tab", "aria-selected": String(this.hub.tab === id), onclick: () => { this.hub.tab = id; re(); } },
         name, ok ? null : h("span", { class: "lock" }, "未解放")));
     }
     const taint = this.meta.taint();
-    p.append(h("div", { class: "spread" },
+    p.append(h("header", { class: "hub-head" },
       h("h2", {}, "納骨堂"),
-      h("div", { class: "row" },
+      tabs,
+      h("div", { class: "row purses" },
         taint > 0 ? h("span", { class: "purse taint" }, "穢れ", h("b", {}, String(taint))) : null,
         h("span", { class: "purse" }, "供物", h("b", {}, String(this.meta.offeringsFree())), `/ ${S.offerings.earned}`),
-        button("タイトル", onBack, "quiet"))),
-      tabs);
+        button("タイトル", onBack, "quiet"))));
     if (this.hub.tab === "tree") this.hubTree(p, re);
     else if (this.hub.tab === "shelf") this.hubShelf(p);
     else this.hubSortie(p, re);
@@ -183,14 +229,14 @@ export class Menus {
 
   /** 亡霊の3択の説明（選んでいる亡霊に対して） */
   private riteText(g: GhostRecord, mode: GhostMode): string {
-    const meta = this.meta;
     if (mode === "devour") {
-      const pw = meta.devourPower(g);
+      const pw = this.meta.devourPower(g);
       return `力を取り込んで単独で出撃する。与ダメージ +${Math.round(pw.might * 100)}%・最大HP +${Math.round(pw.hp * 100)}%。喰らった亡霊は怨霊になり、のちのランで襲ってくる（穢れ +1）。`;
     }
-    return "一緒に戦う。レベルが上がるほど本来の力に近づく。ランが終わると成仏する。";
+    return "この亡霊を連れて出撃する。レベルが上がるほど本来の力に近づく。出撃後は一度きりで成仏する。";
   }
 
+  /** 出撃準備: 左＝亡霊の記録庫、中＝出撃する亡霊と支度、右＝これまでの軌跡 */
   private hubSortie(p: HTMLElement, re: () => void): void {
     const D = this.D, meta = this.meta, hub = this.hub, S = meta.S;
     if (!meta.lineageUnlocked(hub.lineage)) hub.lineage = D.lineages[0].id;
@@ -202,31 +248,34 @@ export class Menus {
     const weapon = lin.weapon ?? hub.weapon;
     const gsel = hub.ghost ? meta.getGhost(hub.ghost) : null;
     const mode: GhostMode = gsel ? hub.ghostMode : "bring";
-
-    const choose = h("div", { class: "choose", "data-scroll": "choose" });
-    // 家系
-    const houses = h("div", { class: "picks" });
-    for (const l of D.lineages) houses.append(this.houseCard(l, hub.lineage === l.id, () => { hub.lineage = l.id; re(); }));
-    choose.append(h("div", { class: "section" }, h("h3", {}, "家系"), houses));
-    // 穢れ（怨霊が残っている時だけ）
     const wr = meta.wraiths();
+    const gen = S.progress.generation + 1;
+
+    // ── 左: 亡霊の記録庫
+    const list = h("div", { class: "ghost-list" });
+    for (const g of stored) list.append(this.ghostCard(g, hub.ghost === g.ghost_id, () => { hub.ghost = hub.ghost === g.ghost_id ? "" : g.ghost_id; re(); }));
+    if (stored.length === 0) list.append(h("div", { class: "empty" }, "まだ亡霊はいない。死ねば、その生き様が最初の亡霊になる。"));
+    const archive = h("section", { class: "frame archive", "data-scroll": "archive" },
+      this.frameHead("亡霊の記録庫", `${stored.length} / ${D.vault_capacity}`),
+      h("p", { class: "flavor" }, "ここで眠るのは、かつてのあなたたち。そして、これからの仲間たち——"),
+      list);
+
+    // ── 中: 出撃する亡霊と支度
+    const center = h("section", { class: "frame sortie", "data-scroll": "sortie" });
+    center.append(this.frameHead(`第${kanjiNum(gen)}代の出撃`, lin.name, "sword"));
     if (wr.length > 0) {
-      const hp = Math.round(meta.taintHpBonus() * 100);
-      choose.append(h("div", { class: "notice taint" },
+      center.append(h("div", { class: "notice taint" },
         h("b", {}, `穢れ ${wr.length}`),
-        h("span", { class: "small" }, `敵のHP +${hp}%。ランの途中で怨霊「${wr[0].display_name}」が現れる。倒せば祓えて、穢れが1つ消える（供物 +${D.rites.wraith.purify_offerings}）。`)));
+        h("span", { class: "small" }, `敵のHP +${Math.round(meta.taintHpBonus() * 100)}%。ランの途中で怨霊「${wr[0].display_name}」が現れる。倒せば祓える（供物 +${D.rites.wraith.purify_offerings}）。`)));
     }
-    // 亡霊
-    const vault = h("div", { class: "picks" });
-    vault.append(this.pick([
-      h("span", { class: "tier" }, "単独"),
-      h("span", { class: "name" }, "誰も連れていかない"),
-      h("span", { class: "meta" }, lin.mods.solo_xp === -1 ? "亡霊は温存される" : `亡霊は温存される。経験値 +${Math.round(D.solo_xp_bonus * 100)}%`),
-    ], { edge: "var(--faint)", pressed: hub.ghost === "", onPress: () => { hub.ghost = ""; re(); } }));
-    for (const g of stored) vault.append(this.ghostCard(g, hub.ghost === g.ghost_id, () => { hub.ghost = g.ghost_id; re(); }));
-    const ghostSec = h("div", { class: "section" }, h("h3", {}, `亡霊　${stored.length} / ${D.vault_capacity}`), vault);
-    if (stored.length === 0) ghostSec.append(h("div", { class: "empty" }, "まだ亡霊はいない。死ねば、その生き様が最初の亡霊になる。"));
-    // 選んだ亡霊をどうするか（連れていく / 喰らう / 弔う）
+    const chosen = h("div", { class: `chosen ${gsel ? mode : "solo"}` },
+      this.portrait(gsel, "big"),
+      h("div", { class: "cbody" },
+        h("span", { class: "clabel" }, gsel ? (mode === "devour" ? "喰らう亡霊" : "出撃する亡霊") : "出撃する亡霊"),
+        h("span", { class: "cname" }, gsel ? gsel.display_name : "誰も連れていかない"),
+        h("p", { class: "small" }, gsel ? this.riteText(gsel, mode)
+          : `左の記録庫から亡霊を選ぶと、連れていける。単独なら亡霊は温存され${lin.mods.solo_xp === -1 ? "る" : `、経験値 +${Math.round(D.solo_xp_bonus * 100)}%`}。`)));
+    center.append(chosen);
     if (gsel) {
       const seg = h("div", { class: "seg rites" });
       for (const [id, name] of [["bring", "連れていく"], ["devour", "喰らう"]] as const) {
@@ -236,13 +285,13 @@ export class Menus {
       seg.append(h("button", {
         type: "button", "aria-pressed": "false", onclick: () => this.showConfirm(`${gsel.display_name}を弔う`,
           `いますぐ成仏させ、供物 +${n} を得る。弔った亡霊は戻らない。`, () => { meta.mourn(gsel.ghost_id); hub.ghost = ""; re(); }, re, "弔う"),
-      }, "弔う"));
-      ghostSec.append(h("div", { class: `rite ${mode}` },
-        h("div", { class: "rite-head" }, h("span", { class: "who" }, gsel.display_name), seg),
-        h("p", { class: "small" }, this.riteText(gsel, mode)),
-        h("p", { class: "small faint" }, `弔う：その場で成仏させ、供物 +${n}。`)));
+      }, `弔う（供物 +${n}）`));
+      center.append(seg);
     }
-    choose.append(ghostSec);
+    // 家系
+    const houses = h("div", { class: "picks houses" });
+    for (const l of D.lineages) houses.append(this.houseCard(l, hub.lineage === l.id, () => { hub.lineage = l.id; re(); }));
+    center.append(h("div", { class: "section" }, h("h4", {}, "家系"), houses));
     // 形見
     if (meta.shelfUnlocked()) {
       const hg = h("div", { class: "picks" });
@@ -252,16 +301,17 @@ export class Menus {
         const bonus = lin.mods.heir_level_bonus ?? 0;
         hg.append(this.pick([
           h("span", { class: "tier" }, `第${x.from_generation}代より`),
-          h("span", { class: "name" }, x.name),
+          h("span", { class: "name" }, x.name.replace(/^第\d+代の形見・/, "")),
           h("span", { class: "meta" }, meta.heirEffect(x) + (bonus ? `（${lin.name}なら +${bonus}Lv）` : "")),
-        ], { edge: "var(--candle)", pressed: hub.heir === x.heir_id, onPress: () => { hub.heir = x.heir_id; re(); } }));
+        ], { edge: "var(--gold)", pressed: hub.heir === x.heir_id, onPress: () => { hub.heir = x.heir_id; re(); } }));
       }
-      choose.append(h("div", { class: "section" }, h("h3", {}, "形見　1つだけ・そのランで使い切り"), hg));
+      center.append(h("div", { class: "section" }, h("h4", {}, "形見　1つだけ・そのランで使い切り"), hg));
     }
-    // 武器・ラン設定
-    const wseg = h("div", { class: "seg" });
+    // 初期武器・ランの長さ
+    const wseg = h("div", { class: "seg weapons" });
     for (const id of Object.keys(D.weapons)) {
-      wseg.append(h("button", { type: "button", "aria-pressed": String(weapon === id), disabled: !!lin.weapon && lin.weapon !== id, onclick: () => { hub.weapon = id; re(); } }, D.weapons[id].name));
+      wseg.append(h("button", { type: "button", "aria-pressed": String(weapon === id), disabled: !!lin.weapon && lin.weapon !== id, onclick: () => { hub.weapon = id; re(); } },
+        iconSvg(id), D.weapons[id].grades[0].name));
     }
     const mseg = h("div", { class: "seg" });
     for (const [id, name] of [["short", "3分でボス"], ["full", "10分"]] as const) {
@@ -269,31 +319,20 @@ export class Menus {
     }
     const seedIn = h("input", { id: "seedIn", inputmode: "numeric", value: String(hub.seed), size: 8, "aria-label": "seed" });
     seedIn.addEventListener("change", () => { const n = Number.parseInt(seedIn.value, 10); if (Number.isFinite(n)) hub.seed = n; });
-    choose.append(h("div", { class: "section opts" }, h("h3", {}, lin.weapon ? `初期武器（${lin.name}は${D.weapons[lin.weapon].name}）` : "初期武器"), wseg,
-      h("h3", {}, "ランの長さ"), h("div", { class: "row" }, mseg, h("label", { class: "row" }, "seed", seedIn))));
-    // 履歴
-    if (S.run_history.length) {
-      const hist = h("div", { class: "hist" });
-      for (const r of S.run_history.slice(0, 6)) {
-        const who = r.devoured ? `　${r.devoured}を喰らう` : r.consumed_ghost ? `　${r.consumed_ghost}と` : "";
-        hist.append(h("div", { class: r.result === "boss_cleared" ? "win" : "" },
-          h("span", {}, r.ended_at.slice(5, 16).replace("T", " ")), h("span", {}, RESULT_NAME[r.result] ?? ""), h("span", {}, fmt(r.duration_seconds)),
-          h("span", {}, `Lv${r.player_level}　撃破${r.kills}${who}`)));
-      }
-      choose.append(h("div", { class: "section" }, h("h3", {}, "これまでのラン"), hist));
-    }
+    center.append(h("div", { class: "section" }, h("h4", {}, lin.weapon ? `初期武器（${lin.name}は${D.weapons[lin.weapon].name}）` : "初期武器"), wseg),
+      h("div", { class: "section" }, h("h4", {}, "ランの長さ"), h("div", { class: "row" }, mseg, h("label", { class: "row seed" }, "seed", seedIn))));
 
-    // 出撃札
+    // 出撃ボタン（単独 / 亡霊と）
     const hsel = hub.heir ? meta.getHeir(hub.heir) : null;
-    const gen = S.progress.generation + 1;
-    const go = (): void => {
+    const go = (withGhost: boolean): void => {
       const n = Number.parseInt(seedIn.value, 10);
       const seed = Number.isFinite(n) ? n : Math.floor(Math.random() * 1_000_000);
       hub.seed = Math.floor(Math.random() * 1_000_000);
-      const req: SortieRequest = { ghostId: hub.ghost, heirId: hub.heir, weapon, mode: hub.mode, seed, lineage: hub.lineage, ghostMode: mode };
-      if (gsel || hsel) {
-        const title = gsel ? (mode === "devour" ? `${gsel.display_name}を喰らって出撃する` : `${gsel.display_name}を連れて出撃する`) : "形見を身につけて出撃する";
-        const body = mode === "devour" && gsel
+      const g = withGhost ? gsel : null;
+      const req: SortieRequest = { ghostId: g ? g.ghost_id : "", heirId: hub.heir, weapon, mode: hub.mode, seed, lineage: hub.lineage, ghostMode: g ? mode : "bring" };
+      if (g || hsel) {
+        const title = g ? (mode === "devour" ? `${g.display_name}を喰らって出撃する` : `${g.display_name}を連れて出撃する`) : "形見を身につけて出撃する";
+        const body = g && mode === "devour"
           ? "出撃した時点で喰らうことが確定する。喰らった亡霊は怨霊となり、次のランから襲ってくる。倒せば祓える。"
           : "出撃した時点で使用が確定し、ランが終わると（勝っても負けても）消える。途中でアプリを閉じても、次に開いた時に同じランから再開できる。";
         this.showConfirm(title, body, () => this.onSortie(req), re);
@@ -301,21 +340,26 @@ export class Menus {
         this.onSortie(req);
       }
     };
-    const warn = !gsel ? "保管庫の亡霊は減らない。"
-      : mode === "devour" ? h("b", { class: "taint" }, "喰らった亡霊は怨霊になる（穢れ +1）。")
-      : h("b", {}, "連れていった亡霊は、このランの後に成仏する。");
-    const tablet = h("aside", { class: "tablet" },
-      h("div", { class: "plate" },
-        h("div", { class: "vertical" }, `第${kanjiNum(gen)}代`, h("br"), h("small", {}, lin.name)),
-        h("dl", {},
-          h("dt", {}, "武器"), h("dd", {}, D.weapons[weapon].name),
-          h("dt", {}, mode === "devour" ? "喰らう" : "同行"), h("dd", { class: gsel ? (mode === "devour" ? "taint" : "soul") : "" }, gsel ? gsel.display_name : "なし"),
-          h("dt", {}, "形見"), h("dd", {}, hsel ? hsel.name.replace(/^第\d+代の形見・/, "") : "なし"),
-          h("dt", {}, "ラン"), h("dd", {}, hub.mode === "short" ? "3分でボス" : "10分"),
-          wr.length > 0 ? h("dt", {}, "怨霊") : null, wr.length > 0 ? h("dd", { class: "taint" }, "現れる") : null)),
-      h("p", { class: "warn" }, warn),
-      button("出撃", go, "primary"));
-    p.append(h("div", { class: "hub" }, choose, tablet));
+    const goRow = h("div", { class: "go-row" },
+      h("button", { type: "button", class: "go solo", onclick: () => go(false) }, h("b", {}, "単独出撃"), h("small", {}, "亡霊なしで挑む")),
+      h("button", { type: "button", class: `go with ${mode}`, disabled: !gsel, onclick: () => go(true) },
+        h("b", {}, mode === "devour" ? "喰らって出撃" : "亡霊と出撃"), h("small", {}, gsel ? (mode === "devour" ? "怨霊になる（穢れ +1）" : "出撃後は一度きりで成仏") : "記録庫から1体選ぶ")));
+
+    // ── 右: これまでの軌跡
+    const trail = h("section", { class: "frame trail", "data-scroll": "trail" }, this.frameHead("これまでの軌跡", "", "clock"));
+    const runs = S.run_history.slice(0, 12);
+    if (runs.length === 0) trail.append(h("div", { class: "empty" }, "まだ記録はない。"));
+    for (const r of runs) {
+      const res = r.result === "boss_cleared" ? "clear" : r.result === "player_death" ? "dead" : "retired";
+      const who = r.devoured ? `${r.devoured}を喰らう` : r.consumed_ghost ? `${r.consumed_ghost}と` : "単独";
+      trail.append(h("div", { class: `trail-item ${res}` },
+        h("div", { class: "tl" }, h("span", { class: "num" }, `#${String(r.generation).padStart(3, "0")}`), h("span", { class: "num t" }, fmt(r.duration_seconds))),
+        h("div", { class: "tw" }, `Lv${r.player_level}・撃破${r.kills}`),
+        h("div", { class: "tw small" }, who),
+        h("span", { class: "res" }, RESULT_NAME[r.result] ?? "")));
+    }
+
+    p.append(h("div", { class: "sortie-grid" }, archive, h("div", { class: "center-col" }, center, goRow), trail));
   }
 
   private rarityBars(level: number): HTMLElement {
@@ -406,7 +450,7 @@ export class Menus {
     if (eff.taint_resist) sum.push(["穢れの重さ", `−${Math.round(eff.taint_resist * 100)}%`]);
     const dl = h("dl", {});
     for (const [k, v] of sum) dl.append(h("dt", {}, k), h("dd", {}, v));
-    const aside = h("aside", { class: "tablet node-card" },
+    const aside = h("aside", { class: "frame node-card" },
       h("div", { class: "nh" }, h("span", { class: "serif" }, n.name), h("span", { class: `state ${open ? "open" : ""}` }, open ? "開いた" : `供物 ${n.cost}`)),
       h("p", {}, n.desc),
       open ? null : button(block === "" ? `開く（供物 ${n.cost}）` : block, () => { if (meta.openNode(n.id)) re(); }, "primary", block !== ""),
@@ -436,23 +480,46 @@ export class Menus {
     p.append(h("h2", {}, title), h("p", {}, body), h("div", { class: "row" }, button(yes, onYes, "primary"), button("戻る", onNo)));
   }
 
+  /** カードのアイコン名 */
+  private cardIcon(c: Card): string {
+    return c.kind === "heal" ? "heal" : c.id;
+  }
+
+  /** いまの持ち物（レベルアップ・ポーズの右側） */
+  private buildList(sim: RunSim): HTMLElement {
+    const D = sim.D;
+    const ul = h("ul", { class: "build-list" });
+    for (const id of Object.keys(sim.weapons)) {
+      const b = sim.wbonus[id] ?? 0;
+      ul.append(h("li", { class: "w" }, iconSvg(id), h("span", { class: "bn" }, sim.weaponName(id), h("small", {}, `Lv${sim.weapons[id]}${b > 0 ? `・+${Math.round(b * 100)}%` : ""}${id === sim.mainWeapon ? "・メイン" : ""}`))));
+    }
+    for (const id of Object.keys(sim.passives)) ul.append(h("li", {}, iconSvg(id), h("span", { class: "bn" }, D.passives[id].name, h("small", {}, `Lv${sim.passives[id]}`))));
+    if (sim.lineageLv > 0) ul.append(h("li", { class: "l" }, iconSvg(sim.lineage.card.id), h("span", { class: "bn" }, sim.lineage.card.name, h("small", {}, `Lv${sim.lineageLv}`))));
+    return h("aside", { class: "frame build-side" }, h("h4", {}, "現在のビルド"), ul,
+      h("p", { class: "small faint" }, `武器 ${Object.keys(sim.weapons).length} / ${D.sub_weapon_slots + 1}・パッシブ ${Object.keys(sim.passives).length} / ${D.passive_slots}`));
+  }
+
   showLevel(sim: RunSim, choices: Card[], onPick: (c: Card) => void): void {
-    const p = this.open();
-    p.append(h("div", { class: "spread" }, h("h2", {}, `レベル ${sim.level - sim.pending + 1}　強化を1つ選ぶ`)));
-    const cards = h("div", { class: "cards" });
+    const p = this.open("level-panel", "ov-level");
+    const cards = h("div", { class: "lv-cards" });
     choices.forEach((c, i) => {
       const R = sim.rarity(c.rar), d = sim.describe(c);
       const aff = sim.cardMods.affinity?.[c.id] ?? 0;
-      const b = h("button", { type: "button", class: `card r-${c.rar}${c.kind === "lineage" ? " house-card" : ""}`, style: `--rc:${R.color}`, onclick: () => onPick(c) },
+      const b = h("button", { type: "button", class: `lv-card r-${c.rar}${c.kind === "lineage" ? " house-card" : ""}`, style: `--rc:${R.color}`, onclick: () => onPick(c) },
         this.touchMode ? null : h("span", { class: "key" }, String(i + 1)),
-        h("span", { class: "rar" }, R.name + (aff > 0 ? `　縁${"●".repeat(aff)}` : "")),
+        h("span", { class: "gem" }, iconSvg(this.cardIcon(c))),
         h("span", { class: "n" }, d.n),
         h("span", { class: "what" }, d.k),
-        h("span", { class: "d" }, d.d));
+        h("span", { class: "d" }, d.d),
+        aff > 0 ? h("span", { class: "aff" }, `縁 ${"●".repeat(aff)}`) : null,
+        h("span", { class: "ribbon" }, R.name));
       cards.append(b);
       this.hotkeys.push(b);
     });
-    p.append(cards, h("p", { class: "build" }, sim.buildText()));
+    p.append(
+      h("header", { class: "lv-head" }, h("h2", {}, "レベルアップ"), h("p", {}, `レベル ${sim.level - sim.pending + 1}　新たな力を選択してください`)),
+      h("div", { class: "lv-body" }, cards, this.buildList(sim)));
+    if (!this.touchMode) p.append(h("p", { class: "keys" }, h("kbd", {}, "1"), h("kbd", {}, "2"), h("kbd", {}, "3"), " で選択"));
     this.guard(this.hotkeys);
   }
 
@@ -460,7 +527,7 @@ export class Menus {
     const p = this.open("narrow");
     let armed = false;
     const warn = h("p", { class: "danger small", hidden: true });
-    p.append(h("h2", {}, "一時停止"), h("p", { class: "build" }, sim.buildText()),
+    p.append(h("h2", {}, "一時停止"), this.buildList(sim),
       h("div", { class: "row" },
         button("続ける", on.resume, "primary"),
         button("設定", on.settings),
@@ -510,41 +577,76 @@ export class Menus {
   }
 
   // ---------------------------------------------------------------- result / pending
-  showResult(sim: RunSim, out: RunRecord | null, onHub: () => void): void {
-    const p = this.open();
-    const meta = this.meta, S = meta.S;
-    const title = { player_death: "倒れた。亡霊が生まれた", boss_cleared: "冥王を倒し、生還した", retired: "リタイアした", "": "" }[sim.result];
-    p.append(h("h2", { class: sim.result === "boss_cleared" ? "win" : sim.result === "player_death" ? "lose" : "" }, title));
-    const stats = h("div", { class: "stats" });
-    for (const [k, v] of [["生存時間", fmt(sim.t)], ["レベル", String(sim.level)], ["撃破", String(sim.kills)], ["最大同時敵数", String(sim.maxAlive)], ["供物", out ? `+${out.offerings}` : "—"]]) {
-      stats.append(h("div", {}, h("b", {}, v), h("span", {}, k)));
+  showResult(sim: RunSim, out: RunRecord | null, onHub: () => void, onTitle: () => void = onHub): void {
+    const meta = this.meta, S = meta.S, D = this.D;
+    const res = sim.result;
+    const p = this.open(`result-panel ${res}`, "ov-result");
+    const bd = backdrop(res === "boss_cleared" ? "result_clear" : "result_death");
+    if (bd) p.before(bd);
+    const head = {
+      player_death: ["YOU DIED", "しかし、あなたの戦いは無駄ではなかった。新たな亡霊が、ここに刻まれる。"],
+      boss_cleared: ["SURVIVED", "冥王を討ち、生還した。供物にクリアの分が加わる。"],
+      retired: ["RETIRED", "撤退した。亡霊も形見も残らない。"],
+      "": ["", ""],
+    }[res];
+    p.append(h("header", { class: "res-head" }, h("h1", {}, head[0]), h("p", {}, head[1])));
+
+    // 左: 記録 / 右: 新しい亡霊
+    const rows: [string, string][] = [
+      ["生存時間", fmt(sim.t)], ["撃破数", sim.kills.toLocaleString()], ["ボス撃破数", String(sim.bossKills)], ["到達レベル", String(sim.level)],
+      ["使用武器", sim.weaponName(sim.mainWeapon)], ["家系", sim.lineage.name], ["獲得した供物", out ? `+${out.offerings}` : "—"],
+    ];
+    const tbl = h("dl", { class: "res-stats" });
+    for (const [k, v] of rows) tbl.append(h("dt", {}, k), h("dd", { class: "num" }, v));
+    const right = h("section", { class: "frame newborn" });
+    if (res === "player_death") {
+      const nid = out?.new_ghost_id ?? "";
+      const ng = S.pending_ghost && S.pending_ghost.ghost_id === nid ? S.pending_ghost : meta.getGhost(nid);
+      if (ng) {
+        const tr = meta.tier(ng.tier_id);
+        right.append(h("h4", {}, "新たな亡霊が生まれました"),
+          h("div", { class: "nb" }, this.portrait(ng, "big"),
+            h("div", {},
+              h("div", { class: "gname" }, h("span", {}, ng.display_name), this.rank(tr)),
+              h("dl", { class: "gstats" },
+                h("dt", {}, "等級"), h("dd", { style: `color:${tr.color}` }, tr.name),
+                h("dt", {}, "生存時間"), h("dd", { class: "num" }, fmt(ng.survival_seconds)),
+                h("dt", {}, "攻撃補正"), h("dd", {}, `×${ng.stat_snapshot.attack_mult.toFixed(2)}`),
+                h("dt", {}, "継承武器"), h("dd", {}, `${this.weaponLabel(ng)} Lv${ng.weapon_level}`)))));
+      }
+    } else {
+      right.append(h("h4", {}, res === "boss_cleared" ? "生還" : "リタイア"),
+        h("p", { class: "small" }, res === "boss_cleared" ? "生還したため亡霊は生まれない。" : "リタイアしたため亡霊も形見も残らない。"));
     }
-    p.append(stats, h("p", { class: "build" }, sim.buildText()));
+    p.append(h("div", { class: "res-grid" }, h("section", { class: "frame" }, tbl), right));
+
+    // 連れていった亡霊の運命・知らせ
+    const fate = out?.consumed_ghost || out?.devoured ? (sim.ghost?.rec ?? sim.devour?.rec ?? null) : null;
+    if (fate) {
+      p.append(h("section", { class: "frame fate" }, h("h4", {}, "連れて行った亡霊の運命"),
+        h("div", { class: "fate-row" }, this.portrait(fate, "small"),
+          h("span", { class: "gname" }, fate.display_name),
+          out?.devoured ? h("span", { class: "chip taint" }, "怨霊化") : h("span", { class: "chip gone" }, "成仏"),
+          h("span", { class: "small mute" }, out?.devoured ? "喰らわれ、怨霊となって次からのランで襲ってくる。" : "あなたと共に戦い、その魂は消えた。"))));
+    }
     for (const id of out?.unlocked_lineages ?? []) {
       const l = meta.lineage(id);
       p.append(h("div", { class: "notice" }, h("b", {}, `家系「${l.name}」が解放された`), h("span", { class: "small mute" }, `${l.motto}。次の出撃から選べる。`)));
     }
-    if (out?.purified) p.append(h("div", { class: "notice soul" }, h("b", {}, "怨霊を祓った"), h("span", { class: "small mute" }, `${out.purified}は鎮まった。穢れが1つ消え、供物 +${this.D.rites.wraith.purify_offerings}。`)));
+    if (out?.purified) p.append(h("div", { class: "notice soul" }, h("b", {}, "怨霊を祓った"), h("span", { class: "small mute" }, `${out.purified}は鎮まった。穢れが1つ消え、供物 +${D.rites.wraith.purify_offerings}。`)));
     else if (out?.wraith_escaped) p.append(h("p", { class: "small taint" }, `怨霊「${out.wraith_escaped}」は祓えなかった。次のランでまた現れる。`));
-    if (out?.devoured) p.append(h("div", { class: "notice taint" }, h("b", {}, `${out.devoured}を喰らった`), h("span", { class: "small mute" }, "怨霊となって、次からのランで襲ってくる。穢れ +1。")));
-    if (out?.consumed_ghost) p.append(h("p", { class: "small" }, `${out.consumed_ghost}は成仏した。`));
-    if (out?.used_heirloom) p.append(h("p", { class: "small" }, `形見「${out.used_heirloom}」を使い切った。`));
-    if (sim.result === "player_death") {
-      const nid = out?.new_ghost_id ?? "";
-      const ng = S.pending_ghost && S.pending_ghost.ghost_id === nid ? S.pending_ghost : meta.getGhost(nid);
-      if (ng) p.append(h("div", { class: "picks" }, this.ghostCard(ng, false, null, "新しく生まれた亡霊")));
-    } else if (sim.result === "boss_cleared") {
-      p.append(h("p", { class: "small" }, "生還したため亡霊は生まれない。供物にクリアの分が加わった。"));
-    } else {
-      p.append(h("p", { class: "small" }, "リタイアしたため亡霊も形見も残らない。"));
-    }
-    const done = (): void => this.showResult(sim, out, onHub);
+    if (out?.used_heirloom) p.append(h("p", { class: "small mute" }, `形見「${out.used_heirloom}」を使い切った。`));
+
+    const done = (): void => this.showResult(sim, out, onHub, onTitle);
     if (S.pending_ghost) {
       this.pendingGhostUi(p, done);
       return;
     }
     if (S.pending_heirloom) this.heirChoiceUi(p, done);
-    p.append(h("div", { class: "row end" }, button("納骨堂へ", onHub, "primary", S.pending_heirloom !== null)));
+    const blocked = S.pending_heirloom !== null;
+    p.append(h("div", { class: "res-buttons" },
+      button("タイトルに戻る", onTitle, "frame-btn", blocked),
+      button("もう一度挑戦する", onHub, "primary", blocked)));
   }
 
   showPending(onDone: () => void): void {

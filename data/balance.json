@@ -5,29 +5,62 @@
   "vault_capacity": 10,
   "solo_xp_bonus": 0.10,
   "tiers": [
-    { "id": "echo", "name": "残響", "from": 0.0, "mult": 0.5, "color": "#8fa39c" },
-    { "id": "lesser", "name": "下級霊", "from": 0.1667, "mult": 0.8, "color": "#7cc4ff" },
-    { "id": "warrior", "name": "戦霊", "from": 0.3333, "mult": 1.2, "color": "#8ff0a4" },
-    { "id": "hero", "name": "英霊", "from": 0.5, "mult": 1.7, "color": "#c9a3ff" },
-    { "id": "greater_hero", "name": "大英霊", "from": 0.6667, "mult": 2.3, "color": "#f0b35a" },
-    { "id": "legend", "name": "伝説の英霊", "from": 0.8333, "mult": 3.0, "color": "#ff7ad9" }
+    { "id": "echo", "name": "残響", "from": 0.0, "mult": 0.5, "rank": "D", "color": "#8fa39c" },
+    { "id": "lesser", "name": "下級霊", "from": 0.1667, "mult": 0.8, "rank": "C", "color": "#7cc4ff" },
+    { "id": "warrior", "name": "戦霊", "from": 0.3333, "mult": 1.2, "rank": "B", "color": "#8ff0a4" },
+    { "id": "hero", "name": "英霊", "from": 0.5, "mult": 1.7, "rank": "A", "color": "#c9a3ff" },
+    { "id": "greater_hero", "name": "大英霊", "from": 0.6667, "mult": 2.3, "rank": "S", "color": "#f0b35a" },
+    { "id": "legend", "name": "伝説の英霊", "from": 0.8333, "mult": 3.0, "rank": "SS", "color": "#ff7ad9" }
   ],
   "ghost_unlock": [[1, 0.25], [6, 0.5], [12, 0.75], [18, 1.0]],
   "player": { "hp": 120, "speed": 205, "radius": 12, "dash_speed": 720, "dash_time": 0.16, "dash_cd": 1.5, "hit_iframe": 0.6, "pickup": 100 },
   "xp": { "base": 4, "per_level": 3 },
   "weapons": {
-    "sword": { "name": "剣", "desc": "近距離の扇形斬り", "cd": 0.9, "damage": 20, "range": 92, "arc": 1.9 },
-    "bow":   { "name": "弓", "desc": "最寄りの敵を射抜く", "cd": 0.65, "damage": 14, "speed": 560 },
-    "fire":  { "name": "炎魔法", "desc": "着弾地点を焼く範囲・継続", "cd": 2.0, "damage": 7, "radius": 68, "burn": 2.6, "tick": 0.4 }
+    "sword": { "name": "剣", "desc": "近くの敵を扇形に斬る", "cd": 0.9, "damage": 20, "range": 92, "per_level": 0.2,
+      "grades": [
+        { "lv": 1, "name": "短剣",           "desc": "素早く短く斬る",               "cd": 0.6,  "dmg": 0.95, "range": 0.9, "arc": 1.7, "dirs": 1 },
+        { "lv": 3, "name": "ロングソード",   "desc": "前と後ろを同時に斬る",         "cd": 0.95, "dmg": 1.1, "range": 1.05,  "arc": 1.9, "dirs": 2 },
+        { "lv": 5, "name": "グレートソード", "desc": "重く、広く薙ぎ払う",           "cd": 1.25, "dmg": 1.6, "range": 1.3,  "arc": 2.5, "dirs": 2 },
+        { "evo": true, "name": "デュランダル", "desc": "全周を薙ぎ払う聖剣",         "cd": 1.1,  "dmg": 2.1, "range": 1.45, "arc": 6.3, "dirs": 1 }
+      ] },
+    "bow": { "name": "弓", "desc": "近くの敵を射抜く", "cd": 0.65, "damage": 14, "speed": 560, "per_level": 0.18,
+      "grades": [
+        { "lv": 1, "name": "ショートボウ",       "desc": "軽く速い矢を1本",           "cd": 0.85, "dmg": 1.0, "count": 1, "pierce": 0, "speed": 1.0 },
+        { "lv": 3, "name": "ロングボウ",         "desc": "矢が2本・1体を貫通",        "cd": 1.0,  "dmg": 1.1, "count": 2, "pierce": 1, "speed": 1.2 },
+        { "lv": 5, "name": "ヘビークロスボウ",   "desc": "重い矢が3本・2体を貫通",    "cd": 1.15, "dmg": 1.6, "count": 3, "pierce": 2, "speed": 1.3 },
+        { "evo": true, "name": "フェイルノート", "desc": "必中の弓。矢が6本・3体を貫通", "cd": 1.0, "dmg": 1.7, "count": 6, "pierce": 3, "speed": 1.4 }
+      ] },
+    "fire": { "name": "炎魔法", "desc": "着弾した場所を焼き続ける", "cd": 2.0, "damage": 7, "radius": 68, "burn": 2.6, "tick": 0.4, "per_level": 0.25,
+      "grades": [
+        { "lv": 1, "name": "ファイアボルト",   "desc": "小さな火を落とす",           "cd": 0.9, "dmg": 0.9, "count": 1, "radius": 0.85, "burn": 0.9 },
+        { "lv": 3, "name": "ファイアボール",   "desc": "大きな火の玉",               "cd": 1.0, "dmg": 1.1, "count": 1, "radius": 1.05, "burn": 1.0 },
+        { "lv": 5, "name": "フレイムストーム", "desc": "炎が2か所に落ちる",          "cd": 1.0, "dmg": 1.3, "count": 2, "radius": 1.15, "burn": 1.2 },
+        { "evo": true, "name": "インフェルノ", "desc": "炎が3か所・広く・長く燃える", "cd": 1.0, "dmg": 1.5, "count": 3, "radius": 1.4, "burn": 1.5 }
+      ] },
+    "spear": { "name": "槍", "desc": "一直線に突き、並んだ敵をまとめて貫く", "cd": 1.0, "damage": 22, "length": 120, "width": 16, "per_level": 0.2,
+      "grades": [
+        { "lv": 1, "name": "ショートスピア", "desc": "まっすぐ素早く突く",          "cd": 0.85, "dmg": 0.9, "length": 1.0, "width": 1.0, "dirs": 1 },
+        { "lv": 3, "name": "パイク",         "desc": "長く遠くまで届く",            "cd": 1.0,  "dmg": 1.15, "length": 1.5, "width": 1.0, "dirs": 1 },
+        { "lv": 5, "name": "ハルバード",     "desc": "前と後ろを同時に突く",        "cd": 1.1,  "dmg": 1.45, "length": 1.55, "width": 1.4, "dirs": 2 },
+        { "evo": true, "name": "グングニル", "desc": "三方を貫く神槍",               "cd": 1.0,  "dmg": 1.9, "length": 2.4, "width": 1.6, "dirs": 3 }
+      ] },
+    "axe": { "name": "斧", "desc": "投げた斧が弧を描いて戻ってくる", "cd": 1.4, "damage": 18, "speed": 380, "size": 10, "per_level": 0.2,
+      "grades": [
+        { "lv": 1, "name": "ハンドアックス", "desc": "片手斧を1本投げる",           "cd": 1.0,  "dmg": 1.0, "count": 1, "size": 1.0, "range": 1.0 },
+        { "lv": 3, "name": "バトルアックス", "desc": "2本を投げる",                 "cd": 1.05, "dmg": 1.2, "count": 2, "size": 1.2, "range": 1.1 },
+        { "lv": 5, "name": "グレートアックス", "desc": "大きな斧が2本、遠くまで",   "cd": 1.2,  "dmg": 1.7, "count": 2, "size": 1.6, "range": 1.3 },
+        { "evo": true, "name": "ラブリュス", "desc": "両刃の大斧が4方向へ",         "cd": 1.1,  "dmg": 1.9, "count": 4, "size": 1.8, "range": 1.35 }
+      ] }
   },
   "weapon_max_level": 5,
+  "evolve_min_level": 3,
   "sub_weapon_slots": 2,
   "passives": {
     "might":  { "name": "攻撃力", "per": 12, "fmt": "与ダメージ +{v}%" },
     "haste":  { "name": "攻撃速度", "per": 10, "fmt": "攻撃速度 +{v}%" },
     "swift":  { "name": "移動速度", "per": 8, "fmt": "移動 +{v}%" },
     "vigor":  { "name": "最大HP", "per": 20, "fmt": "最大HP +{v}（回復も）" },
-    "area":   { "name": "攻撃範囲", "per": 12, "fmt": "剣の届く距離・炎の範囲 +{v}%" },
+    "area":   { "name": "攻撃範囲", "per": 12, "fmt": "斬撃・突き・炎・斧の大きさ +{v}%" },
     "magnet": { "name": "経験値取得範囲", "per": 25, "fmt": "吸い寄せ距離 +{v}%" }
   },
   "passive_slots": 4,
@@ -40,11 +73,6 @@
     { "id": "LR", "name": "レジェンドレア", "weight": 0.5, "color": "#ff7ad9", "wlv": 1, "wbonus": 0.25, "pmul": 3.0, "evolve": true }
   ],
   "maxed_weapon_bonus": { "N": 0.05, "R": 0.10, "SR": 0.15, "UR": 0.25, "LR": 0.25 },
-  "evolutions": {
-    "sword": { "name": "冥剣", "desc": "全周を薙ぎ払う・射程 +30%" },
-    "bow":   { "name": "千本矢", "desc": "矢 +3本・3体まで貫通" },
-    "fire":  { "name": "業火", "desc": "炎が3か所・範囲 +40%・長く燃える" }
-  },
   "offerings": { "per_tenth_survived": 1, "per_100_kills": 1, "clear_bonus": 5, "retire_rate": 0.5 },
   "altar": { "max": 10, "shift": { "N": -5, "R": 1.6, "SR": 1.8, "UR": 1.1, "LR": 0.45 } },
   "library": { "affinity_step": 0.25, "affinity_max": 4 },

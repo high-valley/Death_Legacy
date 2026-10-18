@@ -174,6 +174,7 @@ class Game {
       else if (e.type === "sfx") this.sfx.play(e.name);
       else if (e.type === "toast") this.hud.toast(e.text);
       else if (e.type === "shake" && Settings.shake) this.view.addShake(e.amount);
+      else if (e.type === "dmg") this.view.addDmg(e);
     }
     if (this.state === "loadtest") {
       sim.pending = 0;
@@ -255,6 +256,7 @@ class Game {
 
   private begin(s: RunSim): void {
     this.sim = s;
+    s.showDamage = true;
     this.endTimer = 1.3;
     this.setState("play");
     if (s.ghost) {
@@ -312,7 +314,7 @@ class Game {
     const res = sim.result === "" ? "retired" : sim.result;
     const out = this.meta.settle(sim.summary(), res);   // 冪等: 2回呼ばれても重複しない
     this.setState("result");
-    this.menus.showResult(sim, out, () => this.toHub());
+    this.menus.showResult(sim, out, () => this.toHub(), () => this.toTitle());
   }
 
   private openSettings(back: () => void): void {

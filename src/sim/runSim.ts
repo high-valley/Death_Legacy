@@ -4,6 +4,8 @@
 import { RngStreams } from "../core/rng.ts";
 import { SpatialGrid, pushPair } from "../core/spatialGrid.ts";
 import type { Balance, EnemyDef, Lineage, Rarity, RarityId, RunMode } from "../data/types.ts";
+import { weaponGrade } from "../data/weapons.ts";
+export { gradeIndex, weaponGrade } from "../data/weapons.ts";
 import type { CardMods, GhostMode, GhostRecord, Heirloom, RunResult, Snapshot, Summary } from "../meta/records.ts";
 
 export const STEP = 1 / 60;
@@ -53,7 +55,11 @@ export class Companion {
   }
 }
 
-export interface Shot { x: number; y: number; vx: number; vy: number; dmg: number; pierce: number; life: number; ghost: boolean; hit: Set<Foe> }
+/** 弾。斧は ret 秒たつと持ち主へ戻る（戻り始めで当たり判定を取り直す） */
+export interface Shot {
+  x: number; y: number; vx: number; vy: number; dmg: number; pierce: number; life: number; ghost: boolean; hit: Set<Foe>;
+  rad: number; kind: "arrow" | "axe"; ret?: number; spin?: number; owner?: { x: number; y: number };
+}
 export interface EShot { x: number; y: number; vx: number; vy: number; dmg: number; life: number; cause: string }
 export interface Zone { x: number; y: number; r: number; dmg: number; life: number; tick: number; ghost: boolean }
 export interface Gem { x: number; y: number; v: number; mag: boolean }
@@ -62,6 +68,8 @@ export type SimEvent =
   | { type: "fx"; kind: "arc"; x: number; y: number; a: number; r: number; arc: number; dur: number; ghost: boolean }
   | { type: "fx"; kind: "warn" | "boom"; x: number; y: number; r: number; dur: number }
   | { type: "fx"; kind: "poof"; x: number; y: number; dur: number; color: string }
+  | { type: "fx"; kind: "thrust"; x: number; y: number; a: number; len: number; w: number; dur: number; ghost: boolean }
+  | { type: "dmg"; x: number; y: number; v: number; big: boolean }
   | { type: "sfx"; name: string }
   | { type: "toast"; text: string }
   | { type: "shake"; amount: number };
@@ -153,6 +161,9 @@ export class RunSim {
   maxAlive = 0;
   lastCheckpoint = 0;
   updateMs = 0;
+  /** ダメージ数字を出すか（描画側が決める。テストでは出さない） */
+  showDamage = false;
+  private dmgThisTick = 0;
 
   readonly hero = new Hero();
   ghost: Companion | null = null;
@@ -254,63 +265,107 @@ export class RunSim {
   }
 
   weaponName(id: string): string {
-    return this.evolved[id] ? this.D.evolutions[id].name : this.D.weapons[id].name;
+    return weaponGrade(this.D.weapons[id], this.weapons[id] ?? 1, !!this.evolved[id]).name;
   }
 
   // ---------------------------------------------------------------- weapons
-  /** プレイヤーと亡霊が同じ武器コードを使う */
+  /** プレイヤーと亡霊が同じ武器コードを使う。武器ごとの形は段階（グレード）の数値で決まる */
   fireWeapon(id: string, lv: number, ox: number, oy: number, fx: number, fy: number, dmgMul: number, area: number, isGhost: boolean, evo: boolean): boolean {
     const W = this.D.weapons[id];
+    const g = weaponGrade(W, lv, evo);
     const tgt = this.grid.nearest(ox, oy, 520);
+    const dmg = W.damage * dmgMul * g.dmg * (1 + W.per_level * (lv - 1));
+    // 狙う向き（敵がいなければ向いている方）
+    let dx = fx, dy = fy;
+    if (tgt) {
+      const l = Math.hypot(tgt.x - ox, tgt.y - oy) || 1;
+      dx = (tgt.x - ox) / l; dy = (tgt.y - oy) / l;
+    }
+    const a0 = Math.atan2(dy, dx);
     if (id === "sword") {
-      let dx = fx, dy = fy;
-      if (tgt) {
-        const l = Math.hypot(tgt.x - ox, tgt.y - oy) || 1;
-        dx = (tgt.x - ox) / l; dy = (tgt.y - oy) / l;
-      }
-      const reach = (W.range ?? 90) * area * (1 + 0.1 * (lv - 1)) * (evo ? 1.3 : 1);
-      const dmg = W.damage * dmgMul * (1 + 0.25 * (lv - 1));
-      const arc = evo ? TAU + 0.01 : (W.arc ?? 1.9);
-      const dirs = evo || lv < 3 ? [1] : [1, -1];
-      for (const s of dirs) {
-        const a0 = Math.atan2(dy * s, dx * s);
+      const reach = (W.range ?? 90) * area * (g.range ?? 1) * (1 + 0.04 * (lv - 1));
+      const arc = g.arc ?? 1.9;
+      const dirs = g.dirs ?? 1;
+      for (let k = 0; k < dirs; k++) {
+        const a = a0 + k * Math.PI;
         const list = this.grid.query(ox, oy, reach + 30);
         for (let i = 0; i < list.length; i++) {
           const e = list[i];
           if (e.dead || Math.hypot(e.x - ox, e.y - oy) > reach + e.r) continue;
-          if (Math.abs(angleDiff(a0, Math.atan2(e.y - oy, e.x - ox))) < arc / 2) this.hurt(e, dmg);
+          if (arc >= TAU || Math.abs(angleDiff(a, Math.atan2(e.y - oy, e.x - ox))) < arc / 2) this.hurt(e, dmg);
         }
-        this.emit({ type: "fx", kind: "arc", x: ox, y: oy, a: a0, r: reach, arc: Math.min(arc, TAU), dur: 0.18, ghost: isGhost });
+        this.emit({ type: "fx", kind: "arc", x: ox, y: oy, a, r: reach, arc: Math.min(arc, TAU), dur: 0.18, ghost: isGhost });
       }
     } else if (id === "bow") {
       if (!tgt) return false;
-      const n = 1 + Math.floor((lv - 1) / 2) + (evo ? 3 : 0);
-      const dmg = W.damage * dmgMul * (1 + 0.2 * (lv - 1));
-      const base = Math.atan2(tgt.y - oy, tgt.x - ox);
-      const sp = W.speed ?? 560;
+      const n = g.count ?? 1;
+      const sp = (W.speed ?? 560) * (g.speed ?? 1);
       for (let i = 0; i < n; i++) {
-        const a = base + (i - (n - 1) / 2) * 0.16;
-        this.shots.push({ x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg, pierce: evo ? 3 : lv >= 4 ? 2 : 0, life: 1, ghost: isGhost, hit: new Set() });
+        const a = a0 + (i - (n - 1) / 2) * (n > 3 ? 0.12 : 0.16);
+        this.shots.push({ x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg, pierce: g.pierce ?? 0, life: 1, ghost: isGhost, hit: new Set(), rad: 4, kind: "arrow" });
       }
     } else if (id === "fire") {
       if (!tgt) return false;
-      const n = evo ? 3 : lv >= 4 ? 2 : 1;
+      const n = g.count ?? 1;
+      const fa = isGhost ? 0 : this.mod("fire_area"), fb = isGhost ? 0 : this.mod("fire_burn");
       for (let i = 0; i < n; i++) {
         const at = i === 0 || this.enemies.length === 0 ? tgt : this.enemies[this.rng.misc.randi(this.enemies.length)];
-        const fa = isGhost ? 0 : this.mod("fire_area"), fb = isGhost ? 0 : this.mod("fire_burn");
         this.zones.push({
-          x: at.x, y: at.y, r: (W.radius ?? 68) * area * (1 + 0.08 * (lv - 1)) * (evo ? 1.4 : 1) * (1 + fa),
-          dmg: W.damage * dmgMul * (1 + 0.3 * (lv - 1)), life: (W.burn ?? 2.6) * (evo ? 1.5 : 1) * (1 + fb), tick: 0, ghost: isGhost,
+          x: at.x, y: at.y, r: (W.radius ?? 68) * area * (g.radius ?? 1) * (1 + 0.05 * (lv - 1)) * (1 + fa),
+          dmg, life: (W.burn ?? 2.6) * (g.burn ?? 1) * (1 + fb), tick: 0, ghost: isGhost,
+        });
+      }
+    } else if (id === "spear") {
+      // 突き: 線分の上にいる敵をすべて貫く
+      if (!tgt) return false;
+      const len = (W.length ?? 120) * (g.length ?? 1) * area * (1 + 0.04 * (lv - 1));
+      const hw = (W.width ?? 16) * (g.width ?? 1) / 2;
+      const dirs = g.dirs ?? 1;
+      for (let k = 0; k < dirs; k++) {
+        const a = dirs === 2 ? a0 + k * Math.PI : dirs === 3 ? a0 + (k - 1) * 0.5 : a0;
+        const ux = Math.cos(a), uy = Math.sin(a);
+        const list = this.grid.query(ox + ux * len / 2, oy + uy * len / 2, len / 2 + 30);
+        for (let i = 0; i < list.length; i++) {
+          const e = list[i];
+          if (e.dead) continue;
+          const px = e.x - ox, py = e.y - oy;
+          const along = px * ux + py * uy;
+          if (along < -e.r || along > len + e.r) continue;
+          if (Math.abs(px * uy - py * ux) < hw + e.r) this.hurt(e, dmg);
+        }
+        this.emit({ type: "fx", kind: "thrust", x: ox, y: oy, a, len, w: hw * 2, dur: 0.16, ghost: isGhost });
+      }
+    } else if (id === "axe") {
+      // 投げ斧: 飛んでいって戻ってくる。行きと帰りで1回ずつ当たる
+      if (!tgt) return false;
+      const n = g.count ?? 1;
+      const sp = (W.speed ?? 380) * (g.range ?? 1);
+      const owner = isGhost && this.ghost ? this.ghost : this.hero;
+      for (let i = 0; i < n; i++) {
+        const a = n >= 4 ? a0 + (i * TAU) / n : a0 + (i - (n - 1) / 2) * 0.5;
+        this.shots.push({
+          x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg, pierce: 999, life: 1.6, ghost: isGhost, hit: new Set(),
+          rad: (W.size ?? 10) * (g.size ?? 1) * area, kind: "axe", ret: 0.8, spin: 0, owner,
         });
       }
     }
     return true;
   }
 
+  /** 武器の攻撃間隔（段階とLvで決まる） */
+  weaponCd(id: string, lv: number, evo: boolean): number {
+    const W = this.D.weapons[id];
+    return W.cd * weaponGrade(W, lv, evo).cd * (1 - 0.05 * (lv - 1));
+  }
+
   private hurt(e: Foe, d: number): void {
     if (e.dead) return;
     e.hp -= d;
     e.flash = 0.07;
+    if (this.showDamage && this.dmgThisTick < 12) {
+      this.dmgThisTick++;
+      this.emit({ type: "dmg", x: e.x, y: e.y - e.r, v: Math.round(d), big: d >= 40 });
+    }
     if (this.rng.misc.randf() < 0.08) this.emit({ type: "sfx", name: "hit" });
   }
 
@@ -415,6 +470,7 @@ export class RunSim {
     const t0 = performance.now();
     const D = this.D, h = this.hero;
     this.t += dt;
+    this.dmgThisTick = 0;
     const ml = Math.hypot(mx, my);
     let ux = 0, uy = 0;
     if (ml > 0.01) {
@@ -444,21 +500,36 @@ export class RunSim {
           // 無名の意地: HPが3割以下の時に与ダメージが上がる
           const grit = this.lineage.card.id === "grit" && this.hp <= this.maxHp * 0.3 ? 1 + this.cardPower() : 1;
           const ok = this.fireWeapon(id, lv, h.x, h.y, h.fx, h.fy, this.mightMul() * (1 + (this.wbonus[id] ?? 0)) * grit, this.areaMul(), false, !!this.evolved[id]);
-          h.cds[id] = ok ? D.weapons[id].cd * this.hasteMul() * (1 - 0.06 * (lv - 1)) : 0.2;
+          h.cds[id] = ok ? this.weaponCd(id, lv, !!this.evolved[id]) * this.hasteMul() : 0.2;
         }
       }
       if (this.ghost) this.ghostUpdate(dt);
     }
 
     for (const s of this.shots) {
+      if (s.kind === "axe" && s.owner) {
+        // 行き: 減速しながら進む → 帰り: 持ち主へ向かう（戻ったら消える）
+        s.spin = (s.spin ?? 0) + dt * 14;
+        const prevRet = s.ret ?? 0;
+        s.ret = prevRet - dt;
+        if (s.ret > 0) {
+          s.vx *= 1 - 1.6 * dt; s.vy *= 1 - 1.6 * dt;
+        } else {
+          if (prevRet > 0) s.hit.clear();
+          const ox = s.owner.x - s.x, oy = s.owner.y - s.y, d = Math.hypot(ox, oy) || 1;
+          const sp = Math.min(620, Math.hypot(s.vx, s.vy) + 900 * dt);
+          s.vx = (ox / d) * sp; s.vy = (oy / d) * sp;
+          if (d < 18) s.life = 0;
+        }
+      }
       s.x += s.vx * dt;
       s.y += s.vy * dt;
       s.life -= dt;
-      const list = this.grid.query(s.x, s.y, 30);
+      const list = this.grid.query(s.x, s.y, 30 + s.rad);
       for (let i = 0; i < list.length; i++) {
         const e = list[i];
         if (s.life <= 0 || e.dead || s.hit.has(e)) continue;
-        if (Math.hypot(e.x - s.x, e.y - s.y) < e.r + 4) {
+        if (Math.hypot(e.x - s.x, e.y - s.y) < e.r + s.rad) {
           this.hurt(e, s.dmg);
           s.hit.add(e);
           s.pierce--;
@@ -571,7 +642,7 @@ export class RunSim {
       const ok = this.fireWeapon(wid, lv, g.x, g.y, 1, 0, s.attack_mult * this.ghostUnlock() * (1 + this.mod("ghost_atk")) * (1 + (this.cardMods.ghost_atk ?? 0)), s.area, true, !!r.evolved);
       // 鎮魂の鐘: 亡霊の攻撃間隔が短くなる
       const bell = this.lineage.card.id === "bell" ? Math.max(0.4, 1 - this.cardPower()) : 1;
-      g.cd = ok ? (this.D.weapons[wid].cd / s.attack_speed) * (1 - 0.06 * (lv - 1)) * bell : 0.25;
+      g.cd = ok ? (this.weaponCd(wid, lv, !!r.evolved) / s.attack_speed) * bell : 0.25;
     }
   }
 
@@ -716,7 +787,7 @@ export class RunSim {
       }
       const o = opts.splice(idx, 1)[0];
       let rar = this.rollRarity();
-      if (rar === "LR" && o.kind === "weapon" && (o.lv === 0 || this.evolved[o.id])) rar = "UR"; // 進化は所持武器だけ
+      if (rar === "LR" && o.kind === "weapon" && (o.lv < this.D.evolve_min_level || this.evolved[o.id])) rar = "UR"; // 進化は育てた所持武器だけ
       out.push({ ...o, rar });
     }
     if (out.length === 0) out.push({ kind: "heal", id: "", lv: 0, rar: "N" });
@@ -731,15 +802,21 @@ export class RunSim {
     const D = this.D, R = this.rarity(c.rar);
     if (c.kind === "weapon") {
       const W = D.weapons[c.id], lv = c.lv, maxlv = D.weapon_max_level;
+      const cur = weaponGrade(W, Math.max(1, lv), !!this.evolved[c.id]);
       if (R.evolve && lv > 0 && !this.evolved[c.id]) {
-        const E = D.evolutions[c.id];
-        return { k: `武器進化 Lv${lv} → ${Math.min(maxlv, lv + 1)}`, n: `${W.name} → ${E.name}`, d: E.desc };
+        const E = W.grades[W.grades.length - 1];
+        return { k: `武器進化 Lv${lv} → ${Math.min(maxlv, lv + 1)}`, n: `${cur.name} → ${E.name}`, d: E.desc };
       }
-      if (lv >= maxlv) return { k: "武器 最大Lv", n: W.name, d: `${W.name}のダメージ +${Math.round(D.maxed_weapon_bonus[c.rar] * 100)}%` };
+      if (lv >= maxlv) return { k: "武器 最大Lv", n: cur.name, d: `${cur.name}のダメージ +${Math.round(D.maxed_weapon_bonus[c.rar] * 100)}%` };
       const to = Math.min(maxlv, lv + R.wlv);
-      const head = lv > 0 ? `武器 Lv${lv} → ${to}` : c.id === this.mainWeapon ? "メイン武器" : `サブ武器を追加（Lv${to}）`;
-      const extra = R.wbonus > 0 ? `\nさらに${W.name}のダメージ +${Math.round(R.wbonus * 100)}%` : "";
-      return { k: head, n: W.name, d: (lv > 0 ? weaponLevelText(c.id, to) : W.desc) + extra };
+      const next = weaponGrade(W, to, !!this.evolved[c.id]);
+      const extra = R.wbonus > 0 ? `\nさらにダメージ +${Math.round(R.wbonus * 100)}%` : "";
+      if (lv === 0) {
+        const head = c.id === this.mainWeapon ? "メイン武器" : `サブ武器を追加（Lv${to}）`;
+        return { k: head, n: next.name, d: `${W.desc}。${next.desc}` + extra };
+      }
+      if (next !== cur) return { k: `武器 Lv${lv} → ${to}・持ち替え`, n: `${cur.name} → ${next.name}`, d: next.desc + extra };
+      return { k: `武器 Lv${lv} → ${to}`, n: cur.name, d: `ダメージ +${Math.round(W.per_level * 100)}%・攻撃間隔が短くなる` + extra };
     }
     if (c.kind === "lineage") {
       const L = this.lineage.card;
@@ -850,10 +927,4 @@ export class RunSim {
     }
     return false;
   }
-}
-
-function weaponLevelText(id: string, lv: number): string {
-  if (id === "sword") return lv === 3 ? "前後同時に斬る" : "ダメージ・範囲・速度アップ";
-  if (id === "bow") return lv === 4 ? "矢が貫通する" : lv % 2 === 1 ? "矢が1本増える" : "ダメージ・速度アップ";
-  return lv === 4 ? "炎が2か所に落ちる" : "ダメージ・範囲アップ";
 }

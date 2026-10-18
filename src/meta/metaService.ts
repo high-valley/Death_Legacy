@@ -3,6 +3,7 @@
 //   出撃予約 → チェックポイント → ラン終了処理（冪等）
 // 亡霊と形見の状態: stored → reserved（出撃中）→ consumed / 使用済み（喰らった亡霊は wraith → 祓うと purified、弔うと released）。異常終了しても reserved のまま残り、同じランを再開できる。
 import type { Balance, Lineage, RunMode, Tier, TreeEffect, TreeNode } from "../data/types.ts";
+import { weaponGrade } from "../data/weapons.ts";
 import type { RunOpts } from "../sim/runSim.ts";
 import type { ActiveRun, CardMods, GhostMode, GhostRecord, Heirloom, HeirOption, RunRecord, RunResult, SaveData, Snapshot, Summary } from "./records.ts";
 import type { SaveRepository } from "./saveRepository.ts";
@@ -74,7 +75,7 @@ export class MetaService {
     const house = lin.id === this.D.lineages[0].id ? "" : `${lin.name}・`;
     return {
       ghost_id: uuid(), origin_run_id: sm.run_id, created_at: now(),
-      display_name: `第${this.S.ghost_seq}代・${house}${this.D.weapons[wid].name}の${tr.name}`,
+      display_name: `第${this.S.ghost_seq}代・${house}${weaponGrade(this.D.weapons[wid], wlv, !!sm.evolved[wid]).name}の${tr.name}`,
       survival_seconds: Math.floor(sm.t), run_length: Math.floor(sm.run_len), tier_id: tr.id,
       primary_weapon_id: wid, weapon_level: wlv, evolved: !!sm.evolved[wid],
       passive_id: pid, passive_level: pid ? sm.passives[pid] ?? 0 : 0,
