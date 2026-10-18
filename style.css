@@ -12,6 +12,7 @@
   --candle: #d9a85b;    /* 行動・供物 */
   --soul: #86e0d2;      /* 亡霊 */
   --blood: #d65a5e;     /* 危険 */
+  --taint: #b78be0;     /* 穢れ・怨霊 */
   --f-sans: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif;
   --f-serif: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
   --r: 6px;
@@ -60,7 +61,7 @@ p { margin: 0; color: var(--mute); max-width: 62ch; }
 .lead { font-size: 16px; color: var(--bone); opacity: .82; line-height: 1.9; }
 .small { font-size: 13px; }
 .num { font-variant-numeric: tabular-nums; }
-.gold { color: var(--candle); } .soul { color: var(--soul); } .danger { color: var(--blood); } .mute { color: var(--mute); }
+.gold { color: var(--candle); } .soul { color: var(--soul); } .danger { color: var(--blood); } .mute { color: var(--mute); } .faint { color: var(--faint); } .taint { color: var(--taint); }
 .win { color: var(--candle); } .lose { color: var(--blood); }
 
 /* ---------- 操作 ---------- */
@@ -97,6 +98,7 @@ input[type="range"] { padding: 0; accent-color: var(--candle); }
 .tabs .lock { margin-left: 6px; font-size: 11px; color: var(--faint); font-weight: 400; }
 .purse { font-variant-numeric: tabular-nums; color: var(--mute); font-size: 13px; }
 .purse b { color: var(--candle); font-size: 18px; font-weight: 700; margin: 0 2px; }
+.purse.taint b { color: var(--taint); }
 
 /* ---------- 選ぶカード ---------- */
 .picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 8px; }
@@ -131,6 +133,7 @@ input[type="range"] { padding: 0; accent-color: var(--candle); }
 @media (max-height: 520px) and (min-width: 721px) {
   .hub { grid-template-columns: minmax(0, 1fr) 240px; height: calc(100dvh - 104px); }
   .hub .choose { overflow-y: auto; height: 100%; padding-right: 6px; scrollbar-width: thin; }
+  .hub > aside { max-height: 100%; overflow-y: auto; }
 }
 
 /* 出撃札（位牌）: このゲームの顔 */
@@ -148,6 +151,7 @@ input[type="range"] { padding: 0; accent-color: var(--candle); }
 .tablet dt { color: var(--faint); }
 .tablet dd { margin: 0; color: var(--bone); min-width: 0; overflow-wrap: anywhere; }
 .tablet dd.soul { color: var(--soul); }
+.tablet dd.taint, .tablet .warn b.taint { color: var(--taint); }
 .tablet .warn { font-size: 12px; line-height: 1.6; color: var(--mute); border-top: 1px solid var(--line); padding-top: 10px; }
 .tablet .warn b { color: var(--candle); font-weight: 600; }
 .tablet button.primary { width: 100%; min-height: 52px; font: 600 19px var(--f-serif); letter-spacing: .2em; }
@@ -184,9 +188,65 @@ input[type="range"] { padding: 0; accent-color: var(--candle); }
 .notice b { font: 600 16px var(--f-serif); color: var(--candle); }
 .notice.soul { background: #13201f; border-color: #2c4f4a; }
 .notice.soul b { color: var(--soul); }
+.notice.taint { background: #1c1724; border-color: #4a3a5e; }
+.notice.taint b { color: var(--taint); }
+.notice.taint span { color: var(--mute); }
 .build { font-size: 13px; color: var(--mute); line-height: 1.7; }
 
-/* ---------- 祭壇・書庫 ---------- */
+/* ---------- 亡霊の3択（選んだ亡霊の下に出る） ---------- */
+.rite { display: grid; gap: 6px; padding: 12px 14px; border-radius: 8px; background: #13201f; border: 1px solid #2c4f4a; }
+.rite.devour { background: #1c1724; border-color: #4a3a5e; }
+.rite-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; }
+.rite .who { font: 600 15px var(--f-serif); color: var(--soul); }
+.rite.devour .who { color: var(--taint); }
+.rite .seg { background: rgba(0,0,0,.25); }
+.rite.devour .seg button[aria-pressed="true"] { color: var(--taint); }
+.rite p { max-width: none; }
+
+/* ---------- 祭壇の樹 ---------- */
+.tree-hub { --tree-row: 84px; }
+.tree { position: relative; }
+.tree svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.tree path { fill: none; stroke: var(--line); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.tree path.reach { stroke: #4a5868; stroke-dasharray: 4 4; }
+.tree path.lit { stroke: var(--candle); opacity: .75; }
+.tree-grid { position: relative; display: grid; }
+.node {
+  place-self: center; width: min(calc(100% - 12px), 132px); min-height: 54px; padding: 6px 8px; display: grid; gap: 1px; justify-items: center; align-content: center;
+  background: var(--stone); border: 1px solid var(--line); border-radius: 8px; font-weight: 400; line-height: 1.25;
+}
+.node .nn { font: 600 14px var(--f-serif); color: var(--mute); white-space: nowrap; }
+.node .nc { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.node.open { background: #221c12; border-color: var(--candle); box-shadow: 0 0 14px rgba(217,168,91,.18); }
+.node.open .nn { color: var(--bone); } .node.open .nc { color: var(--candle); }
+.node.ready { border: 1px dashed var(--candle); }
+.node.ready .nn { color: var(--bone); } .node.ready .nc { color: var(--candle); }
+.node.reach .nn { color: var(--mute); }
+.node.far { opacity: .45; }
+.node.root { border-radius: 50%/40%; width: min(100%, 110px); }
+.node.root .nn { font-size: 16px; color: var(--candle); letter-spacing: .2em; }
+.node[aria-pressed="true"] { outline: 2px solid var(--soul); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; max-width: none; }
+.legend .k { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--line); margin-right: -6px; vertical-align: -1px; }
+.legend .k.open { background: #221c12; border-color: var(--candle); } .legend .k.ready { border: 1px dashed var(--candle); } .legend .k.far { opacity: .45; }
+.node-card { gap: 10px; }
+.node-card .nh { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.node-card .nh .serif { font-size: 19px; }
+.node-card .state { font-size: 12px; color: var(--candle); font-variant-numeric: tabular-nums; }
+.node-card p { font-size: 13px; line-height: 1.65; }
+.node-card h3 { font-size: 12px; margin-top: 4px; }
+.node-card .dist { gap: 4px; }
+.node-card .dist .r { grid-template-columns: 6.6em 1fr 3.4em; gap: 6px; font-size: 11px; }
+.node-card button.primary { font: 600 15px var(--f-sans); letter-spacing: .04em; min-height: 46px; }
+.node-card button.quiet { font-size: 12px; min-height: 36px; justify-self: start; padding: 4px 0; }
+@media (max-height: 520px) {
+  .tree-hub { --tree-row: 66px; }
+  .node { min-height: 46px; padding: 4px 6px; } .node .nn { font-size: 13px; }
+  .node-card { overflow-y: auto; max-height: 100%; }
+}
+@media (max-width: 720px) { .tree-hub { --tree-row: 64px; } .node { width: calc(100% - 6px); padding: 4px 2px; min-height: 46px; } .node .nn { font-size: 11px; letter-spacing: -.02em; } .node .nc { font-size: 10px; } .node.root .nn { font-size: 14px; } }
+
+/* ---------- 縁と封印・レア度の分布 ---------- */
 .dist { display: grid; gap: 7px; max-width: 560px; }
 .dist .r { display: grid; grid-template-columns: 8.5em 1fr 4em; gap: 12px; align-items: center; font-size: 13px; }
 .dist .track { height: 8px; background: var(--stone); border-radius: 4px; overflow: hidden; }

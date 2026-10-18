@@ -4,7 +4,7 @@
 // ブラウザでは localStorage、テストではメモリ、将来の Steam 版（Electron）ではファイルに差し替える。
 import type { SaveData } from "./records.ts";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /** localStorage と同じ形の保存先 */
 export interface KV {
@@ -27,7 +27,7 @@ export function freshSave(dataVersion = 1): SaveData {
     active_run: null, pending_ghost: null, pending_heirloom: null,
     progress: { clears: 0, deaths: 0, runs: 0, generation: 0, total_survival: 0, companion_runs: 0, best_weapon_level: {} },
     lineages: ["nameless"],
-    offerings: { earned: 0 }, alloc: { altar: 0, affinity: {}, seals: [] },
+    offerings: { earned: 0, mourned: 0 }, tree: [], alloc: { affinity: {}, seals: [] },
     heirlooms: [], heir_seq: 0,
   };
 }
@@ -40,6 +40,11 @@ export function isValidSave(d: unknown): d is SaveData {
 
 /** schema_version を上げる時は、ここに段階的な変換（v1 → v2 → …）を足す */
 export function migrate(d: SaveData): SaveData {
+  // v1 → v2: 祭壇（段階）と書庫（縁・封印に供物を払う）を「祭壇の樹」に統合。払っていた供物はすべて戻し、樹は何も開いていない状態にする
+  if ((d.schema_version ?? 1) < 2) {
+    d.tree = [];
+    d.alloc = { affinity: {}, seals: [] };
+  }
   const base = freshSave() as unknown as Record<string, unknown>;
   const o = d as unknown as Record<string, unknown>;
   for (const k of Object.keys(base)) if (!(k in o)) o[k] = structuredClone(base[k]);
@@ -49,6 +54,8 @@ export function migrate(d: SaveData): SaveData {
   }
   if (!Array.isArray(d.lineages) || d.lineages.length === 0) d.lineages = ["nameless"];
   if (d.active_run && !d.active_run.lineage_id) d.active_run.lineage_id = "nameless";
+  if (d.active_run && !d.active_run.ghost_mode) d.active_run.ghost_mode = "bring";
+  if (!Array.isArray(d.tree)) d.tree = [];
   d.schema_version = SCHEMA_VERSION;
   return d;
 }

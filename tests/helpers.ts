@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { loadBalance } from "../src/data/dataLoader.ts";
 import type { Balance, RunMode } from "../src/data/types.ts";
 import { MetaService, uuid } from "../src/meta/metaService.ts";
-import type { RunRecord } from "../src/meta/records.ts";
+import type { GhostMode, RunRecord } from "../src/meta/records.ts";
 import { MemoryKV, SaveRepository } from "../src/meta/saveRepository.ts";
 import { RunSim, STEP } from "../src/sim/runSim.ts";
 
@@ -29,14 +29,15 @@ export class World {
   }
 
   /** 出撃（予約まで含む）。失敗時は null */
-  sortie(ghostId = "", heirId = "", mode: RunMode = "short", weapon = "sword", seed = 1, lineage = "nameless"): RunSim | null {
+  sortie(ghostId = "", heirId = "", mode: RunMode = "short", weapon = "sword", seed = 1, lineage = "nameless", ghostMode: GhostMode = "bring"): RunSim | null {
     const rid = uuid();
-    if (!this.meta.reserve(rid, seed, mode, weapon, ghostId, heirId, lineage)) return null;
-    const ar = this.repo.data.active_run!;
-    return new RunSim(D, {
-      run_id: rid, seed, mode, weapon: ar.weapon, lineage: ar.lineage_id,
-      ghost: ghostId ? this.meta.getGhost(ghostId) : null, heirloom: heirId ? this.meta.getHeir(heirId) : null, card_mods: this.meta.cardMods(),
-    });
+    if (!this.meta.reserve(rid, seed, mode, weapon, ghostId, heirId, lineage, ghostMode)) return null;
+    return new RunSim(D, this.meta.runOpts(this.repo.data.active_run!));
+  }
+
+  /** 中断したランを再開する（アプリを開き直した想定） */
+  resume(): RunSim {
+    return new RunSim(D, this.meta.runOpts(this.repo.data.active_run!));
   }
 
   die(r: RunSim | null, at = -1): RunRecord {

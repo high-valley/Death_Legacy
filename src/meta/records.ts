@@ -1,7 +1,9 @@
 // セーブに入るデータの形（戦闘ロジックとセーブの受け渡しに使う型）
 import type { RunMode } from "../data/types.ts";
 
-export type GhostStatus = "stored" | "reserved" | "consumed" | "released" | "pending";
+// wraith = 喰らわれて怨霊になった（穢れ1つ分）。祓うと purified
+export type GhostStatus = "stored" | "reserved" | "consumed" | "released" | "pending" | "wraith" | "purified";
+export type GhostMode = "bring" | "devour";
 
 export interface GhostRecord {
   ghost_id: string;
@@ -26,6 +28,7 @@ export interface GhostRecord {
   reserved_by_run?: string;
   consumed_by_run?: string;
   consumed_at?: string;
+  wraith_since?: string;
 }
 
 export interface HeirOption { type: "weapon" | "passive"; id: string; level: number }
@@ -38,7 +41,13 @@ export interface Heirloom extends HeirOption {
   reserved_by_run?: string;
 }
 
-export interface CardMods { altar: number; affinity: Record<string, number>; seals: string[] }
+/** 祭壇の樹から戦闘に渡す値 */
+export interface CardMods {
+  altar: number; affinity: Record<string, number>; seals: string[];
+  ghost_atk?: number; devour_bonus?: number; taint_resist?: number;
+}
+/** 縁・封印の割り当て（樹で開いた枠の中で自由に付け外し） */
+export interface Alloc { affinity: Record<string, number>; seals: string[] }
 
 export type RunResult = "" | "player_death" | "boss_cleared" | "retired";
 
@@ -49,6 +58,7 @@ export interface Snapshot {
   wbonus: Record<string, number>; evolved: Record<string, boolean>;
   kills: number; boss_kills: number; boss_spawned: boolean; elite_idx: number; spawn_acc: number;
   lineage_lv?: number; lpow?: number;
+  wraith_spawned?: boolean; wraith_dead?: boolean;
 }
 
 /** ラン終了処理（MetaService.settle）に渡す要約 */
@@ -58,11 +68,15 @@ export interface Summary {
   wbonus: Record<string, number>; evolved: Record<string, boolean>;
   level: number; kills: number; boss_kills: number; death_cause: string; ghost_id: string; heirloom_id: string;
   lineage_id: string;
+  ghost_mode?: GhostMode;
+  wraith_id?: string; wraith_purified?: boolean;
 }
 
 export interface ActiveRun {
   run_id: string; seed: number; mode: RunMode; weapon: string; ghost_id: string; heirloom_id: string;
   lineage_id: string; started_at: string; checkpoint: Snapshot | null;
+  ghost_mode?: GhostMode;   // 無い古いセーブは bring
+  wraith_id?: string;       // このランに現れる怨霊（出撃時に決める）
 }
 
 export interface RunRecord {
@@ -72,6 +86,7 @@ export interface RunRecord {
   consumed_ghost: string; new_ghost_id: string; new_ghost?: string; new_ghost_pending: boolean;
   used_heirloom: string; offerings: number; generation: number;
   lineage_id: string; unlocked_lineages: string[];
+  ghost_mode?: GhostMode; devoured?: string; purified?: string; wraith_escaped?: string;
 }
 
 export interface SaveData {
@@ -90,8 +105,9 @@ export interface SaveData {
     best_weapon_level: Record<string, number>;   // 武器ごとの最高Lv（火守の解放条件）
   };
   lineages: string[];                            // 解放済みの家系
-  offerings: { earned: number };
-  alloc: CardMods;
+  offerings: { earned: number; mourned: number };   // mourned = 弔って得た分（earned に含む）
+  tree: string[];                                     // 開いた節
+  alloc: Alloc;
   heirlooms: Heirloom[];
   heir_seq: number;
 }

@@ -87,8 +87,15 @@ export class Hud {
       ...Object.keys(sim.weapons).map((k): [string, number, boolean] => [sim.weaponName(k), sim.weapons[k], true]),
       ...Object.keys(sim.passives).map((k): [string, number, boolean] => [D.passives[k].name, sim.passives[k], false]),
     ];
-    const iy = ly + 20;
+    const iy0 = ly + 20;
+    const limit = W / 2 - 170;   // 中央の時計・HPバーにかからないところまで。入りきらない分は2行目へ
+    let iy2 = iy0;
     for (const [name, lv, weapon] of items) {
+      if (x + ctx.measureText(name).width + 20 > limit && x > pad) {
+        if (iy2 > iy0) break;
+        x = pad; iy2 += 17;
+      }
+      const iy = iy2;
       ctx.fillStyle = weapon ? C.bone : C.dim;
       ctx.fillText(name, x, iy);
       x += ctx.measureText(name).width + 3;
@@ -96,7 +103,6 @@ export class Hud {
       ctx.fillText(String(lv), x, iy);
       x += ctx.measureText(String(lv)).width + 12;
       ctx.font = `12px ${FONT}`;
-      if (x > W * 0.42) break;   // 中央の時計にかからないところで打ち切る
     }
 
     // ── 中央上: 残り時間とボス
@@ -106,9 +112,17 @@ export class Hud {
     ctx.fillText(sim.bossSpawned ? fmt(sim.t) : fmt(sim.runLen - sim.t), W / 2, pad + tsz * 0.8);
     ctx.font = `12px ${SERIF}`; ctx.fillStyle = C.dim;
     ctx.fillText(sim.bossSpawned ? "冥王戦" : "冥王が来るまで", W / 2, pad + tsz + 14);
+    let by = pad + tsz + 24;
     if (sim.boss && !sim.boss.dead) {
-      const w = Math.min(420, W - 220), y = pad + tsz + 24;
-      bar(ctx, W / 2 - w / 2, y, w, 8, sim.boss.hp / sim.boss.maxHp, C.blood);
+      const w = Math.min(420, W - 220);
+      bar(ctx, W / 2 - w / 2, by, w, 8, sim.boss.hp / sim.boss.maxHp, C.blood);
+      by += 14;
+    }
+    if (sim.wraith && !sim.wraith.dead) {
+      const w = Math.min(300, W - 260);
+      bar(ctx, W / 2 - w / 2, by, w, 6, sim.wraith.hp / sim.wraith.maxHp, C.taint);
+      ctx.font = `11px ${SERIF}`; ctx.fillStyle = C.taint;
+      ctx.fillText("怨霊", W / 2, by + 18);
     }
 
     // ── 右上: 同行亡霊と撃破（スマホではポーズボタンを避ける）
@@ -123,9 +137,15 @@ export class Hud {
       ry += 18;
       ctx.font = `12px ${FONT}`; ctx.fillStyle = C.dim;
       ctx.fillText(`力の解放 ${Math.round(sim.ghostUnlock() * 100)}%`, gx, ry);
+    } else if (sim.devour) {
+      ctx.font = `600 ${small ? 13 : 14}px ${SERIF}`; ctx.fillStyle = C.taint;
+      ctx.fillText(`${sim.devour.rec.display_name}を喰らった`, gx, ry);
+      ry += 18;
+      ctx.font = `12px ${FONT}`; ctx.fillStyle = C.dim;
+      ctx.fillText(`与ダメージ +${Math.round(sim.devour.might * 100)}%`, gx, ry);
     } else {
       ctx.font = `12px ${FONT}`; ctx.fillStyle = C.dim;
-      ctx.fillText(`単独　経験値 +${Math.round(D.solo_xp_bonus * 100)}%`, gx, ry);
+      ctx.fillText(`単独　経験値 +${Math.round(D.solo_xp_bonus * 100 * (1 + sim.mod("solo_xp")))}%`, gx, ry);
     }
     ry += 22;
     ctx.font = `600 16px ${MONO}`; ctx.fillStyle = C.bone;
@@ -141,7 +161,7 @@ export class Hud {
       ctx.globalAlpha = Math.min(1, this.toastT * 2);
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.font = `600 ${small ? 15 : 17}px ${SERIF}`;
-      const w = ctx.measureText(this.toastText).width + 48, y = H * 0.24;
+      const w = ctx.measureText(this.toastText).width + 48, y = Math.max(H * 0.24, by + 44);   // ボス・怨霊のHPと重ねない
       ctx.fillStyle = "rgba(14,18,23,.88)"; ctx.fillRect(W / 2 - w / 2, y - 18, w, 36);
       ctx.fillStyle = C.candle; ctx.fillRect(W / 2 - w / 2, y - 18, w, 1); ctx.fillRect(W / 2 - w / 2, y + 17, w, 1);
       ctx.fillStyle = C.bone; ctx.fillText(this.toastText, W / 2, y + 1);
@@ -157,7 +177,7 @@ export class Hud {
         `更新 ${sim.updateMs.toFixed(2)} ms`,
         `弾 ${sim.shots.length + sim.eshots.length}  炎 ${sim.zones.length}  経験値 ${sim.gems.length}`,
         `seed ${sim.seed}`,
-      ].forEach((l, i) => ctx.fillText(l, pad, pad + 96 + i * 16));
+      ].forEach((l, i) => ctx.fillText(l, pad, pad + 118 + i * 16));
     }
     ctx.textBaseline = "alphabetic";
   }

@@ -1,16 +1,16 @@
-// 戦闘以外の画面: タイトル / 納骨堂（出撃・祭壇・書庫・形見の棚）/ 確認 / レベルアップ / ポーズ / 設定 / リザルト。
+// 戦闘以外の画面: タイトル / 納骨堂（出撃・祭壇の樹・形見の棚）/ 確認 / レベルアップ / ポーズ / 設定 / リザルト。
 // 画面を開くたびに作り直す（状態は MetaService と hub の選択だけが持つ）。
 // 納骨堂は「左＝誰が行くか（家系・亡霊・形見）」「右＝出撃札（いまの選択のまとめと出撃ボタン）」の2列。
 import type { Balance, Lineage, RunMode } from "../data/types.ts";
 import type { MetaService } from "../meta/metaService.ts";
-import type { ActiveRun, GhostRecord, RunRecord } from "../meta/records.ts";
+import type { ActiveRun, GhostMode, GhostRecord, RunRecord } from "../meta/records.ts";
 import { Platform } from "../platform.ts";
 import { Settings } from "../settings.ts";
 import { RunSim, type Card } from "../sim/runSim.ts";
 import { fmt } from "../view/hud.ts";
 import { button, h } from "./dom.ts";
 
-export interface SortieRequest { ghostId: string; heirId: string; weapon: string; mode: RunMode; seed: number; lineage: string }
+export interface SortieRequest { ghostId: string; heirId: string; weapon: string; mode: RunMode; seed: number; lineage: string; ghostMode: GhostMode }
 
 const RESULT_NAME: Record<string, string> = { player_death: "死亡", boss_cleared: "生還", retired: "リタイア" };
 const KANJI = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
@@ -27,7 +27,7 @@ export class Menus {
   readonly root: HTMLElement;
   readonly meta: MetaService;
   readonly D: Balance;
-  hub = { tab: "sortie", ghost: "", heir: "", weapon: "sword", mode: "short" as RunMode, seed: 0, lineage: "nameless" };
+  hub = { tab: "sortie", ghost: "", ghostMode: "bring" as GhostMode, heir: "", weapon: "sword", mode: "short" as RunMode, seed: 0, lineage: "nameless", node: "" };
   touchMode = false;
   onSortie: (r: SortieRequest) => void = () => {};
   private hotkeys: HTMLButtonElement[] = [];
@@ -137,25 +137,58 @@ export class Menus {
   }
 
   // ---------------------------------------------------------------- hub
+  /** 選び直しで画面を作り直しても、スクロール位置は保つ（同じタブの時だけ） */
+  private captureScroll(): Map<string, number> | null {
+    const panel = this.root.querySelector<HTMLElement>(".panel[data-screen='hub']");
+    if (!panel || panel.dataset.tab !== this.hub.tab) return null;
+    const m = new Map<string, number>();
+    const ov = this.root.querySelector<HTMLElement>(".ov");
+    if (ov) m.set("ov", ov.scrollTop);
+    this.root.querySelectorAll<HTMLElement>("[data-scroll]").forEach((el) => m.set(el.dataset.scroll!, el.scrollTop));
+    return m;
+  }
+
+  private restoreScroll(m: Map<string, number> | null): void {
+    if (!m) return;
+    const ov = this.root.querySelector<HTMLElement>(".ov");
+    if (ov) ov.scrollTop = m.get("ov") ?? 0;
+    this.root.querySelectorAll<HTMLElement>("[data-scroll]").forEach((el) => { el.scrollTop = m.get(el.dataset.scroll!) ?? 0; });
+  }
+
   showHub(onBack: () => void): void {
+    const keep = this.captureScroll();
     const p = this.open("wide");
+    p.dataset.screen = "hub";
+    p.dataset.tab = this.hub.tab;
     const S = this.meta.S;
     const re = (): void => this.showHub(onBack);
     const tabs = h("div", { class: "tabs", role: "tablist" });
-    for (const [id, name, ok] of [["sortie", "出撃", true], ["altar", "祭壇", true], ["library", "書庫", this.meta.libraryUnlocked()], ["shelf", "形見の棚", this.meta.shelfUnlocked()]] as const) {
+    for (const [id, name, ok] of [["sortie", "出撃", true], ["tree", "祭壇の樹", true], ["shelf", "形見の棚", this.meta.shelfUnlocked()]] as const) {
       tabs.append(h("button", { type: "button", role: "tab", "aria-selected": String(this.hub.tab === id), onclick: () => { this.hub.tab = id; re(); } },
         name, ok ? null : h("span", { class: "lock" }, "未解放")));
     }
+    const taint = this.meta.taint();
     p.append(h("div", { class: "spread" },
       h("h2", {}, "納骨堂"),
       h("div", { class: "row" },
+        taint > 0 ? h("span", { class: "purse taint" }, "穢れ", h("b", {}, String(taint))) : null,
         h("span", { class: "purse" }, "供物", h("b", {}, String(this.meta.offeringsFree())), `/ ${S.offerings.earned}`),
         button("タイトル", onBack, "quiet"))),
       tabs);
-    if (this.hub.tab === "altar") this.hubAltar(p, re);
-    else if (this.hub.tab === "library") this.hubLibrary(p, re);
+    if (this.hub.tab === "tree") this.hubTree(p, re);
     else if (this.hub.tab === "shelf") this.hubShelf(p);
     else this.hubSortie(p, re);
+    this.restoreScroll(keep);
+  }
+
+  /** 亡霊の3択の説明（選んでいる亡霊に対して） */
+  private riteText(g: GhostRecord, mode: GhostMode): string {
+    const meta = this.meta;
+    if (mode === "devour") {
+      const pw = meta.devourPower(g);
+      return `力を取り込んで単独で出撃する。与ダメージ +${Math.round(pw.might * 100)}%・最大HP +${Math.round(pw.hp * 100)}%。喰らった亡霊は怨霊になり、のちのランで襲ってくる（穢れ +1）。`;
+    }
+    return "一緒に戦う。レベルが上がるほど本来の力に近づく。ランが終わると成仏する。";
   }
 
   private hubSortie(p: HTMLElement, re: () => void): void {
@@ -167,12 +200,22 @@ export class Menus {
     const heirs = meta.shelfUnlocked() ? meta.storedHeirs() : [];
     if (hub.heir && !heirs.some((x) => x.heir_id === hub.heir)) hub.heir = "";
     const weapon = lin.weapon ?? hub.weapon;
+    const gsel = hub.ghost ? meta.getGhost(hub.ghost) : null;
+    const mode: GhostMode = gsel ? hub.ghostMode : "bring";
 
-    const choose = h("div", { class: "choose" });
+    const choose = h("div", { class: "choose", "data-scroll": "choose" });
     // 家系
     const houses = h("div", { class: "picks" });
     for (const l of D.lineages) houses.append(this.houseCard(l, hub.lineage === l.id, () => { hub.lineage = l.id; re(); }));
     choose.append(h("div", { class: "section" }, h("h3", {}, "家系"), houses));
+    // 穢れ（怨霊が残っている時だけ）
+    const wr = meta.wraiths();
+    if (wr.length > 0) {
+      const hp = Math.round(meta.taintHpBonus() * 100);
+      choose.append(h("div", { class: "notice taint" },
+        h("b", {}, `穢れ ${wr.length}`),
+        h("span", { class: "small" }, `敵のHP +${hp}%。ランの途中で怨霊「${wr[0].display_name}」が現れる。倒せば祓えて、穢れが1つ消える（供物 +${D.rites.wraith.purify_offerings}）。`)));
+    }
     // 亡霊
     const vault = h("div", { class: "picks" });
     vault.append(this.pick([
@@ -181,8 +224,25 @@ export class Menus {
       h("span", { class: "meta" }, lin.mods.solo_xp === -1 ? "亡霊は温存される" : `亡霊は温存される。経験値 +${Math.round(D.solo_xp_bonus * 100)}%`),
     ], { edge: "var(--faint)", pressed: hub.ghost === "", onPress: () => { hub.ghost = ""; re(); } }));
     for (const g of stored) vault.append(this.ghostCard(g, hub.ghost === g.ghost_id, () => { hub.ghost = g.ghost_id; re(); }));
-    choose.append(h("div", { class: "section" }, h("h3", {}, `亡霊　${stored.length} / ${D.vault_capacity}`), vault,
-      stored.length === 0 ? h("div", { class: "empty" }, "まだ亡霊はいない。死ねば、その生き様が最初の亡霊になる。") : null));
+    const ghostSec = h("div", { class: "section" }, h("h3", {}, `亡霊　${stored.length} / ${D.vault_capacity}`), vault);
+    if (stored.length === 0) ghostSec.append(h("div", { class: "empty" }, "まだ亡霊はいない。死ねば、その生き様が最初の亡霊になる。"));
+    // 選んだ亡霊をどうするか（連れていく / 喰らう / 弔う）
+    if (gsel) {
+      const seg = h("div", { class: "seg rites" });
+      for (const [id, name] of [["bring", "連れていく"], ["devour", "喰らう"]] as const) {
+        seg.append(h("button", { type: "button", "aria-pressed": String(mode === id), onclick: () => { hub.ghostMode = id; re(); } }, name));
+      }
+      const n = meta.mournOfferings(gsel);
+      seg.append(h("button", {
+        type: "button", "aria-pressed": "false", onclick: () => this.showConfirm(`${gsel.display_name}を弔う`,
+          `いますぐ成仏させ、供物 +${n} を得る。弔った亡霊は戻らない。`, () => { meta.mourn(gsel.ghost_id); hub.ghost = ""; re(); }, re, "弔う"),
+      }, "弔う"));
+      ghostSec.append(h("div", { class: `rite ${mode}` },
+        h("div", { class: "rite-head" }, h("span", { class: "who" }, gsel.display_name), seg),
+        h("p", { class: "small" }, this.riteText(gsel, mode)),
+        h("p", { class: "small faint" }, `弔う：その場で成仏させ、供物 +${n}。`)));
+    }
+    choose.append(ghostSec);
     // 形見
     if (meta.shelfUnlocked()) {
       const hg = h("div", { class: "picks" });
@@ -201,53 +261,59 @@ export class Menus {
     // 武器・ラン設定
     const wseg = h("div", { class: "seg" });
     for (const id of Object.keys(D.weapons)) {
-      const b = h("button", { type: "button", "aria-pressed": String(weapon === id), disabled: !!lin.weapon && lin.weapon !== id, onclick: () => { hub.weapon = id; re(); } }, D.weapons[id].name);
-      wseg.append(b);
+      wseg.append(h("button", { type: "button", "aria-pressed": String(weapon === id), disabled: !!lin.weapon && lin.weapon !== id, onclick: () => { hub.weapon = id; re(); } }, D.weapons[id].name));
     }
     const mseg = h("div", { class: "seg" });
     for (const [id, name] of [["short", "3分でボス"], ["full", "10分"]] as const) {
       mseg.append(h("button", { type: "button", "aria-pressed": String(hub.mode === id), onclick: () => { hub.mode = id; re(); } }, name));
     }
     const seedIn = h("input", { id: "seedIn", inputmode: "numeric", value: String(hub.seed), size: 8, "aria-label": "seed" });
+    seedIn.addEventListener("change", () => { const n = Number.parseInt(seedIn.value, 10); if (Number.isFinite(n)) hub.seed = n; });
     choose.append(h("div", { class: "section opts" }, h("h3", {}, lin.weapon ? `初期武器（${lin.name}は${D.weapons[lin.weapon].name}）` : "初期武器"), wseg,
       h("h3", {}, "ランの長さ"), h("div", { class: "row" }, mseg, h("label", { class: "row" }, "seed", seedIn))));
     // 履歴
     if (S.run_history.length) {
       const hist = h("div", { class: "hist" });
       for (const r of S.run_history.slice(0, 6)) {
+        const who = r.devoured ? `　${r.devoured}を喰らう` : r.consumed_ghost ? `　${r.consumed_ghost}と` : "";
         hist.append(h("div", { class: r.result === "boss_cleared" ? "win" : "" },
           h("span", {}, r.ended_at.slice(5, 16).replace("T", " ")), h("span", {}, RESULT_NAME[r.result] ?? ""), h("span", {}, fmt(r.duration_seconds)),
-          h("span", {}, `Lv${r.player_level}　撃破${r.kills}${r.consumed_ghost ? `　${r.consumed_ghost}と` : ""}`)));
+          h("span", {}, `Lv${r.player_level}　撃破${r.kills}${who}`)));
       }
       choose.append(h("div", { class: "section" }, h("h3", {}, "これまでのラン"), hist));
     }
 
     // 出撃札
-    const gsel = hub.ghost ? meta.getGhost(hub.ghost) : null;
     const hsel = hub.heir ? meta.getHeir(hub.heir) : null;
     const gen = S.progress.generation + 1;
     const go = (): void => {
       const n = Number.parseInt(seedIn.value, 10);
       const seed = Number.isFinite(n) ? n : Math.floor(Math.random() * 1_000_000);
       hub.seed = Math.floor(Math.random() * 1_000_000);
-      const req: SortieRequest = { ghostId: hub.ghost, heirId: hub.heir, weapon, mode: hub.mode, seed, lineage: hub.lineage };
+      const req: SortieRequest = { ghostId: hub.ghost, heirId: hub.heir, weapon, mode: hub.mode, seed, lineage: hub.lineage, ghostMode: mode };
       if (gsel || hsel) {
-        this.showConfirm(gsel ? `${gsel.display_name}を連れて出撃する` : "形見を身につけて出撃する",
-          "出撃した時点で使用が確定し、ランが終わると（勝っても負けても）消える。途中でアプリを閉じても、次に開いた時に同じランから再開できる。",
-          () => this.onSortie(req), re);
+        const title = gsel ? (mode === "devour" ? `${gsel.display_name}を喰らって出撃する` : `${gsel.display_name}を連れて出撃する`) : "形見を身につけて出撃する";
+        const body = mode === "devour" && gsel
+          ? "出撃した時点で喰らうことが確定する。喰らった亡霊は怨霊となり、次のランから襲ってくる。倒せば祓える。"
+          : "出撃した時点で使用が確定し、ランが終わると（勝っても負けても）消える。途中でアプリを閉じても、次に開いた時に同じランから再開できる。";
+        this.showConfirm(title, body, () => this.onSortie(req), re);
       } else {
         this.onSortie(req);
       }
     };
+    const warn = !gsel ? "保管庫の亡霊は減らない。"
+      : mode === "devour" ? h("b", { class: "taint" }, "喰らった亡霊は怨霊になる（穢れ +1）。")
+      : h("b", {}, "連れていった亡霊は、このランの後に成仏する。");
     const tablet = h("aside", { class: "tablet" },
       h("div", { class: "plate" },
         h("div", { class: "vertical" }, `第${kanjiNum(gen)}代`, h("br"), h("small", {}, lin.name)),
         h("dl", {},
           h("dt", {}, "武器"), h("dd", {}, D.weapons[weapon].name),
-          h("dt", {}, "同行"), h("dd", { class: gsel ? "soul" : "" }, gsel ? gsel.display_name : "なし"),
+          h("dt", {}, mode === "devour" ? "喰らう" : "同行"), h("dd", { class: gsel ? (mode === "devour" ? "taint" : "soul") : "" }, gsel ? gsel.display_name : "なし"),
           h("dt", {}, "形見"), h("dd", {}, hsel ? hsel.name.replace(/^第\d+代の形見・/, "") : "なし"),
-          h("dt", {}, "ラン"), h("dd", {}, hub.mode === "short" ? "3分でボス" : "10分"))),
-      h("p", { class: "warn" }, gsel ? h("b", {}, "連れていった亡霊は、このランの後に成仏する。") : "保管庫の亡霊は減らない。"),
+          h("dt", {}, "ラン"), h("dd", {}, hub.mode === "short" ? "3分でボス" : "10分"),
+          wr.length > 0 ? h("dt", {}, "怨霊") : null, wr.length > 0 ? h("dd", { class: "taint" }, "現れる") : null)),
+      h("p", { class: "warn" }, warn),
       button("出撃", go, "primary"));
     p.append(h("div", { class: "hub" }, choose, tablet));
   }
@@ -266,43 +332,88 @@ export class Menus {
     return box;
   }
 
-  private hubAltar(p: HTMLElement, re: () => void): void {
-    const D = this.D, meta = this.meta, a = meta.S.alloc.altar;
-    p.append(
-      h("p", {}, "供物を捧げるほど、レベルアップで出るカードのレア度が上がる。捧げた供物はいつでも戻せる。"),
-      h("div", { class: "stepper" },
-        button("戻す", () => { meta.allocAltar(-1); re(); }, "", a <= 0),
-        h("span", { class: "count" }, `${a}`, h("span", { class: "mute small" }, ` / ${D.altar.max}`)),
-        button("捧げる", () => { meta.allocAltar(1); re(); }, "primary", a >= D.altar.max || meta.offeringsFree() < 1)),
-      h("h3", {}, "いまの排出率"),
-      this.rarityBars(a),
-    );
-  }
+  // ---------------------------------------------------------------- 祭壇の樹
+  private hubTree(p: HTMLElement, re: () => void): void {
+    const D = this.D, meta = this.meta, hub = this.hub;
+    if (!meta.treeNode(hub.node)) hub.node = D.tree[0].id;
+    const cols = Math.max(...D.tree.map((n) => n.x)) + 1;
+    const rows = Math.max(...D.tree.map((n) => n.y)) + 1;
 
-  private hubLibrary(p: HTMLElement, re: () => void): void {
-    const L = this.D.library, meta = this.meta;
-    if (!meta.libraryUnlocked()) {
-      p.append(h("div", { class: "empty" }, `累計の生存時間が ${fmt(L.unlock_total_survival)} に達すると開く（いま ${fmt(meta.S.progress.total_survival)}）。`));
-      return;
+    // 枝（親→子）を SVG の線で、節をグリッドに置く。座標は data の x, y
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${cols * 100} ${rows * 100}`);
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("aria-hidden", "true");
+    for (const n of D.tree) {
+      for (const pid of n.parents) {
+        const pn = meta.treeNode(pid)!;
+        const path = document.createElementNS(NS, "path");
+        const x1 = pn.x * 100 + 50, y1 = pn.y * 100 + 50, x2 = n.x * 100 + 50, y2 = n.y * 100 + 50;
+        path.setAttribute("d", `M${x1} ${y1} C${x1} ${(y1 + y2) / 2} ${x2} ${(y1 + y2) / 2} ${x2} ${y2}`);
+        path.setAttribute("class", meta.nodeOpen(n.id) ? "lit" : meta.nodeOpen(pid) ? "reach" : "");
+        svg.append(path);
+      }
     }
-    p.append(h("p", {}, `「縁」を結んだカードは出やすくなる（1つにつき ×${1 + L.affinity_step}、最大${L.affinity_max}）。「封印」したカードは新しく取る候補から外れる（供物${L.seal_cost}、最大${L.seal_max}枚）。どちらもいつでも戻せる。`),
-      h("p", { class: "small mute" }, `封印 ${meta.S.alloc.seals.length} / ${L.seal_max}`));
-    const list = h("div", { class: "alloc" });
-    const cards: [string, string, string][] = [
-      ...Object.keys(this.D.weapons).map((id): [string, string, string] => [id, this.D.weapons[id].name, "武器"]),
-      ...Object.keys(this.D.passives).map((id): [string, string, string] => [id, this.D.passives[id].name, "パッシブ"]),
+    const grid = h("div", { class: "tree-grid", style: `grid-template-columns:repeat(${cols},minmax(0,1fr));grid-template-rows:repeat(${rows},var(--tree-row))` });
+    for (const n of D.tree) {
+      const open = meta.nodeOpen(n.id), block = meta.nodeBlock(n.id);
+      const reach = !open && n.parents.every((x) => meta.nodeOpen(x));
+      const state = open ? "open" : block === "" ? "ready" : reach ? "reach" : "far";
+      grid.append(h("button", {
+        type: "button", class: `node ${state}${n.parents.length === 0 ? " root" : ""}`, "aria-pressed": String(hub.node === n.id),
+        style: `grid-column:${n.x + 1};grid-row:${n.y + 1}`, onclick: () => { hub.node = n.id; re(); },
+      }, h("span", { class: "nn" }, n.name), h("span", { class: "nc" }, open ? (n.parents.length ? "開いた" : "") : `供物 ${n.cost}`)));
+    }
+    const left = h("div", { class: "choose", "data-scroll": "tree" },
+      h("div", { class: "tree" }, svg, grid),
+      h("p", { class: "small faint legend" }, h("i", { class: "k open" }), "開いた", h("i", { class: "k ready" }), "開ける", h("i", { class: "k reach" }), "供物か条件が足りない", h("i", { class: "k far" }), "まだ先"));
+
+    // 縁と封印（枠を開いた時だけ）
+    const ap = meta.affinityPoints(), ss = meta.sealSlots();
+    if (ap > 0 || ss > 0) {
+      const L = D.library;
+      const list = h("div", { class: "alloc" });
+      const cards: [string, string, string][] = [
+        ...Object.keys(D.weapons).map((id): [string, string, string] => [id, D.weapons[id].name, "武器"]),
+        ...Object.keys(D.passives).map((id): [string, string, string] => [id, D.passives[id].name, "パッシブ"]),
+      ];
+      for (const [id, name, kind] of cards) {
+        const af = meta.affinity(id), sealed = meta.sealed(id);
+        list.append(h("div", { class: `r${sealed ? " sealed" : ""}` },
+          h("div", { class: "nm" }, name, h("small", {}, `${kind}${af > 0 ? `　出やすさ ×${(1 + af * L.affinity_step).toFixed(2)}` : ""}${sealed ? "　封印中" : ""}`)),
+          ap > 0 ? h("span", { class: "pips" }, "●".repeat(af) + "○".repeat(L.affinity_max - af)) : h("span"),
+          ap > 0 ? button("−", () => { meta.allocAffinity(id, -1); re(); }, "", af <= 0) : h("span"),
+          ap > 0 ? button("＋縁", () => { meta.allocAffinity(id, 1); re(); }, "", sealed || af >= L.affinity_max || meta.affinityUsed() >= ap) : h("span"),
+          ss > 0 ? button(sealed ? "封印を解く" : "封印", () => { meta.toggleSeal(id); re(); }, "", !sealed && (meta.S.alloc.seals.length >= ss || af > 0)) : h("span")));
+      }
+      left.append(h("div", { class: "section" },
+        h("h3", {}, `縁と封印　縁 ${meta.affinityUsed()} / ${ap}　封印 ${meta.S.alloc.seals.length} / ${ss}`),
+        h("p", { class: "small" }, `縁を結んだカードはレベルアップで出やすくなる（1つにつき ×${1 + L.affinity_step}、1枚に最大${L.affinity_max}）。封印したカードは新しく取る候補から外れる。何度でも付け替えられる。`),
+        list));
+    }
+
+    // 右: 選んだ節の札
+    const n = meta.treeNode(hub.node)!;
+    const open = meta.nodeOpen(n.id), block = meta.nodeBlock(n.id);
+    const eff = meta.cardMods();
+    const sum: [string, string][] = [
+      ["レア度", `${eff.altar} / ${D.altar.max}`],
+      ["縁", `${meta.affinityUsed()} / ${ap}`],
+      ["封印", `${meta.S.alloc.seals.length} / ${ss}`],
+      ["亡霊の攻撃", `+${Math.round((eff.ghost_atk ?? 0) * 100)}%`],
     ];
-    for (const [id, name, kind] of cards) {
-      const af = meta.affinity(id), sealed = meta.sealed(id);
-      list.append(h("div", { class: `r${sealed ? " sealed" : ""}` },
-        h("div", { class: "nm" }, name, h("small", {}, `${kind}${af > 0 ? `　出やすさ ×${(1 + af * L.affinity_step).toFixed(2)}` : ""}${sealed ? "　封印中" : ""}`)),
-        h("span", { class: "pips" }, "●".repeat(af) + "○".repeat(L.affinity_max - af)),
-        button("−", () => { meta.allocAffinity(id, -1); re(); }, "", af <= 0),
-        button("＋縁", () => { meta.allocAffinity(id, 1); re(); }, "", sealed || af >= L.affinity_max || meta.offeringsFree() < 1),
-        button(sealed ? "封印を解く" : "封印", () => { meta.toggleSeal(id); re(); }, "",
-          !sealed && (meta.S.alloc.seals.length >= L.seal_max || meta.offeringsFree() < L.seal_cost || af > 0))));
-    }
-    p.append(list);
+    if (eff.taint_resist) sum.push(["穢れの重さ", `−${Math.round(eff.taint_resist * 100)}%`]);
+    const dl = h("dl", {});
+    for (const [k, v] of sum) dl.append(h("dt", {}, k), h("dd", {}, v));
+    const aside = h("aside", { class: "tablet node-card" },
+      h("div", { class: "nh" }, h("span", { class: "serif" }, n.name), h("span", { class: `state ${open ? "open" : ""}` }, open ? "開いた" : `供物 ${n.cost}`)),
+      h("p", {}, n.desc),
+      open ? null : button(block === "" ? `開く（供物 ${n.cost}）` : block, () => { if (meta.openNode(n.id)) re(); }, "primary", block !== ""),
+      h("h3", {}, "いまの効果"), dl,
+      h("h3", {}, "レベルアップのレア度"), this.rarityBars(eff.altar),
+      meta.S.tree.length > 0 ? button("樹をほどく（供物を全部戻す）", () => this.showConfirm("樹をほどく", "開いた節と縁・封印をすべて外し、払った供物を全部戻す。あとで好きな枝に開き直せる。", () => { meta.resetTree(); re(); }, re, "ほどく"), "quiet") : null);
+    p.append(h("div", { class: "hub tree-hub" }, left, aside));
   }
 
   private hubShelf(p: HTMLElement): void {
@@ -320,9 +431,9 @@ export class Menus {
   }
 
   // ---------------------------------------------------------------- confirm / level / pause / settings
-  showConfirm(title: string, body: string, onYes: () => void, onNo: () => void): void {
+  showConfirm(title: string, body: string, onYes: () => void, onNo: () => void, yes = "出撃する"): void {
     const p = this.open("narrow");
-    p.append(h("h2", {}, title), h("p", {}, body), h("div", { class: "row" }, button("出撃する", onYes, "primary"), button("戻る", onNo)));
+    p.append(h("h2", {}, title), h("p", {}, body), h("div", { class: "row" }, button(yes, onYes, "primary"), button("戻る", onNo)));
   }
 
   showLevel(sim: RunSim, choices: Card[], onPick: (c: Card) => void): void {
@@ -413,6 +524,9 @@ export class Menus {
       const l = meta.lineage(id);
       p.append(h("div", { class: "notice" }, h("b", {}, `家系「${l.name}」が解放された`), h("span", { class: "small mute" }, `${l.motto}。次の出撃から選べる。`)));
     }
+    if (out?.purified) p.append(h("div", { class: "notice soul" }, h("b", {}, "怨霊を祓った"), h("span", { class: "small mute" }, `${out.purified}は鎮まった。穢れが1つ消え、供物 +${this.D.rites.wraith.purify_offerings}。`)));
+    else if (out?.wraith_escaped) p.append(h("p", { class: "small taint" }, `怨霊「${out.wraith_escaped}」は祓えなかった。次のランでまた現れる。`));
+    if (out?.devoured) p.append(h("div", { class: "notice taint" }, h("b", {}, `${out.devoured}を喰らった`), h("span", { class: "small mute" }, "怨霊となって、次からのランで襲ってくる。穢れ +1。")));
     if (out?.consumed_ghost) p.append(h("p", { class: "small" }, `${out.consumed_ghost}は成仏した。`));
     if (out?.used_heirloom) p.append(h("p", { class: "small" }, `形見「${out.used_heirloom}」を使い切った。`));
     if (sim.result === "player_death") {

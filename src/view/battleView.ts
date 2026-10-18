@@ -119,6 +119,15 @@ export class BattleView {
         ctx.strokeStyle = C.night; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 0.55, 0, 7); ctx.stroke();
         ctx.lineWidth = 1.5;
+      } else if (e.kind === "wraith" && vis(e.x, e.y, e.r + 12)) {
+        // 怨霊: 揺らぐ二重の輪（色は元の亡霊の等級）
+        const wob = Math.sin(sim.t * 5) * 3;
+        ctx.strokeStyle = C.taint; ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 6 + wob, 0, 7); ctx.stroke();
+        ctx.globalAlpha = 0.35;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 13 - wob, 0, 7); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.lineWidth = 1.5;
       }
     }
 

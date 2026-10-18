@@ -164,6 +164,19 @@ test("古いセーブに新項目を補う", () => {
   assert.ok(d.offerings && Array.isArray(d.alloc.seals) && d.progress.generation === 0 && d.progress.deaths === 3);
 });
 
+test("v1 のセーブ: 祭壇・書庫に払っていた供物は全部戻る", () => {
+  const w = new World();
+  w.kv.setItem("test", JSON.stringify({
+    schema_version: 1, ghosts: [], run_history: [], settled_runs: [], offerings: { earned: 9 },
+    alloc: { altar: 4, affinity: { fire: 2 }, seals: ["bow"] },
+  }));
+  w.reload();
+  assert.equal(w.repo.data.schema_version, 2);
+  assert.deepEqual(w.repo.data.tree, []);
+  assert.deepEqual(w.repo.data.alloc, { affinity: {}, seals: [] });
+  assert.equal(w.meta.offeringsFree(), 9);
+});
+
 test("供物: 生存6/10 + 撃破200 = 8、世代が1進む", () => {
   const w = new World();
   const r = w.sortie("", "", "short", "bow", 21)!;
@@ -173,17 +186,36 @@ test("供物: 生存6/10 + 撃破200 = 8、世代が1進む", () => {
   assert.equal(w.repo.data.progress.generation, 1);
 });
 
-test("供物の割り振りの上限", () => {
+test("祭壇の樹: 親から順に・供物の分だけ開け、ほどくと全額戻る", () => {
   const w = new World();
   w.repo.data.offerings.earned = 5;
+  assert.ok(!w.meta.openNode("rar2"), "手前の節が開いていない");
+  assert.ok(w.meta.openNode("rar1"));
+  assert.equal(w.meta.cardMods().altar, 2);
+  assert.equal(w.meta.nodeBlock("aff1"), "累計の生存時間 5分で開ける");
   w.repo.data.progress.total_survival = 9999;
-  assert.ok(w.meta.allocAltar(3));
+  assert.ok(w.meta.openNode("aff1"));
+  assert.equal(w.meta.offeringsFree(), 2);
+  assert.ok(!w.meta.openNode("rar2"), "供物が足りない");
   assert.ok(w.meta.allocAffinity("fire", 2));
-  assert.ok(!w.meta.allocAltar(1), "供物が足りなければ捧げられない");
-  assert.ok(!w.meta.toggleSeal("bow"), "封印は供物2が必要");
-  assert.ok(w.meta.allocAltar(-3) && w.meta.toggleSeal("bow"), "戻した供物で封印できる");
+  assert.ok(!w.meta.allocAffinity("bow", 1), "縁は樹で開いた数まで");
+  assert.ok(!w.meta.toggleSeal("bow"), "封の札を開くまで封印できない");
+  w.meta.resetTree();
+  assert.equal(w.meta.offeringsFree(), 5);
+  assert.equal(w.meta.affinity("fire"), 0);
+  assert.ok(w.meta.openNode("seal1") && w.meta.toggleSeal("bow"));
   assert.ok(!w.meta.allocAffinity("bow", 1), "封印中のカードに縁は結べない");
-  assert.ok(w.meta.offeringsFree() >= 0);
+  assert.ok(!w.meta.toggleSeal("swift"), "封印の枠は1つ");
+});
+
+test("祭壇の樹の合流節は、親がすべて開いてから", () => {
+  const w = new World();
+  w.repo.data.offerings.earned = 99;
+  w.repo.data.progress.total_survival = 9999;
+  for (const id of ["rar1", "rar2"]) assert.ok(w.meta.openNode(id));
+  assert.ok(!w.meta.openNode("meifu"));
+  for (const id of ["aff1", "aff2", "meifu", "rar3"]) assert.ok(w.meta.openNode(id), id);
+  assert.equal(w.meta.cardMods().altar, D.altar.max);
 });
 
 test("形見: 候補 → 棚 → 身につけて出撃 → 使い切り", () => {

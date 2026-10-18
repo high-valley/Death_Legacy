@@ -1,9 +1,10 @@
 // ランをまたぐ要素をまとめて扱う。
-//   亡霊の保管・入れ替え / 死亡した主人公から亡霊を作る / 供物と祭壇・書庫 / 形見 /
+//   亡霊の保管・入れ替え / 死亡した主人公から亡霊を作る / 供物と祭壇の樹 / 形見 / 亡霊の3択と穢れ・怨霊 /
 //   出撃予約 → チェックポイント → ラン終了処理（冪等）
-// 亡霊と形見の状態: stored → reserved（出撃中）→ consumed / 使用済み。異常終了しても reserved のまま残り、同じランを再開できる。
-import type { Balance, Lineage, RunMode, Tier } from "../data/types.ts";
-import type { CardMods, GhostRecord, Heirloom, HeirOption, RunRecord, RunResult, SaveData, Snapshot, Summary } from "./records.ts";
+// 亡霊と形見の状態: stored → reserved（出撃中）→ consumed / 使用済み（喰らった亡霊は wraith → 祓うと purified、弔うと released）。異常終了しても reserved のまま残り、同じランを再開できる。
+import type { Balance, Lineage, RunMode, Tier, TreeEffect, TreeNode } from "../data/types.ts";
+import type { RunOpts } from "../sim/runSim.ts";
+import type { ActiveRun, CardMods, GhostMode, GhostRecord, Heirloom, HeirOption, RunRecord, RunResult, SaveData, Snapshot, Summary } from "./records.ts";
 import type { SaveRepository } from "./saveRepository.ts";
 
 export function uuid(): string {
@@ -147,11 +148,11 @@ export class MetaService {
     this.repo.write();
   }
 
-  // ================================================================ offerings
+  // ================================================================ offerings / 祭壇の樹
+  /** 開いた節に払った供物の合計 */
   offeringsUsed(): number {
-    const a = this.S.alloc;
-    let n = a.altar + a.seals.length * this.D.library.seal_cost;
-    for (const k in a.affinity) n += a.affinity[k];
+    let n = 0;
+    for (const nd of this.D.tree) if (this.S.tree.includes(nd.id)) n += nd.cost;
     return n;
   }
 
@@ -159,8 +160,54 @@ export class MetaService {
     return this.S.offerings.earned - this.offeringsUsed();
   }
 
-  libraryUnlocked(): boolean {
-    return this.S.progress.total_survival >= this.D.library.unlock_total_survival;
+  treeNode(id: string): TreeNode | null {
+    return this.D.tree.find((n) => n.id === id) ?? null;
+  }
+
+  /** 根（tree[0]）は最初から開いている */
+  nodeOpen(id: string): boolean {
+    return this.D.tree[0]?.id === id || this.S.tree.includes(id);
+  }
+
+  /** 開けない理由（開ける時は ""） */
+  nodeBlock(id: string): string {
+    const n = this.treeNode(id);
+    if (!n) return "存在しない節";
+    if (this.nodeOpen(id)) return "開いている";
+    if (!n.parents.every((p) => this.nodeOpen(p))) return "手前の節を先に開く";
+    if (n.req_survival && this.S.progress.total_survival < n.req_survival) return `累計の生存時間 ${Math.floor(n.req_survival / 60)}分で開ける`;
+    if (this.offeringsFree() < n.cost) return "供物が足りない";
+    return "";
+  }
+
+  openNode(id: string): boolean {
+    if (this.nodeBlock(id) !== "") return false;
+    this.S.tree.push(id);
+    this.repo.write();
+    return true;
+  }
+
+  /** 樹をほどく: 開いた節と縁・封印をすべて外し、供物を全額戻す */
+  resetTree(): void {
+    this.S.tree = [];
+    this.S.alloc = { affinity: {}, seals: [] };
+    this.repo.write();
+  }
+
+  /** 開いた節の効果の合計 */
+  treeTotal(key: keyof TreeEffect): number {
+    let v = 0;
+    for (const n of this.D.tree) if (this.nodeOpen(n.id)) v += n.effect[key] ?? 0;
+    return v;
+  }
+
+  affinityPoints(): number { return this.treeTotal("affinity_pts"); }
+  sealSlots(): number { return this.treeTotal("seal_slots"); }
+
+  affinityUsed(): number {
+    let n = 0;
+    for (const k in this.S.alloc.affinity) n += this.S.alloc.affinity[k];
+    return n;
   }
 
   shelfUnlocked(): boolean {
@@ -177,22 +224,18 @@ export class MetaService {
 
   cardMods(): CardMods {
     const a = this.S.alloc;
-    return { altar: a.altar, affinity: { ...a.affinity }, seals: [...a.seals] };
+    return {
+      altar: Math.min(this.D.altar.max, this.treeTotal("altar")), affinity: { ...a.affinity }, seals: [...a.seals],
+      ghost_atk: this.treeTotal("ghost_atk"), devour_bonus: this.treeTotal("devour_bonus"), taint_resist: Math.min(1, this.treeTotal("taint_resist")),
+    };
   }
 
-  allocAltar(delta: number): boolean {
-    const a = this.S.alloc;
-    const nv = a.altar + delta;
-    if (nv < 0 || nv > this.D.altar.max || (delta > 0 && this.offeringsFree() < delta)) return false;
-    a.altar = nv;
-    this.repo.write();
-    return true;
-  }
-
+  /** 縁の付け外し（樹で開いた数の中で。供物はかからない） */
   allocAffinity(id: string, delta: number): boolean {
     const a = this.S.alloc;
     const nv = this.affinity(id) + delta;
-    if (nv < 0 || nv > this.D.library.affinity_max || (delta > 0 && (this.offeringsFree() < delta || this.sealed(id) || !this.libraryUnlocked()))) return false;
+    if (nv < 0 || nv > this.D.library.affinity_max) return false;
+    if (delta > 0 && (this.sealed(id) || this.affinityUsed() + delta > this.affinityPoints())) return false;
     if (nv === 0) delete a.affinity[id];
     else a.affinity[id] = nv;
     this.repo.write();
@@ -200,15 +243,67 @@ export class MetaService {
   }
 
   toggleSeal(id: string): boolean {
-    const a = this.S.alloc, L = this.D.library;
+    const a = this.S.alloc;
     if (this.sealed(id)) {
       a.seals = a.seals.filter((s) => s !== id);
     } else {
-      if (!this.libraryUnlocked() || a.seals.length >= L.seal_max || this.offeringsFree() < L.seal_cost || this.affinity(id) > 0) return false;
+      if (a.seals.length >= this.sealSlots() || this.affinity(id) > 0) return false;
       a.seals.push(id);
     }
     this.repo.write();
     return true;
+  }
+
+  // ================================================================ 亡霊の3択（連れていく / 喰らう / 弔う）と穢れ
+  /** 怨霊（喰らわれた亡霊）。古い順 */
+  wraiths(): GhostRecord[] {
+    return this.S.ghosts.filter((g) => g.status === "wraith");
+  }
+
+  /** 穢れ = まだ祓っていない怨霊の数 */
+  taint(): number {
+    return this.wraiths().length;
+  }
+
+  /** 穢れで敵のHPが増える割合（清めの塩で軽くなる） */
+  taintHpBonus(): number {
+    return this.taint() * this.D.rites.wraith.enemy_hp_per_taint * (1 - Math.min(1, this.treeTotal("taint_resist")));
+  }
+
+  /** 喰らった時の力（与ダメージ・最大HPの増分） */
+  devourPower(g: GhostRecord): { might: number; hp: number } {
+    const R = this.D.rites.devour, m = this.tier(g.tier_id).mult * (1 + this.treeTotal("devour_bonus"));
+    return { might: R.might_per_mult * m, hp: R.hp_per_mult * m };
+  }
+
+  mournOfferings(g: GhostRecord): number {
+    const R = this.D.rites.mourn;
+    return Math.round((R.base + R.per_mult * this.tier(g.tier_id).mult) * (1 + this.treeTotal("mourn_bonus")));
+  }
+
+  /** 弔う: その場で成仏させ、供物を得る。戻せない */
+  mourn(ghostId: string): number {
+    const g = this.getGhost(ghostId);
+    if (!g || g.status !== "stored") return 0;
+    const n = this.mournOfferings(g);
+    g.status = "released";
+    g.consumed_at = now();
+    this.S.offerings.earned += n;
+    this.S.offerings.mourned += n;
+    this.repo.write();
+    return n;
+  }
+
+  /** 出撃中のランを作るための材料（出撃・再開・テストで共通） */
+  runOpts(ar: ActiveRun): RunOpts {
+    const g = ar.ghost_id ? this.getGhost(ar.ghost_id) : null;
+    const devour = ar.ghost_mode === "devour";
+    return {
+      run_id: ar.run_id, seed: ar.seed, mode: ar.mode, weapon: ar.weapon, lineage: ar.lineage_id,
+      ghost: devour ? null : g, devour: devour && g ? { rec: g, ...this.devourPower(g) } : null,
+      wraith: ar.wraith_id ? this.getGhost(ar.wraith_id) : null, taint_hp: this.taintHpBonus(),
+      heirloom: ar.heirloom_id ? this.getHeir(ar.heirloom_id) : null, card_mods: this.cardMods(), checkpoint: ar.checkpoint,
+    };
   }
 
   // ================================================================ lineages
@@ -245,7 +340,7 @@ export class MetaService {
 
   // ================================================================ sortie / settlement
   /** 出撃確定の瞬間に保存。亡霊・形見は reserved になり、異常終了しても複製されない */
-  reserve(runId: string, seed: number, mode: RunMode, weapon: string, ghostId: string, heirId: string, lineageId = "nameless"): boolean {
+  reserve(runId: string, seed: number, mode: RunMode, weapon: string, ghostId: string, heirId: string, lineageId = "nameless", ghostMode: GhostMode = "bring"): boolean {
     if (this.S.active_run) return false;
     if (!this.lineageUnlocked(lineageId)) return false; // 未解放の家系では出撃できない
     const lin = this.lineage(lineageId);
@@ -261,7 +356,12 @@ export class MetaService {
     }
     if (g) { g.status = "reserved"; g.reserved_by_run = runId; }
     if (h) { h.status = "reserved"; h.reserved_by_run = runId; }
-    this.S.active_run = { run_id: runId, seed, mode, weapon, ghost_id: ghostId, heirloom_id: heirId, lineage_id: lin.id, started_at: now(), checkpoint: null };
+    // 怨霊は一番古いものから1体ずつ現れる（再開しても同じ怨霊になるよう出撃時に決める）
+    const wraith = this.wraiths()[0];
+    this.S.active_run = {
+      run_id: runId, seed, mode, weapon, ghost_id: ghostId, heirloom_id: heirId, lineage_id: lin.id, started_at: now(), checkpoint: null,
+      ghost_mode: g ? ghostMode : "bring", wraith_id: wraith ? wraith.ghost_id : "",
+    };
     this.repo.write();
     return true;
   }
@@ -283,15 +383,37 @@ export class MetaService {
       selected_ghost_id: sm.ghost_id, player_build: { weapons: sm.weapons, passives: sm.passives }, player_level: sm.level,
       kills: sm.kills, boss_kills: sm.boss_kills, ended_at: ended, consumed_ghost: "", new_ghost_id: "", new_ghost_pending: false,
       used_heirloom: "", offerings: 0, generation: 0, lineage_id: sm.lineage_id, unlocked_lineages: [],
+      ghost_mode: sm.ghost_mode ?? "bring",
     };
-    // ① 同行亡霊は結果にかかわらず消費
+    const devour = sm.ghost_mode === "devour";
+    // ① 同行亡霊は結果にかかわらず消費。喰らった亡霊は怨霊になる（穢れ +1）
     if (sm.ghost_id) {
       const g = this.getGhost(sm.ghost_id);
       if (g && g.status === "reserved" && g.reserved_by_run === sm.run_id) {
-        g.status = "consumed";
         g.consumed_by_run = sm.run_id;
         g.consumed_at = ended;
-        out.consumed_ghost = g.display_name;
+        if (devour) {
+          g.status = "wraith";
+          g.wraith_since = ended;
+          out.devoured = g.display_name;
+        } else {
+          g.status = "consumed";
+          out.consumed_ghost = g.display_name;
+        }
+      }
+    }
+    // 怨霊を倒していれば祓う（穢れ −1・供物）。倒せなければ残る
+    let purifyOffer = 0;
+    if (sm.wraith_id) {
+      const w = this.getGhost(sm.wraith_id);
+      if (w && w.status === "wraith") {
+        if (sm.wraith_purified) {
+          w.status = "purified";
+          out.purified = w.display_name;
+          purifyOffer = D.rites.wraith.purify_offerings;
+        } else {
+          out.wraith_escaped = w.display_name;
+        }
       }
     }
     // ② 死亡時だけ新しい亡霊。満杯なら pending にして入れ替えを選ばせる（捨てない）
@@ -311,7 +433,7 @@ export class MetaService {
     if (res === "boss_cleared") s.progress.clears += 1;
     s.progress.runs += 1;
     // 家系の解放条件の記録 → 解放判定
-    if (sm.ghost_id) s.progress.companion_runs += 1;
+    if (sm.ghost_id && !devour) s.progress.companion_runs += 1;
     for (const id in sm.weapons) s.progress.best_weapon_level[id] = Math.max(s.progress.best_weapon_level[id] ?? 0, sm.weapons[id]);
     out.unlocked_lineages = this.checkUnlocks();
     // ③ 世代交代: 供物・形見の候補・世代数
@@ -319,6 +441,7 @@ export class MetaService {
     const frac = Math.min(1, sm.t / sm.run_len);
     let offer = Math.floor(frac * 10) * of.per_tenth_survived + Math.floor(sm.kills / 100) * of.per_100_kills + (res === "boss_cleared" ? of.clear_bonus : 0);
     if (res === "retired") offer = Math.floor(offer * of.retire_rate);
+    offer += purifyOffer;
     s.offerings.earned += offer;
     out.offerings = offer;
     s.progress.generation += 1;
@@ -345,7 +468,7 @@ export class MetaService {
     s.settled_runs.push(sm.run_id);
     s.settled_runs = s.settled_runs.slice(-100);
     s.active_run = null;
-    const gone = s.ghosts.filter((g) => g.status === "consumed" || g.status === "released");
+    const gone = s.ghosts.filter((g) => g.status === "consumed" || g.status === "released" || g.status === "purified");
     if (gone.length > 30) {
       const drop = new Set(gone.slice(0, gone.length - 30).map((g) => g.ghost_id));
       s.ghosts = s.ghosts.filter((g) => !drop.has(g.ghost_id));
@@ -364,6 +487,7 @@ export class MetaService {
       main_weapon: ar.weapon, weapons: cp?.weapons ?? { [ar.weapon]: 1 }, passives: cp?.passives ?? {}, ppow: cp?.ppow ?? {},
       wbonus: cp?.wbonus ?? {}, evolved: cp?.evolved ?? {}, level: cp?.level ?? 1, kills: cp?.kills ?? 0,
       boss_kills: 0, death_cause: "", ghost_id: ar.ghost_id, heirloom_id: ar.heirloom_id ?? "", lineage_id: ar.lineage_id ?? "nameless",
+      ghost_mode: ar.ghost_mode ?? "bring", wraith_id: ar.wraith_id ?? "", wraith_purified: cp?.wraith_dead ?? false,
     };
     return this.settle(sm, "retired");
   }

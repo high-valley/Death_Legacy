@@ -28,7 +28,7 @@ export function loadBalance(raw: unknown): Loaded {
 
   const D = raw as Balance;
   if (!need(raw, ["schema_version", "data_version", "run_length", "vault_capacity", "tiers", "ghost_unlock", "player", "xp", "weapons",
-    "passives", "rarities", "maxed_weapon_bonus", "evolutions", "offerings", "altar", "library", "shelf", "enemies", "spawn", "checkpoint_interval", "lineages"], "balance")) {
+    "passives", "rarities", "maxed_weapon_bonus", "evolutions", "offerings", "altar", "library", "tree", "rites", "shelf", "enemies", "spawn", "checkpoint_interval", "lineages"], "balance")) {
     return { D, errors };
   }
   // 等級は生存割合の昇順で、最初は0から
@@ -76,6 +76,28 @@ export function loadBalance(raw: unknown): Loaded {
     }
   });
   if (D.lineages.length === 0) errors.push("lineages: 1つ以上必要");
+  // 祭壇の樹: 根は1つ（費用0・親なし）、親は先に定義された節、レア度の合計は altar.max 以下
+  const nids = new Set<string>();
+  let altarSum = 0;
+  const effKeys = ["altar", "affinity_pts", "seal_slots", "ghost_atk", "devour_bonus", "taint_resist", "mourn_bonus"];
+  D.tree.forEach((n, i) => {
+    if (!need(n, ["id", "name", "x", "y", "cost", "parents", "desc", "effect"], `tree[${i}]`)) return;
+    if (nids.has(n.id)) errors.push(`tree: id '${n.id}' が重複`);
+    if (i === 0 && (n.parents.length > 0 || n.cost !== 0)) errors.push("tree[0] は根（parents: []、cost: 0）にする");
+    if (i > 0 && n.parents.length === 0) errors.push(`tree[${n.id}]: 親がない`);
+    for (const p of n.parents) if (!nids.has(p)) errors.push(`tree[${n.id}]: 親 '${p}' が先に定義されていない`);
+    for (const k of Object.keys(n.effect)) if (!effKeys.includes(k)) errors.push(`tree[${n.id}]: 知らない効果 '${k}'`);
+    altarSum += n.effect.altar ?? 0;
+    nids.add(n.id);
+  });
+  if (altarSum > D.altar.max) errors.push(`tree: altar の合計 ${altarSum} が altar.max ${D.altar.max} を超える`);
+  if (need(D.rites, ["devour", "mourn", "wraith"], "rites")) {
+    need(D.rites.devour, ["might_per_mult", "hp_per_mult"], "rites.devour");
+    need(D.rites.mourn, ["base", "per_mult"], "rites.mourn");
+    need(D.rites.wraith, ["at", "hp_per_mult", "short_hp_mult", "purify_offerings", "enemy_hp_per_taint"], "rites.wraith");
+    if (!(D.rites.wraith.at > 0 && D.rites.wraith.at < 1)) errors.push("rites.wraith.at は 0〜1");
+  }
+  if (!isDict(D.enemies.wraith) || D.enemies.wraith.ai !== "wraith") errors.push("enemies.wraith（ai: wraith）が必要");
   for (const [lv, u] of D.ghost_unlock) if (!(lv >= 1 && u > 0 && u <= 1)) errors.push("ghost_unlock は [レベル, 0〜1]");
   return { D, errors };
 }

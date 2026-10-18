@@ -4,7 +4,7 @@
 import { RngStreams } from "../core/rng.ts";
 import { SpatialGrid, pushPair } from "../core/spatialGrid.ts";
 import type { Balance, EnemyDef, Lineage, Rarity, RarityId, RunMode } from "../data/types.ts";
-import type { CardMods, GhostRecord, Heirloom, RunResult, Snapshot, Summary } from "../meta/records.ts";
+import type { CardMods, GhostMode, GhostRecord, Heirloom, RunResult, Snapshot, Summary } from "../meta/records.ts";
 
 export const STEP = 1 / 60;
 const TAU = Math.PI * 2;
@@ -80,7 +80,15 @@ export interface RunOpts {
   heirloom?: Heirloom | null;
   card_mods?: CardMods;
   checkpoint?: Snapshot | null;
+  /** 喰らった亡霊（同行はしない。力だけを取り込む） */
+  devour?: Devour | null;
+  /** このランに現れる怨霊 */
+  wraith?: GhostRecord | null;
+  /** 穢れによる敵HPの増分（0.12 = +12%） */
+  taint_hp?: number;
 }
+
+export interface Devour { rec: GhostRecord; might: number; hp: number }
 
 /** 配列から条件に合わないものを取り除く（新しい配列を作らない） */
 function compact<T>(arr: T[], keep: (v: T) => boolean): void {
@@ -114,6 +122,13 @@ export class RunSim {
   ghostId = "";
   heirloomId = "";
   solo: boolean;
+  ghostMode: GhostMode = "bring";
+  devour: Devour | null = null;
+  wraithRec: GhostRecord | null = null;
+  wraith: Foe | null = null;
+  wraithSpawned = false;
+  wraithDead = false;
+  taintHp = 0;
   cardMods: CardMods = { altar: 0, affinity: {}, seals: [] };
 
   t = 0;
@@ -169,7 +184,16 @@ export class RunSim {
       this.ghost = new Companion(structuredClone(o.ghost));
       this.ghostId = o.ghost.ghost_id;
     }
-    this.solo = this.ghost === null;
+    if (o.devour && !this.ghost) {
+      this.devour = { rec: structuredClone(o.devour.rec), might: o.devour.might, hp: o.devour.hp };
+      this.ghostId = o.devour.rec.ghost_id;
+      this.ghostMode = "devour";
+      this.maxHp = Math.round(this.maxHp * (1 + this.devour.hp));
+      this.hp = this.maxHp;
+    }
+    this.solo = this.ghost === null && this.devour === null;
+    if (o.wraith) this.wraithRec = structuredClone(o.wraith);
+    this.taintHp = Math.max(0, o.taint_hp ?? 0);
     if (o.heirloom) {
       this.heirloomId = o.heirloom.heir_id;
       if (!o.checkpoint) this.applyHeirloom(o.heirloom);
@@ -207,7 +231,7 @@ export class RunSim {
   progress(): number { return Math.min(1, this.t / this.runLen); }
   xpNeed(): number { return this.D.xp.base + this.level * this.D.xp.per_level; }
   pw(id: string): number { return this.ppow[id] ?? 0; }
-  mightMul(): number { return 1 + 0.12 * this.pw("might"); }
+  mightMul(): number { return (1 + 0.12 * this.pw("might")) * (1 + (this.devour?.might ?? 0)); }
   hasteMul(): number { return 1 / (1 + 0.1 * this.pw("haste")); }
   areaMul(): number { return 1 + 0.12 * this.pw("area"); }
 
@@ -328,7 +352,7 @@ export class RunSim {
     const e = new Foe(kind, def);
     e.x = this.hero.x + Math.cos(a) * d;
     e.y = this.hero.y + Math.sin(a) * d;
-    let scale = 1 + this.D.spawn.hp_growth * this.progress();
+    let scale = (1 + this.D.spawn.hp_growth * this.progress()) * (1 + this.taintHp);
     if (kind === "boss") scale = this.mode === "short" ? (def.short_hp_mult ?? 1) : 1;
     e.maxHp = def.hp * scale;
     e.hp = e.maxHp;
@@ -344,10 +368,31 @@ export class RunSim {
     this.emit({ type: "sfx", name: "boss" });
   }
 
+  /** 喰らった亡霊が怨霊になって襲ってくる。等級が高いほど硬い */
+  spawnWraith(): void {
+    const rec = this.wraithRec!, W = this.D.rites.wraith;
+    const tier = this.D.tiers.find((x) => x.id === rec.tier_id) ?? this.D.tiers[0];
+    const base = this.D.enemies.wraith;
+    const def = { ...base, name: `怨霊・${rec.display_name}`, color: tier.color };
+    const e = new Foe("wraith", def);
+    const a = this.rng.spawn.randf() * TAU;
+    e.x = this.hero.x + Math.cos(a) * 640;
+    e.y = this.hero.y + Math.sin(a) * 640;
+    e.maxHp = (base.hp + W.hp_per_mult * tier.mult) * (this.mode === "short" ? W.short_hp_mult : 1);
+    e.hp = e.maxHp;
+    e.cd = 1.5;
+    this.enemies.push(e);
+    this.wraith = e;
+    this.wraithSpawned = true;
+    this.emit({ type: "toast", text: `怨霊「${rec.display_name}」が現れた` });
+    this.emit({ type: "sfx", name: "boss" });
+  }
+
   private spawning(dt: number): void {
     const S = this.D.spawn;
     const p = this.progress();
     if (!this.bossSpawned && this.t >= this.runLen) this.spawnBoss();
+    if (this.wraithRec && !this.wraithSpawned && p >= this.D.rites.wraith.at) this.spawnWraith();
     if (this.eliteIdx < S.elites_at.length && p >= S.elites_at[this.eliteIdx]) {
       this.spawnEnemy("elite");
       this.eliteIdx++;
@@ -446,6 +491,12 @@ export class RunSim {
         this.bossKills++;
         this.end("boss_cleared");
       }
+      if (e === this.wraith) {
+        this.wraithDead = true;
+        this.wraith = null;
+        this.emit({ type: "toast", text: "怨霊を祓った。穢れが1つ消える" });
+        this.emit({ type: "sfx", name: "ghost" });
+      }
       this.emit({ type: "fx", kind: "poof", x: e.x, y: e.y, dur: 0.3, color: e.def.color });
       // 送り火: 倒した場所に小さな炎が残る
       if (this.lineage.card.id === "okuribi" && this.lpow > 0 && this.rng.lineage.randf() < Math.min(0.6, this.cardPower())) {
@@ -517,7 +568,7 @@ export class RunSim {
     g.cd -= dt;
     if (g.cd <= 0) {
       const r = g.rec, s = r.stat_snapshot, wid = r.primary_weapon_id, lv = r.weapon_level;
-      const ok = this.fireWeapon(wid, lv, g.x, g.y, 1, 0, s.attack_mult * this.ghostUnlock() * (1 + this.mod("ghost_atk")), s.area, true, !!r.evolved);
+      const ok = this.fireWeapon(wid, lv, g.x, g.y, 1, 0, s.attack_mult * this.ghostUnlock() * (1 + this.mod("ghost_atk")) * (1 + (this.cardMods.ghost_atk ?? 0)), s.area, true, !!r.evolved);
       // 鎮魂の鐘: 亡霊の攻撃間隔が短くなる
       const bell = this.lineage.card.id === "bell" ? Math.max(0.4, 1 - this.cardPower()) : 1;
       g.cd = ok ? (this.D.weapons[wid].cd / s.attack_speed) * (1 - 0.06 * (lv - 1)) * bell : 0.25;
@@ -561,6 +612,18 @@ export class RunSim {
           e.cd = def.interval ?? 2.6;
           const bs = def.bullet_speed ?? 190;
           this.eshots.push({ x: e.x, y: e.y, vx: ux * bs, vy: uy * bs, dmg: def.damage, life: 2.2, cause: "shooter" });
+        }
+        break;
+      }
+      case "wraith": {
+        // 間合いを保ちながら3方向に呪いを撃つ
+        const range = def.range ?? 230;
+        const want = d > range ? 1 : d < range - 90 ? -0.6 : 0.25;
+        e.vx = ux * sp * want - uy * sp * 0.4; e.vy = uy * sp * want + ux * sp * 0.4;
+        if (d < range + 80 && e.cd <= 0) {
+          e.cd = def.interval ?? 2.2;
+          const bs = def.bullet_speed ?? 200, a0 = Math.atan2(uy, ux);
+          for (const k of [-0.28, 0, 0.28]) this.eshots.push({ x: e.x, y: e.y, vx: Math.cos(a0 + k) * bs, vy: Math.sin(a0 + k) * bs, dmg: def.damage, life: 2.4, cause: "wraith" });
         }
         break;
       }
@@ -738,6 +801,7 @@ export class RunSim {
       weapons: { ...this.weapons }, passives: { ...this.passives }, ppow: { ...this.ppow }, wbonus: { ...this.wbonus }, evolved: { ...this.evolved },
       kills: this.kills, boss_kills: this.bossKills, boss_spawned: this.bossSpawned, elite_idx: this.eliteIdx, spawn_acc: this.spawnAcc,
       lineage_lv: this.lineageLv, lpow: this.lpow,
+      wraith_spawned: this.wraithSpawned, wraith_dead: this.wraithDead,
     };
   }
 
@@ -761,6 +825,11 @@ export class RunSim {
     this.lastCheckpoint = this.t;
     this.rng.advance(Math.floor(this.t * 3)); // 乱数列を経過時間ぶん進めて、同じ seed の流れに乗せる
     if (c.boss_spawned) this.spawnBoss();
+    this.wraithDead = !!c.wraith_dead;
+    if (c.wraith_spawned) {
+      if (this.wraithDead || !this.wraithRec) this.wraithSpawned = true;
+      else this.spawnWraith();   // 倒しきる前に中断した時は、満タンで出直す
+    }
     this.emit({ type: "toast", text: "中断したランを再開した" });
   }
 
@@ -769,7 +838,8 @@ export class RunSim {
       run_id: this.run_id, seed: this.seed, mode: this.mode, t: this.t, run_len: this.runLen, main_weapon: this.mainWeapon,
       weapons: { ...this.weapons }, passives: { ...this.passives }, ppow: { ...this.ppow }, wbonus: { ...this.wbonus }, evolved: { ...this.evolved },
       level: this.level, kills: this.kills, boss_kills: this.bossKills, death_cause: this.deathCause, ghost_id: this.ghostId, heirloom_id: this.heirloomId,
-      lineage_id: this.lineage.id,
+      lineage_id: this.lineage.id, ghost_mode: this.ghostMode,
+      wraith_id: this.wraithRec?.ghost_id ?? "", wraith_purified: this.wraithDead,
     };
   }
 

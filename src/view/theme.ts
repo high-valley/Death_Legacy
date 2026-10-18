@@ -12,4 +12,5 @@ export const C = {
   soul: "#86e0d2",    // 亡霊
   candle: "#d9a85b",  // 強調・経験値・注意
   blood: "#d65a5e",   // HP・危険
+  taint: "#b78be0",   // 穢れ・怨霊
 } as const;

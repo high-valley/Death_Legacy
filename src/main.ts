@@ -260,21 +260,20 @@ class Game {
     if (s.ghost) {
       this.hud.toast(`${s.ghost.rec.display_name}が付き従う`);
       this.sfx.play("ghost");
+    } else if (s.devour) {
+      this.hud.toast(`${s.devour.rec.display_name}を喰らった`);
+      this.sfx.play("ghost");
     }
   }
 
   private sortie(r: SortieRequest): void {
     const rid = uuid();
     // 出撃確定の瞬間に予約を保存（亡霊・形見は reserved）
-    if (!this.meta.reserve(rid, r.seed, r.mode, r.weapon, r.ghostId, r.heirId, r.lineage)) {
+    if (!this.meta.reserve(rid, r.seed, r.mode, r.weapon, r.ghostId, r.heirId, r.lineage, r.ghostMode)) {
       this.toHub();
       return;
     }
-    const ar = this.meta.S.active_run!;
-    const s = new RunSim(this.D, {
-      run_id: rid, seed: r.seed, mode: r.mode, weapon: ar.weapon, lineage: ar.lineage_id,
-      ghost: r.ghostId ? this.meta.getGhost(r.ghostId) : null, heirloom: r.heirId ? this.meta.getHeir(r.heirId) : null, card_mods: this.meta.cardMods(),
-    });
+    const s = new RunSim(this.D, this.meta.runOpts(this.meta.S.active_run!));
     this.menus.hub.ghost = "";
     this.menus.hub.heir = "";
     if (r.heirId) this.hud.toast("形見を身につけた");
@@ -284,11 +283,7 @@ class Game {
   private resume(): void {
     const ar = this.meta.S.active_run;
     if (!ar) return this.toTitle();
-    this.begin(new RunSim(this.D, {
-      run_id: ar.run_id, seed: ar.seed, mode: ar.mode, weapon: ar.weapon, lineage: ar.lineage_id,
-      ghost: ar.ghost_id ? this.meta.getGhost(ar.ghost_id) : null, heirloom: ar.heirloom_id ? this.meta.getHeir(ar.heirloom_id) : null,
-      card_mods: this.meta.cardMods(), checkpoint: ar.checkpoint,
-    }));
+    this.begin(new RunSim(this.D, this.meta.runOpts(ar)));
   }
 
   private levelUp(): void {
@@ -377,15 +372,15 @@ class Game {
   }
 
   // ---------------------------------------------------------------- demo
-  /** ?demo: 見本データ（亡霊3体・形見・供物）。本物のセーブとは別の場所に作る */
+  /** ?demo: 見本データ（亡霊3体・怨霊1体・形見・供物・樹）。本物のセーブとは別の場所に作る */
   private seedDemo(): void {
     this.repo.wipe();
-    const ws = ["bow", "fire", "sword"];
-    for (let k = 0; k < 3; k++) {
+    const ws = ["bow", "fire", "sword", "bow"];
+    for (let k = 0; k < 4; k++) {
       const rid = uuid();
       this.meta.reserve(rid, k, "short", ws[k], "", "");
       const r = new RunSim(this.D, { run_id: rid, seed: k, mode: "short", weapon: ws[k] });
-      r.t = [100, 150, 172][k];
+      r.t = [100, 150, 172, 120][k];
       r.weapons[r.mainWeapon] = 4;
       r.passives = { haste: 2 };
       r.ppow = { haste: 3 };
@@ -395,7 +390,12 @@ class Game {
       this.meta.settle(r.summary(), "player_death");
       this.meta.resolveHeirloom(0);
     }
-    this.repo.data.alloc = { altar: 4, affinity: { fire: 2, might: 1 }, seals: ["swift"] };
+    const d = this.repo.data;
+    d.ghosts[d.ghosts.length - 1].status = "wraith";   // 喰らわれて怨霊になった例
+    d.offerings.earned += 12;
+    d.progress.total_survival += 300;
+    d.tree = ["rar1", "aff1", "soul1"];
+    d.alloc = { affinity: { fire: 2 }, seals: [] };
     this.repo.data.lineages = ["nameless", "firekeeper"];
     this.repo.data.progress.companion_runs = 1;
     this.repo.write();

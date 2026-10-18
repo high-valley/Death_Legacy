@@ -7,7 +7,7 @@ export interface Rarity { id: RarityId; name: string; weight: number; color: str
 export type RarityId = "N" | "R" | "SR" | "UR" | "LR";
 export interface EnemyDef {
   name: string; hp: number; speed: number; radius: number; damage: number; xp: number;
-  ai: "chase" | "charge" | "shoot" | "boss"; color: string;
+  ai: "chase" | "charge" | "shoot" | "boss" | "wraith"; color: string;
   dash_speed?: number; range?: number; interval?: number; bullet_speed?: number; short_hp_mult?: number;
   slam?: { damage: number; radius: number; windup: number };
   nova?: { count: number; speed: number; damage: number };
@@ -25,6 +25,21 @@ export interface LineageMods {
 export interface Lineage {
   id: string; name: string; motto: string; trait: string; weakness: string;
   weapon: string | null; mods: LineageMods; card: LineageCard; unlock: LineageUnlock | null;
+}
+
+/** 祭壇の樹の節。effect の値は開いた節の分だけ足し合わせる */
+export interface TreeEffect {
+  altar?: number; affinity_pts?: number; seal_slots?: number; ghost_atk?: number;
+  devour_bonus?: number; taint_resist?: number; mourn_bonus?: number;
+}
+export interface TreeNode {
+  id: string; name: string; x: number; y: number; cost: number; parents: string[]; desc: string;
+  req_survival?: number; effect: TreeEffect;
+}
+export interface Rites {
+  devour: { might_per_mult: number; hp_per_mult: number };
+  mourn: { base: number; per_mult: number };
+  wraith: { at: number; hp_per_mult: number; short_hp_mult: number; purify_offerings: number; enemy_hp_per_taint: number };
 }
 
 export interface Balance {
@@ -48,7 +63,9 @@ export interface Balance {
   evolutions: Record<string, { name: string; desc: string }>;
   offerings: { per_tenth_survived: number; per_100_kills: number; clear_bonus: number; retire_rate: number };
   altar: { max: number; shift: Record<RarityId, number> };
-  library: { unlock_total_survival: number; affinity_step: number; affinity_max: number; seal_cost: number; seal_max: number };
+  library: { affinity_step: number; affinity_max: number };
+  tree: TreeNode[];
+  rites: Rites;
   shelf: { unlock_generation: number; capacity: number; max_level: number };
   enemies: Record<string, EnemyDef>;
   spawn: {
