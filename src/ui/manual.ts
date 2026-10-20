@@ -50,11 +50,11 @@ export function manualPage(D: Balance, ch: Chapter, touch: boolean): HTMLElement
       sec("点数の数え方", list([
         ["主人公の武器のタグ … ", h("b", {}, `${P.hero_weapon}点`), "（剣なら", tag(D, "slash"), "、炎の魔導書なら", tag(D, "fire"), "）"],
         ["連れていく亡霊1体ごと … 亡霊の武器のタグ ", h("b", {}, `${P.ghost_weapon}点`), "＋", tag(D, "spirit"), h("b", {}, ` ${P.ghost_spirit}点`)],
-        ["タグ付きのパッシブ … ", h("b", {}, `1Lvにつき${P.passive_level}点`), "（例: 刃研ぎは", tag(D, "slash"), "）"],
+        ["タグ付きのパッシブ … ", h("b", {}, `1Lvにつき${P.passive_level}点`), "（例: 刃研ぎは", tag(D, "slash"), "。2Lvで1点）"],
         ["霊廟の「武具の間」に住む亡霊 … その亡霊の武器のタグ ", h("b", {}, "1点")],
       ]),
       para("一人で出撃した時は、主人公の武器のタグに合うパッシブだけがカードに出る。亡霊を連れていく・武具の間に住まわせると、別のタグのカードも出るようになる。")),
-      sec("例", para("剣の主人公（", tag(D, ex, P.hero_weapon), "）が斧の亡霊（", tag(D, "slash", P.ghost_weapon), tag(D, "spirit", P.ghost_spirit), "）を連れて出撃 →", tag(D, ex, P.hero_weapon + P.ghost_weapon), "。刃研ぎを Lv1 取れば", tag(D, ex, P.hero_weapon + P.ghost_weapon + P.passive_level), "で、4点のセット効果まで発動する。")),
+      sec("例", para("剣の主人公（", tag(D, ex, P.hero_weapon), "）が斧の亡霊（", tag(D, "slash", P.ghost_weapon), tag(D, "spirit", P.ghost_spirit), "）を連れて出撃 →", tag(D, ex, P.hero_weapon + P.ghost_weapon), "。刃研ぎを Lv2 まで育てれば", tag(D, ex, P.hero_weapon + P.ghost_weapon + P.passive_level * 2), "で、4点のセット効果まで発動する。")),
     );
     const t = h("div", { class: "man-sets" });
     for (const id of Object.keys(D.tags)) {
@@ -63,11 +63,15 @@ export function manualPage(D: Balance, ch: Chapter, touch: boolean): HTMLElement
     }
     box.append(sec("セット効果の一覧", t));
   } else if (ch === "cards") {
-    const rl = D.rarities.map((r) => [h("b", { style: `color:${r.color}` }, r.name), r.evolve ? `　武器を最終形に進化させる（武器 Lv${D.evolve_min_level} 以上で出る）` : `　武器は +${r.wlv} Lv${r.wbonus ? `・威力 +${pct(r.wbonus)}` : ""}、パッシブは効果 ×${r.pmul}`]);
+    const rl = D.rarities.map((r) => [h("b", { style: `color:${r.color}` }, r.name), `　武器は +${r.wlv} Lv${r.wbonus ? `・威力 +${pct(r.wbonus)}` : ""}、パッシブは効果 ×${r.pmul}`]);
+    const rk = D.rank_levels;
     box.append(
       sec("レア度", para("カードの枠の色がレア度。高いほど一度に大きく強くなる。祭壇の樹で高いレア度が出やすくなる。"), list(rl)),
-      sec("武器の道と進化", para(`武器は育つと持ち替える（剣なら 短剣 → ロングソード…）。Lv3 で道を2つから選び、その先も同じ道で育つ。最大は Lv${D.weapon_max_level}。レジェンドレアのカードで最終形（デュランダルなど）に進化する。`)),
-      sec("パッシブ", para(`主人公の能力を上げるカード。持てるのは ${D.passive_slots} 種類まで、それぞれ Lv${D.passive_max_level} まで。タグ付きのものは共鳴の点数にもなる。`)),
+      sec("武器のレベルとランク", list([
+        [h("b", {}, "レベル"), `　武器カードで上がる。上がるのはダメージだけ（最大 Lv${D.weapon_max_level}。最大の後もカードでダメージを上乗せできる）。`],
+        [h("b", {}, "ランク"), `　武器が Lv${rk[0]}・Lv${rk[1]}・Lv${rk[2]} に届くと、次のレベルアップで「ランクアップ」の札が出る。取ると武器そのものが変わり、攻撃の形が変わる（剣なら 短剣 → ロングソード／レイピアの道を選ぶ → グレートソード／エストック → デュランダルに進化）。`],
+      ])),
+      sec("パッシブ", para(`主人公の能力を上げるカード。持てるのは ${D.passive_slots} 種類まで、それぞれ Lv${D.passive_max_level} まで。全部は育ちきらないので、どれを伸ばすかを選ぶ。タグ付きのものは1Lvにつき共鳴の点数 ${D.tag_points.passive_level} 点。`)),
       sec("刻印", para("まれに混ざる特別なカード（金色）。一度取るとそのラン中ずっと効く強い効果。祭壇の樹の書架を開くと種類が増える。")),
       sec("呪い", para("良いことと悪いことがセットになったカード（紫）。祭壇の樹の「禁忌の頁」を開くと出るようになる。取るかどうかは自由。"),
         list(D.curses.map((c) => [h("b", {}, c.name), `　${c.desc}`]))),

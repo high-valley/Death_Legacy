@@ -16,7 +16,7 @@
   "player": { "weapon_mult": 1.0, "hp": 120, "speed": 205, "radius": 12, "dash_speed": 720, "dash_time": 0.16, "dash_cd": 1.5, "hit_iframe": 0.6, "pickup": 100 },
   "xp": { "base": 4, "per_level": 3 },
   "weapons": {
-    "sword": { "name": "剣", "desc": "近くの敵を扇形に斬る", "tags": ["slash"], "cd": 0.9, "damage": 20, "range": 92, "per_level": 0.2,
+    "sword": { "name": "剣", "desc": "近くの敵を扇形に斬る", "tags": ["slash"], "cd": 0.9, "damage": 20, "range": 92, "per_level": 0.066,
       "grades": [
         { "lv": 1, "name": "短剣",           "desc": "素早く短く斬る",                 "cd": 0.6,  "dmg": 0.95, "range": 0.9,  "arc": 1.7, "dirs": 1 },
         { "lv": 3, "branch": "a", "name": "ロングソード",   "desc": "前と後ろを同時に斬る",   "cd": 0.95, "dmg": 1.1, "range": 1.05, "arc": 1.9, "dirs": 2 },
@@ -25,7 +25,7 @@
         { "lv": 5, "branch": "b", "name": "エストック",     "desc": "遠くまで鋭く連続で斬る", "cd": 0.38, "dmg": 1.15, "range": 1.45, "arc": 1.1, "dirs": 1 },
         { "evo": true, "name": "デュランダル", "desc": "全周を薙ぎ払う聖剣",                 "cd": 1.1,  "dmg": 2.1, "range": 1.45, "arc": 6.3, "dirs": 1 }
       ] },
-    "bow": { "name": "弓", "desc": "近くの敵を射抜く", "tags": ["shot"], "cd": 0.65, "damage": 11, "speed": 560, "per_level": 0.18,
+    "bow": { "name": "弓", "desc": "近くの敵を射抜く", "tags": ["shot"], "cd": 0.65, "damage": 11, "speed": 560, "per_level": 0.06,
       "grades": [
         { "lv": 1, "name": "ショートボウ",       "desc": "軽く速い矢を1本",                 "cd": 0.85, "dmg": 1.0, "count": 1, "pierce": 0, "speed": 1.0 },
         { "lv": 3, "branch": "a", "name": "ロングボウ",     "desc": "矢が2本・1体を貫通",     "cd": 1.0,  "dmg": 1.1, "count": 2, "pierce": 1, "speed": 1.2 },
@@ -34,7 +34,7 @@
         { "lv": 5, "branch": "b", "name": "リピーター",     "desc": "2本ずつ、さらに速く連射", "cd": 0.42, "dmg": 1.05, "count": 2, "pierce": 1, "speed": 1.4 },
         { "evo": true, "name": "フェイルノート", "desc": "必中の弓。矢が6本・3体を貫通", "cd": 1.0, "dmg": 1.7, "count": 6, "pierce": 3, "speed": 1.4 }
       ] },
-    "fire": { "name": "炎の魔導書", "desc": "炎を呼び、着弾した場所を焼き続ける", "tags": ["fire"], "cd": 2.0, "damage": 7, "radius": 68, "burn": 2.6, "tick": 0.4, "per_level": 0.25,
+    "fire": { "name": "炎の魔導書", "desc": "炎を呼び、着弾した場所を焼き続ける", "tags": ["fire"], "cd": 2.0, "damage": 7, "radius": 68, "burn": 2.6, "tick": 0.4, "per_level": 0.083,
       "grades": [
         { "lv": 1, "name": "ファイア",           "desc": "小さな火を落とす",               "cd": 0.9, "dmg": 0.9, "count": 1, "radius": 0.85, "burn": 0.9 },
         { "lv": 3, "branch": "a", "name": "フレイム",       "desc": "大きな炎で焼く",         "cd": 1.0, "dmg": 1.1, "count": 1, "radius": 1.05, "burn": 1.0 },
@@ -43,7 +43,7 @@
         { "lv": 5, "branch": "b", "name": "メテオ",         "desc": "巨大な火球が1つ。とても広く焼く", "cd": 1.2, "dmg": 2.0, "count": 1, "radius": 1.9, "burn": 1.1 },
         { "evo": true, "name": "エクスプロージョン", "desc": "究極の炎魔法。炎が3か所・広く・長く燃える", "cd": 1.0, "dmg": 1.5, "count": 3, "radius": 1.4, "burn": 1.5 }
       ] },
-    "ice": { "name": "氷の魔導書", "desc": "氷の刃を放ち、当たった敵を遅くする", "tags": ["ice"], "cd": 0.95, "damage": 21, "speed": 430, "slow": 0.5, "slow_time": 1.6, "per_level": 0.2,
+    "ice": { "name": "氷の魔導書", "desc": "氷の刃を放ち、当たった敵を遅くする", "tags": ["ice"], "cd": 0.95, "damage": 21, "speed": 430, "slow": 0.5, "slow_time": 1.6, "per_level": 0.066,
       "grades": [
         { "lv": 1, "name": "アイス",             "desc": "氷の刃を1本。当たった敵を遅くする", "cd": 0.9,  "dmg": 1.0, "count": 1, "pierce": 1 },
         { "lv": 3, "branch": "a", "name": "フロスト",       "desc": "氷の刃が3本に広がる",     "cd": 1.0,  "dmg": 1.1, "count": 3, "pierce": 1 },
@@ -52,7 +52,7 @@
         { "lv": 5, "branch": "b", "name": "グレイシャルランス", "desc": "氷の槍が2本、6体を貫き凍らせる", "cd": 0.95, "dmg": 2.0, "count": 2, "pierce": 6, "freeze": 0.6 },
         { "evo": true, "name": "アブソリュートゼロ", "desc": "究極の氷魔法。全方位へ氷の刃、長く凍らせる", "cd": 1.0, "dmg": 1.5, "count": 12, "pierce": 3, "freeze": 0.9 }
       ] },
-    "thunder": { "name": "雷の魔導書", "desc": "雷が敵から敵へ飛び移る", "tags": ["thunder"], "cd": 1.3, "damage": 20, "range": 340, "jump": 150, "per_level": 0.2,
+    "thunder": { "name": "雷の魔導書", "desc": "雷が敵から敵へ飛び移る", "tags": ["thunder"], "cd": 1.3, "damage": 20, "range": 340, "jump": 150, "per_level": 0.066,
       "grades": [
         { "lv": 1, "name": "サンダー",           "desc": "雷が2体に飛び移る",               "cd": 1.0, "dmg": 1.0, "count": 1, "chain": 2 },
         { "lv": 3, "branch": "a", "name": "ライトニング",   "desc": "雷が4体に飛び移る",       "cd": 1.0, "dmg": 1.1, "count": 1, "chain": 4 },
@@ -61,7 +61,7 @@
         { "lv": 5, "branch": "b", "name": "プラズマ",       "desc": "雷が2筋、とても速く連発", "cd": 0.45, "dmg": 0.95, "count": 2, "chain": 3 },
         { "evo": true, "name": "ジャッジメント", "desc": "究極の雷魔法。雷が3筋、それぞれ8体に", "cd": 0.95, "dmg": 1.55, "count": 3, "chain": 8 }
       ] },
-    "spear": { "name": "槍", "desc": "一直線に突き、並んだ敵をまとめて貫く", "tags": ["pierce"], "cd": 0.75, "damage": 50, "length": 150, "width": 26, "per_level": 0.2,
+    "spear": { "name": "槍", "desc": "一直線に突き、並んだ敵をまとめて貫く", "tags": ["pierce"], "cd": 0.75, "damage": 50, "length": 150, "width": 26, "per_level": 0.066,
       "grades": [
         { "lv": 1, "name": "ショートスピア",     "desc": "まっすぐ素早く突く",              "cd": 0.85, "dmg": 0.9, "length": 1.0, "width": 1.0, "dirs": 1 },
         { "lv": 3, "branch": "a", "name": "パイク",         "desc": "長く遠くまで届く",        "cd": 1.0,  "dmg": 1.15, "length": 1.5, "width": 1.0, "dirs": 1 },
@@ -70,7 +70,7 @@
         { "lv": 5, "branch": "b", "name": "ランス",         "desc": "極太の一撃で遠くまで貫く", "cd": 1.15, "dmg": 2.2, "length": 2.1, "width": 2.2, "dirs": 1 },
         { "evo": true, "name": "グングニル", "desc": "三方を貫く神槍",                       "cd": 1.0,  "dmg": 1.9, "length": 2.4, "width": 1.6, "dirs": 3 }
       ] },
-    "axe": { "name": "斧", "desc": "投げた斧が弧を描いて戻ってくる", "tags": ["slash"], "cd": 0.9, "damage": 36, "speed": 400, "size": 13, "per_level": 0.2,
+    "axe": { "name": "斧", "desc": "投げた斧が弧を描いて戻ってくる", "tags": ["slash"], "cd": 0.9, "damage": 36, "speed": 400, "size": 13, "per_level": 0.066,
       "grades": [
         { "lv": 1, "name": "ハンドアックス",     "desc": "片手斧を1本投げる",               "cd": 1.0,  "dmg": 1.0, "count": 1, "size": 1.0, "range": 1.0 },
         { "lv": 3, "branch": "a", "name": "バトルアックス", "desc": "2本を投げる",             "cd": 1.05, "dmg": 1.2, "count": 2, "size": 1.2, "range": 1.1 },
@@ -80,34 +80,47 @@
         { "evo": true, "name": "ラブリュス", "desc": "両刃の大斧が4方向へ",                  "cd": 1.1,  "dmg": 1.9, "count": 4, "size": 1.8, "range": 1.35 }
       ] }
   },
-  "weapon_max_level": 5,
-  "evolve_min_level": 3,
+  "weapon_max_level": 20,
+  "rank_levels": [5, 10, 15],
   "sub_weapon_slots": 0,
   "passives": {
-    "might":  { "name": "攻撃力", "per": 12, "fmt": "与ダメージ +{v}%" },
-    "haste":  { "name": "攻撃速度", "per": 10, "fmt": "攻撃速度 +{v}%" },
-    "swift":  { "name": "移動速度", "per": 8, "fmt": "移動 +{v}%" },
-    "vigor":  { "name": "最大HP", "per": 20, "fmt": "最大HP +{v}（回復も）" },
-    "area":   { "name": "攻撃範囲", "per": 12, "fmt": "斬撃・突き・炎・斧の大きさ +{v}%" },
-    "magnet": { "name": "経験値取得範囲", "per": 25, "fmt": "吸い寄せ距離 +{v}%" },
-    "ember":  { "name": "熾火の心臓", "per": 12, "fmt": "炎のダメージ +{v}%", "tag": "fire" },
-    "frost":  { "name": "凍てつく指", "per": 12, "fmt": "氷のダメージ +{v}%", "tag": "ice" },
-    "volt":   { "name": "雷鳴の鼓動", "per": 12, "fmt": "雷のダメージ +{v}%", "tag": "thunder" },
-    "edge":   { "name": "刃研ぎ",     "per": 12, "fmt": "斬撃（剣・斧）のダメージ +{v}%", "tag": "slash" },
-    "point":  { "name": "穂先の誓い", "per": 12, "fmt": "突き（槍）のダメージ +{v}%", "tag": "pierce" },
-    "hawk":   { "name": "鷹の目",     "per": 12, "fmt": "射撃（弓）のダメージ +{v}%", "tag": "shot" },
-    "medium": { "name": "霊媒",       "per": 15, "fmt": "亡霊の攻撃 +{v}%", "tag": "spirit" }
+    "might":  { "name": "攻撃力", "per": 8, "fmt": "与ダメージ +{v}%" },
+    "haste":  { "name": "攻撃速度", "per": 7, "fmt": "攻撃速度 +{v}%" },
+    "swift":  { "name": "移動速度", "per": 5, "fmt": "移動 +{v}%" },
+    "vigor":  { "name": "最大HP", "per": 13, "fmt": "最大HP +{v}（回復も）" },
+    "area":   { "name": "攻撃範囲", "per": 8, "fmt": "斬撃・突き・炎・斧の大きさ +{v}%" },
+    "magnet": { "name": "経験値取得範囲", "per": 17, "fmt": "吸い寄せ距離 +{v}%" },
+    "crit":   { "name": "急所の見切り", "per": 4, "fmt": "会心率 +{v}%（会心はダメージ2倍）" },
+    "guard":  { "name": "古傷の鎧", "per": 4, "fmt": "受けるダメージ −{v}%" },
+    "regen":  { "name": "灯火の命", "per": 2, "fmt": "10秒ごとに HP +{v}" },
+    "hunter": { "name": "狩人の勘", "per": 8, "fmt": "精鋭・冥王・怨霊への与ダメージ +{v}%" },
+    "ember":  { "name": "熾火の心臓", "per": 8, "fmt": "炎のダメージ +{v}%", "tag": "fire" },
+    "kindle": { "name": "業火の種",   "per": 8, "fmt": "燃える時間 +{v}%", "tag": "fire", "mod": "burn" },
+    "frost":  { "name": "凍てつく指", "per": 8, "fmt": "氷のダメージ +{v}%", "tag": "ice" },
+    "chill":  { "name": "冬の吐息",   "per": 10, "fmt": "遅くする時間 +{v}%", "tag": "ice", "mod": "slow_t" },
+    "volt":   { "name": "雷鳴の鼓動", "per": 8, "fmt": "雷のダメージ +{v}%", "tag": "thunder" },
+    "static": { "name": "雷雲",       "per": 4, "fmt": "雷の攻撃間隔 −{v}%", "tag": "thunder", "mod": "cd" },
+    "edge":   { "name": "刃研ぎ",     "per": 8, "fmt": "斬撃（剣・斧）のダメージ +{v}%", "tag": "slash" },
+    "tempo":  { "name": "剣舞",       "per": 4, "fmt": "斬撃（剣・斧）の攻撃間隔 −{v}%", "tag": "slash", "mod": "cd" },
+    "point":  { "name": "穂先の誓い", "per": 8, "fmt": "突き（槍）のダメージ +{v}%", "tag": "pierce" },
+    "reach":  { "name": "長柄",       "per": 6, "fmt": "突き（槍）の長さ +{v}%", "tag": "pierce", "mod": "length" },
+    "hawk":   { "name": "鷹の目",     "per": 8, "fmt": "射撃（弓）のダメージ +{v}%", "tag": "shot" },
+    "quiver": { "name": "速射",       "per": 4, "fmt": "射撃（弓）の攻撃間隔 −{v}%", "tag": "shot", "mod": "cd" },
+    "medium": { "name": "霊媒",       "per": 10, "fmt": "亡霊の攻撃 +{v}%", "tag": "spirit" }
   },
   "passive_slots": 5,
-  "passive_max_level": 5,
+  "passive_max_level": 8,
+  "cd_cut_max": 0.5,
+  "guard_floor": 0.4,
+  "crit_mult": 2,
   "rarities": [
     { "id": "N",  "name": "ノーマル",       "weight": 70,  "color": "#9aa5a0", "wlv": 1, "wbonus": 0.0,  "pmul": 1.0 },
     { "id": "R",  "name": "レア",           "weight": 20,  "color": "#6fb6ff", "wlv": 1, "wbonus": 0.10, "pmul": 1.5 },
     { "id": "SR", "name": "スーパーレア",   "weight": 7,   "color": "#b88cff", "wlv": 2, "wbonus": 0.10, "pmul": 2.0 },
-    { "id": "UR", "name": "ウルトラレア",   "weight": 2.5, "color": "#f0b35a", "wlv": 2, "wbonus": 0.25, "pmul": 2.5 },
-    { "id": "LR", "name": "レジェンドレア", "weight": 0.5, "color": "#ff7ad9", "wlv": 1, "wbonus": 0.25, "pmul": 3.0, "evolve": true }
+    { "id": "UR", "name": "ウルトラレア",   "weight": 2.5, "color": "#f0b35a", "wlv": 3, "wbonus": 0.25, "pmul": 2.5 },
+    { "id": "LR", "name": "レジェンドレア", "weight": 0.5, "color": "#ff7ad9", "wlv": 4, "wbonus": 0.3, "pmul": 3.0 }
   ],
-  "maxed_weapon_bonus": { "N": 0.05, "R": 0.10, "SR": 0.15, "UR": 0.25, "LR": 0.25 },
+  "maxed_weapon_bonus": { "N": 0.05, "R": 0.10, "SR": 0.15, "UR": 0.25, "LR": 0.3 },
   "tags": {
     "fire":    { "name": "炎", "color": "#ff8a4c", "sets": [
       { "at": 2, "text": "炎のダメージ +15%", "mods": { "dmg": 0.15 } },
@@ -138,7 +151,7 @@
       { "at": 4, "text": "亡霊の攻撃間隔 −20%", "mods": { "ghost_cd": 0.2 } },
       { "at": 6, "text": "亡霊は最初から本来の力で戦う", "mods": { "ghost_full": 1 } } ] }
   },
-  "tag_points": { "hero_weapon": 2, "ghost_weapon": 1, "ghost_spirit": 1, "passive_level": 1 },
+  "tag_points": { "hero_weapon": 2, "ghost_weapon": 1, "ghost_spirit": 1, "passive_level": 0.5 },
   "sigils": [
     { "id": "ember_step",  "tier": 0, "name": "残り火の歩み", "desc": "回避した場所に炎が残る" },
     { "id": "soul_drain",  "tier": 0, "name": "吸魂",         "desc": "敵を20体倒すごとに HP +5" },
@@ -147,14 +160,23 @@
     { "id": "frost_thorn", "tier": 1, "name": "霜の棘",       "desc": "遅い・凍った敵への与ダメージ +30%" },
     { "id": "executioner", "tier": 1, "name": "処刑人",       "desc": "HPが15%以下になった雑魚を即座に倒す" },
     { "id": "ghost_echo",  "tier": 2, "name": "霊の共鳴",     "desc": "亡霊があなたの武器も一緒に撃つ（40%の威力）", "need": "ghost" },
-    { "id": "storm_heart", "tier": 2, "name": "嵐の心臓",     "desc": "雷が飛び移っても弱まらず、+1体", "need": "thunder" }
+    { "id": "storm_heart", "tier": 2, "name": "嵐の心臓",     "desc": "雷が飛び移っても弱まらず、+1体", "need": "thunder" },
+    { "id": "undying",     "tier": 0, "name": "不屈",         "desc": "倒れるダメージを1回だけ HP1 で耐える" },
+    { "id": "hunt_glory",  "tier": 1, "name": "狩人の誉れ",   "desc": "精鋭・怨霊を倒すと HP +20・5秒間 攻撃速度 +30%" }
   ],
   "sigil_chance": 0.14,
   "curses": [
     { "id": "blood_pact", "name": "血の契約", "desc": "与ダメージ +40%・最大HP −30%", "mods": { "might": 0.4, "max_hp": -0.3 } },
     { "id": "frenzy",     "name": "狂奔",     "desc": "攻撃速度 +30%・敵の移動 +20%", "mods": { "haste": 0.3, "enemy_speed": 0.2 } },
     { "id": "glass",      "name": "硝子の魂", "desc": "経験値 +50%・受けるダメージ +50%", "mods": { "xp": 0.5, "dmg_taken": 0.5 } },
-    { "id": "burden",     "name": "重荷",     "desc": "攻撃範囲 +35%・回避の待ち時間 +60%", "mods": { "area": 0.35, "dash_cd": 0.6 } }
+    { "id": "burden",     "name": "重荷",     "desc": "攻撃範囲 +35%・回避の待ち時間 +60%", "mods": { "area": 0.35, "dash_cd": 0.6 } },
+    { "id": "reckless",   "name": "捨て身",   "desc": "与ダメージ +35%・攻撃範囲 −25%", "mods": { "might": 0.35, "area": -0.25 } },
+    { "id": "shell",      "name": "鈍重の殻", "desc": "受けるダメージ −35%・移動 −15%", "mods": { "dmg_taken": -0.35, "speed": -0.15 } },
+    { "id": "maw",        "name": "貪る口",   "desc": "経験値 +40%・吸い寄せ距離 −50%", "mods": { "xp": 0.4, "pickup": -0.5 } },
+    { "id": "horde",      "name": "群れ呼び", "desc": "経験値 +35%・敵の出現数 +30%", "mods": { "xp": 0.35, "spawn_rate": 0.3 } },
+    { "id": "fever",      "name": "焦燥",     "desc": "攻撃速度 +40%・これから出る敵のHP +25%", "mods": { "haste": 0.4, "enemy_hp": 0.25 } },
+    { "id": "thirst",     "name": "血の渇き", "desc": "与ダメージ +30%・HPが毎秒1減る（最大HPの30%で止まる）", "mods": { "might": 0.3, "hp_drain": 1 } },
+    { "id": "precocious", "name": "早熟",     "desc": "武器 Lv+4（すぐ）・パッシブの枠 −2", "mods": { "weapon_lv": 4, "passive_slots": -2 }, "need": "few_passives" }
   ],
   "curse_chance": 0.16,
   "ghost_slots": { "base": 1, "max": 2 },
@@ -178,7 +200,7 @@
     { "id": "pure2", "name": "鎮めの香",   "x": 4, "y": 2, "cost": 3, "parents": ["pure1"], "desc": "弔った時の供物 +50%", "effect": { "mourn_bonus": 0.5 } },
     { "id": "twin",  "name": "双魂の契り", "x": 3, "y": 3, "cost": 6, "parents": ["soul2"], "desc": "亡霊を2体まで連れていける", "effect": { "ghost_slots": 1 } },
     { "id": "eirei", "name": "英霊の座",   "x": 4, "y": 3, "cost": 6, "parents": ["soul2", "pure2"], "desc": "亡霊の攻撃 +20%。喰らった時の力も +20%", "effect": { "ghost_atk": 0.2, "devour_bonus": 0.2 } },
-    { "id": "lore1", "name": "刻印の書架・一", "x": 5, "y": 1, "cost": 3, "parents": ["root"], "desc": "新しい刻印カード（霜の棘・処刑人）が出るようになる", "effect": { "sigil_tier": 1 } },
+    { "id": "lore1", "name": "刻印の書架・一", "x": 5, "y": 1, "cost": 3, "parents": ["root"], "desc": "新しい刻印カード（霜の棘・処刑人・狩人の誉れ）が出るようになる", "effect": { "sigil_tier": 1 } },
     { "id": "lore2", "name": "刻印の書架・二", "x": 5, "y": 2, "cost": 5, "parents": ["lore1"], "desc": "新しい刻印カード（霊の共鳴・嵐の心臓）が出るようになる", "effect": { "sigil_tier": 1 } },
     { "id": "taboo", "name": "禁忌の頁",   "x": 5, "y": 3, "cost": 4, "parents": ["lore2"], "desc": "呪いカード（強い効果と不利の両方）が出るようになる", "effect": { "curses": 1 } }
   ],
@@ -187,7 +209,7 @@
     "mourn": { "base": 1, "per_mult": 2 },
     "wraith": { "at": 0.45, "hp_per_mult": 220, "short_hp_mult": 0.8, "purify_offerings": 3, "enemy_hp_per_taint": 0.06 }
   },
-  "shelf": { "unlock_generation": 1, "capacity": 5, "max_level": 3 },
+  "shelf": { "unlock_generation": 1, "capacity": 5, "max_level": 5, "weapon_max_level": 10 },
   "enemies": {
     "chaser":  { "name": "亡者", "hp": 10, "speed": 70, "radius": 10, "damage": 5, "xp": 1, "ai": "chase", "color": "#6d7f7a" },
     "charger": { "name": "突進鬼", "hp": 26, "speed": 58, "radius": 12, "damage": 10, "xp": 2, "ai": "charge", "color": "#c46b4f", "dash_speed": 380 },
@@ -202,7 +224,7 @@
   "checkpoint_interval": 10,
   "lineages": [
     { "id": "nameless", "name": "無名", "motto": "名も無き者は、何にでもなれる",
-      "trait": "初期武器を自由に選べる。形見の効果 +1Lv（最大Lv5）",
+      "trait": "初期武器を自由に選べる。形見の効果 +1Lv",
       "weakness": "なし",
       "weapon": null, "mods": { "heir_level_bonus": 1 },
       "card": { "id": "grit", "name": "無名の意地", "max": 3, "per": 15, "fmt": "HPが3割以下の時、与ダメージ +{v}%" },
@@ -212,7 +234,7 @@
       "weakness": "最大HP −20%",
       "weapon": "fire", "mods": { "fire_area": 0.2, "fire_burn": 0.3, "max_hp": -0.2 },
       "card": { "id": "okuribi", "name": "送り火", "max": 3, "per": 10, "fmt": "敵を倒すと {v}% の確率で小さな炎が残る" },
-      "unlock": { "type": "weapon_level", "weapon": "fire", "level": 5, "text": "炎の魔導書を最大Lv（5）まで育てる" } },
+      "unlock": { "type": "weapon_level", "weapon": "fire", "level": 15, "text": "炎の魔導書を Lv15 まで育てる" } },
     { "id": "gravekeeper", "name": "墓守", "motto": "死者と共に歩む一族",
       "trait": "亡霊の解放が1段階早い。亡霊の攻撃 +20%",
       "weakness": "単独出撃の経験値ボーナスなし。移動速度 −10%",

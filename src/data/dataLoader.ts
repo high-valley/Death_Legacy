@@ -27,7 +27,7 @@ export function loadBalance(raw: unknown): Loaded {
   };
 
   const D = raw as Balance;
-  if (!need(raw, ["schema_version", "data_version", "run_length", "vault_capacity", "tiers", "ghost_unlock", "player", "xp", "weapons", "evolve_min_level",
+  if (!need(raw, ["schema_version", "data_version", "run_length", "vault_capacity", "tiers", "ghost_unlock", "player", "xp", "weapons", "rank_levels", "cd_cut_max", "guard_floor", "crit_mult",
     "passives", "rarities", "maxed_weapon_bonus", "offerings", "altar", "library", "tree", "rites", "shelf", "enemies", "spawn", "checkpoint_interval", "lineages", "tags", "tag_points", "sigils", "sigil_chance", "curses", "curse_chance", "ghost_slots", "ghost_birth", "facilities"], "balance")) {
     return { D, errors };
   }
@@ -62,11 +62,18 @@ export function loadBalance(raw: unknown): Loaded {
       if (!at.some((g) => g.branch === "a") || !at.some((g) => g.branch === "b")) errors.push(`weapons.${id}: Lv${lv} に道 a と b の両方が必要`);
     }
     if (gs.length < 2) errors.push(`weapons.${id}: 段階は2つ以上`);
+    const ranks = new Set(gs.filter((g) => !g.evo).map((g) => g.lv ?? 1)).size;
+    if (Array.isArray(D.rank_levels) && D.rank_levels.length !== ranks) errors.push(`weapons.${id}: rank_levels は ${ranks} 個（段階の数に合わせる）`);
   }
+  if (Array.isArray(D.rank_levels)) D.rank_levels.forEach((v, i) => {
+    if (!(v >= 1 && v <= D.weapon_max_level) || (i > 0 && v <= D.rank_levels[i - 1])) errors.push("rank_levels: 1〜最大Lvで、昇順にする");
+  });
   for (const id of Object.keys(D.passives)) {
     need(D.passives[id], ["name", "per", "fmt"], `passives.${id}`);
     const t = D.passives[id].tag;
     if (t && isDict(D.tags) && !(t in D.tags)) errors.push(`passives.${id}: タグ '${t}' が tags にない`);
+    const pm = D.passives[id].mod;
+    if (pm !== undefined && (!t || !["burn", "slow_t", "cd", "length"].includes(pm))) errors.push(`passives.${id}: mod は burn / slow_t / cd / length（tag が要る）`);
   }
   const rarIds: string[] = [];
   for (const r of D.rarities) {
@@ -149,10 +156,13 @@ export function loadBalance(raw: unknown): Loaded {
     }
   }
   need(D.tag_points, ["hero_weapon", "ghost_weapon", "ghost_spirit", "passive_level"], "tag_points");
-  const SIG = ["ember_step", "soul_drain", "iron_vow", "greed", "frost_thorn", "executioner", "ghost_echo", "storm_heart"];
+  const SIG = ["ember_step", "soul_drain", "iron_vow", "greed", "frost_thorn", "executioner", "ghost_echo", "storm_heart", "undying", "hunt_glory"];
   for (const sg of D.sigils) if (need(sg, ["id", "tier", "name", "desc"], "sigils") && !SIG.includes(sg.id)) errors.push(`sigils: '${sg.id}' の効果がコードにない`);
-  const CUR = ["might", "max_hp", "haste", "xp", "enemy_speed", "dmg_taken", "area", "dash_cd"];
-  for (const c of D.curses) if (need(c, ["id", "name", "desc", "mods"], "curses")) for (const k of Object.keys(c.mods)) if (!CUR.includes(k)) errors.push(`curses.${c.id}: 知らない効果 '${k}'`);
+  const CUR = ["might", "max_hp", "haste", "xp", "enemy_speed", "dmg_taken", "area", "dash_cd", "speed", "pickup", "spawn_rate", "enemy_hp", "hp_drain", "weapon_lv", "passive_slots"];
+  for (const c of D.curses) if (need(c, ["id", "name", "desc", "mods"], "curses")) {
+    for (const k of Object.keys(c.mods)) if (!CUR.includes(k)) errors.push(`curses.${c.id}: 知らない効果 '${k}'`);
+    if (c.need !== undefined && c.need !== "few_passives") errors.push(`curses.${c.id}: need は few_passives だけ`);
+  }
   if (need(D.ghost_slots, ["base", "max"], "ghost_slots") && !(D.ghost_slots.base >= 1 && D.ghost_slots.max >= D.ghost_slots.base)) errors.push("ghost_slots: 1 <= base <= max");
   need(D.ghost_birth, ["fragments", "min_survival", "drops"], "ghost_birth");
   for (const [lv, u] of D.ghost_unlock) if (!(lv >= 1 && u > 0 && u <= 1)) errors.push("ghost_unlock は [レベル, 0〜1]");

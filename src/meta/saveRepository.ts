@@ -2,9 +2,10 @@
 //   書き込み: 一時領域に書く → 読み戻して検証 → 旧データを .bak に退避 → 本体へ置き換え
 //   読み込み: 本体が壊れていれば .bak から復元
 // ブラウザでは localStorage、テストではメモリ、将来の Steam 版（Electron）ではファイルに差し替える。
-import type { SaveData } from "./records.ts";
+import { legacyWeapon } from "../data/weapons.ts";
+import type { GhostRecord, HeirOption, SaveData, Snapshot } from "./records.ts";
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /** localStorage と同じ形の保存先 */
 export interface KV {
@@ -45,6 +46,8 @@ export function migrate(d: SaveData): SaveData {
     d.tree = [];
     d.alloc = { affinity: {}, seals: [] };
   }
+  // v4 → v5: 武器のランクとレベルを分けた（ADR 024）。古い武器Lv（1〜5）→ ランク＋新しいレベル（1〜20）、パッシブLv（〜5）→ 〜8
+  if ((d.schema_version ?? 1) < 5) migrateLevels(d);
   // v3 → v4: 施設。弔った回数は、残っている記録（弔うと consumed_at が付く）から数える
   const oldMourned = (d.schema_version ?? 1) < 4 ? (d.ghosts ?? []).filter((g) => g.status === "released" && !!g.consumed_at).length : -1;
   const base = freshSave() as unknown as Record<string, unknown>;
@@ -124,5 +127,37 @@ export class SaveRepository {
   wipe(): void {
     this.data = freshSave();
     this.write();
+  }
+}
+
+/** v4 → v5 のレベル読み替え（亡霊・形見・形見の候補・最高Lv・中断ラン） */
+function migrateLevels(d: SaveData): void {
+  const ghost = (g: GhostRecord | null | undefined): void => {
+    if (!g || g.weapon_rank !== undefined) return;
+    const x = legacyWeapon(g.weapon_level ?? 1);
+    g.weapon_rank = x.rank;
+    g.weapon_level = x.level;
+    g.passive_level = Math.min(8, Math.round((g.passive_level ?? 0) * 1.6));
+  };
+  for (const g of d.ghosts ?? []) ghost(g);
+  ghost(d.pending_ghost);
+  const heir = (o: HeirOption): void => {
+    o.level = o.type === "weapon" ? Math.min(10, legacyWeapon(o.level).level) : Math.min(5, Math.round(o.level * 1.6));
+  };
+  for (const h of d.heirlooms ?? []) heir(h);
+  for (const o of d.pending_heirloom?.options ?? []) heir(o);
+  const best = d.progress?.best_weapon_level ?? {};
+  for (const k in best) best[k] = legacyWeapon(best[k]).level;
+  const cp: Snapshot | null | undefined = d.active_run?.checkpoint;
+  if (cp && !cp.rank) {
+    cp.rank = {};
+    for (const k in cp.weapons) {
+      const x = legacyWeapon(cp.weapons[k]);
+      cp.rank[k] = x.rank;
+      cp.weapons[k] = x.level;
+    }
+    // パッシブは段階が細かくなった（1段の効果が約2/3）。強さが変わらないよう Lv と効果量を読み替える
+    for (const k in cp.passives) cp.passives[k] = Math.min(8, Math.round(cp.passives[k] * 1.6));
+    for (const k in cp.ppow) cp.ppow[k] = cp.ppow[k] * 1.5;
   }
 }

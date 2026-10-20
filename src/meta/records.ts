@@ -21,6 +21,7 @@ export interface GhostRecord {
   passive_id: string;
   passive_level: number;
   weapon_branch?: "a" | "b";
+  weapon_rank?: number;     // v5: 武器ランク（0〜。進化は evolved）。weapon_level はダメージのレベル
   kills: number;
   boss_kills: number;
   death_cause_id: string;
@@ -65,6 +66,7 @@ export interface Snapshot {
   lineage_lv?: number; lpow?: number;
   wraith_spawned?: boolean; wraith_dead?: boolean;
   fragments?: number; branch?: Record<string, "a" | "b">; sigils?: string[]; curses?: string[];
+  rank?: Record<string, number>; undying_used?: boolean;
 }
 
 /** ラン終了処理（MetaService.settle）に渡す要約 */
@@ -77,6 +79,7 @@ export interface Summary {
   ghosts: GhostPick[];
   fragments: number;
   branch: Record<string, "a" | "b">;
+  rank?: Record<string, number>;
   wraith_id?: string; wraith_purified?: boolean;
 }
 

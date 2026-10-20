@@ -34,30 +34,19 @@ test("どの武器も Lv1 → Lv3（道2つ）→ Lv5（道2つ）→ 進化 の
   assert.ok(["spear", "axe"].every((id) => id in D.weapons), "槍と斧がある");
 });
 
-test("持ち替えになるカードは、次の段階の名前を見せる", () => {
+test("武器の名前はランクで決まり、レベルを上げても持ち替えない", () => {
   const r = sim("sword");
-  r.weapons.sword = 2;
-  const d = r.describe({ kind: "weapon", id: "sword", lv: 2, rar: "N" });
-  assert.equal(d.n, "短剣 → ロングソード");
-  r.applyChoice({ kind: "weapon", id: "sword", lv: 2, rar: "N" });
+  r.weapons.sword = 9;
+  assert.equal(r.weaponName("sword"), "短剣");
+  r.rank.sword = 1; r.branch.sword = "a";
   assert.equal(r.weaponName("sword"), "ロングソード");
-});
-
-test("育っていない武器（Lv3未満）にはレジェンドレアの進化が出ない", () => {
-  const r = sim("sword", 9);
-  r.cardMods = { altar: 10, affinity: { sword: 4 }, seals: [] };
-  for (let i = 0; i < 400; i++) for (const c of r.rollChoices()) assert.ok(!(c.kind === "weapon" && c.id === "sword" && c.rar === "LR"));
-  r.weapons.sword = 3;
-  let lr = 0;
-  for (let i = 0; i < 400; i++) for (const c of r.rollChoices()) if (c.kind === "weapon" && c.id === "sword" && c.rar === "LR") lr++;
-  assert.ok(lr > 0, "Lv3 からは進化が出る");
 });
 
 test("槍: 一直線上の敵をまとめて貫き、横の敵には当たらない", () => {
   const r = sim("spear");
   const a = place(r, 60, 0), b = place(r, 100, 0), side = place(r, 0, 80);
   r.grid.rebuild(r.enemies);
-  r.fireWeapon("spear", 1, 0, 0, 1, 0, 1, 1, false, false);
+  r.fireWeapon("spear", 1, 0, 0, 0, 1, 0, 1, 1, false, false);
   assert.ok(a.hp < a.maxHp && b.hp < b.maxHp, "並んだ2体に当たる");
   assert.equal(side.hp, side.maxHp, "横の敵には当たらない");
   assert.ok(r.drainEvents().some((e) => e.type === "fx" && e.kind === "thrust"));
@@ -67,10 +56,10 @@ test("ハルバードは前後、グングニルは三方を突く", () => {
   const r = sim("spear");
   const front = place(r, 80, 0), back = place(r, -80, 0);
   r.grid.rebuild(r.enemies);
-  r.fireWeapon("spear", 5, 0, 0, 1, 0, 1, 1, false, false);
+  r.fireWeapon("spear", 1, 2, 0, 0, 1, 0, 1, 1, false, false);
   assert.ok(front.hp < front.maxHp && back.hp < back.maxHp);
   r.drainEvents();
-  r.fireWeapon("spear", 5, 0, 0, 1, 0, 1, 1, false, true);
+  r.fireWeapon("spear", 1, 2, 0, 0, 1, 0, 1, 1, false, true);
   assert.equal(r.drainEvents().filter((e) => e.type === "fx" && e.kind === "thrust").length, 3);
 });
 
@@ -78,7 +67,7 @@ test("斧: 飛んでいって戻ってくる。行きと帰りで2回当たる",
   const r = sim("axe");
   const e = place(r, 120, 0);
   r.grid.rebuild(r.enemies);
-  r.fireWeapon("axe", 1, 0, 0, 1, 0, 1, 1, false, false);
+  r.fireWeapon("axe", 1, 0, 0, 0, 1, 0, 1, 1, false, false);
   r.hero.cds.axe = 999;   // 主人公が次の斧を投げないように
   assert.equal(r.shots.length, 1);
   const s = r.shots[0];
@@ -97,7 +86,7 @@ test("ラブリュスは4方向へ投げる", () => {
   const r = sim("axe");
   place(r, 100, 0);
   r.grid.rebuild(r.enemies);
-  r.fireWeapon("axe", 5, 0, 0, 1, 0, 1, 1, false, true);
+  r.fireWeapon("axe", 1, 2, 0, 0, 1, 0, 1, 1, false, true);
   assert.equal(r.shots.length, 4);
 });
 
@@ -113,7 +102,7 @@ test("ダメージ数字は描画側が頼んだ時だけ、1ティック12個�
   const r = sim("sword");
   for (let i = 0; i < 30; i++) place(r, 20 + (i % 5), (i % 3) - 1);
   r.grid.rebuild(r.enemies);
-  r.fireWeapon("sword", 1, 0, 0, 1, 0, 1, 1, false, false);
+  r.fireWeapon("sword", 1, 0, 0, 0, 1, 0, 1, 1, false, false);
   assert.equal(r.drainEvents().filter((e) => e.type === "dmg").length, 0);
   r.showDamage = true;
   r.hero.cds.sword = 0;
@@ -137,13 +126,13 @@ test("氷: 当たった敵が遅くなり、氷河の魔導書なら一瞬凍る
   const e = place(r, 60, 0);
   e.def = { ...e.def, speed: 100 };
   r.grid.rebuild(r.enemies);
-  r.fireWeapon("ice", 1, 0, 0, 1, 0, 1, 1, false, false);
+  r.fireWeapon("ice", 1, 0, 0, 0, 1, 0, 1, 1, false, false);
   for (let i = 0; i < 12 && e.slowT === 0; i++) r.step(STEP, 0, 0);
   assert.ok(e.slowT > 0 && e.freezeT === 0, "Lv1 は遅くなるだけ");
   const r2 = sim("ice");
   const f = place(r2, 60, 0);
   r2.grid.rebuild(r2.enemies);
-  r2.fireWeapon("ice", 5, 0, 0, 1, 0, 1, 1, false, false);
+  r2.fireWeapon("ice", 1, 2, 0, 0, 1, 0, 1, 1, false, false);
   for (let i = 0; i < 12 && f.freezeT === 0; i++) r2.step(STEP, 0, 0);
   assert.ok(f.freezeT > 0, "Lv5 は凍る");
   const x0 = f.x;
@@ -153,7 +142,7 @@ test("氷: 当たった敵が遅くなり、氷河の魔導書なら一瞬凍る
   const b = r3.spawnEnemy("boss", 60);
   b.x = 60; b.y = 0;
   r3.grid.rebuild(r3.enemies);
-  r3.fireWeapon("ice", 5, 0, 0, 1, 0, 1, 1, false, false);
+  r3.fireWeapon("ice", 1, 2, 0, 0, 1, 0, 1, 1, false, false);
   for (let i = 0; i < 12; i++) r3.step(STEP, 0, 0);
   assert.ok(b.freezeT === 0 && b.slowT > 0 && b.slowMul > D.weapons.ice.slow!, "冥王は凍らず、遅くなるのも弱い");
 });
@@ -163,10 +152,10 @@ test("雷: 近くの敵へ段階の数だけ飛び移り、届かない敵には
   const chain = [place(r, 80, 0), place(r, 180, 0), place(r, 280, 0), place(r, 380, 0), place(r, 480, 0)];
   const far = place(r, 1200, 0);
   r.grid.rebuild(r.enemies);
-  r.fireWeapon("thunder", 1, 0, 0, 1, 0, 1, 1, false, false);
+  r.fireWeapon("thunder", 1, 0, 0, 0, 1, 0, 1, 1, false, false);
   assert.equal(chain.filter((e) => e.hp < e.maxHp).length, 2, "稲妻の書は2体");
   for (const e of chain) e.hp = e.maxHp;
-  r.fireWeapon("thunder", 3, 0, 0, 1, 0, 1, 1, false, false);
+  r.fireWeapon("thunder", 1, 1, 0, 0, 1, 0, 1, 1, false, false);
   assert.equal(chain.filter((e) => e.hp < e.maxHp).length, 4, "雷の魔導書は4体");
   assert.equal(far.hp, far.maxHp);
   const hit = chain.map((e) => e.maxHp - e.hp);
@@ -181,10 +170,8 @@ test("氷と雷でも最後まで遊べる（簡易ボット）", () => {
   }
 });
 
-test("形見で最初から Lv3 以上でも、次の武器カードで道を選べる", () => {
+test("形見で最初から Lv5 以上なら、最初のレベルアップでランクアップの札が出る", () => {
   const r = sim("sword", 5);
-  r.weapons.sword = 3;
-  let seen = false;
-  for (let i = 0; i < 200 && !seen; i++) seen = r.rollChoices().some((c) => c.kind === "weapon" && c.id === "sword" && !!c.branch);
-  assert.ok(seen, "道を選ぶカードが出る");
+  r.weapons.sword = 6;
+  assert.ok(r.rollChoices().some((c) => c.kind === "rank" && !!c.branch), "道を選ぶ札が出る");
 });

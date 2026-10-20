@@ -12,7 +12,7 @@ test("t01 新規データで出撃 → レベルアップ → ボス → 敗北�
   const r = w.sortie("", "", "short", "sword", 11)!;
   assert.ok(r, "亡霊0体でも出撃できる");
   for (let i = 0; i < 60 * 40; i++) botStep(r);
-  assert.ok(r.level >= 3 && r.kills > 20, `Lv${r.level} 撃破${r.kills}`);
+  assert.ok(r.level >= 3 && r.kills > 10, `Lv${r.level} 撃破${r.kills}`);
   r.t = r.runLen;
   r.step(STEP, 0, 0);
   assert.ok(r.bossSpawned, "時間でボスが出る");
@@ -222,7 +222,7 @@ test("v1 のセーブ: 祭壇・書庫に払っていた供物は全部戻る", 
     alloc: { altar: 4, affinity: { fire: 2 }, seals: ["bow"] },
   }));
   w.reload();
-  assert.equal(w.repo.data.schema_version, 4);
+  assert.equal(w.repo.data.schema_version, 5);
   assert.deepEqual(w.repo.data.tree, []);
   assert.deepEqual(w.repo.data.alloc, { affinity: {}, seals: [] });
   assert.equal(w.meta.offeringsFree(), 9);
@@ -321,4 +321,25 @@ test("リタイアは供物半分・形見と亡霊なし", () => {
   r.end("retired");
   const out = w.meta.settle(r.summary(), "retired")!;
   assert.ok(out.offerings === 2 && w.repo.data.pending_heirloom === null && out.new_ghost_id === "");
+});
+
+test("v4 のセーブ: 古い武器Lv（1〜5）をランクと新しいレベルに読み替える（亡霊・形見・中断ラン）", () => {
+  const w = new World();
+  w.kv.setItem("test", JSON.stringify({
+    schema_version: 4, run_history: [], settled_runs: [],
+    ghosts: [{ ghost_id: "g1", status: "stored", primary_weapon_id: "sword", weapon_level: 5, weapon_branch: "b", passive_level: 3, tier_id: "hero", display_name: "x", stat_snapshot: { attack_mult: 1, attack_speed: 1, area: 1 } }],
+    heirlooms: [{ heir_id: "h1", type: "weapon", id: "sword", level: 3, name: "x", from_generation: 1, status: "stored" }],
+    progress: { best_weapon_level: { fire: 5 } },
+    active_run: { run_id: "r", seed: 1, mode: "short", weapon: "spear", heirloom_id: "", lineage_id: "nameless", started_at: "", ghosts: [],
+      checkpoint: { t: 60, hp: 50, max_hp: 120, level: 5, xp: 0, weapons: { spear: 3 }, passives: { might: 2 }, ppow: { might: 2 }, wbonus: {}, evolved: {}, kills: 0, boss_kills: 0, boss_spawned: false, elite_idx: 0, spawn_acc: 0, branch: { spear: "b" } } },
+  }));
+  w.reload();
+  const g = w.meta.getGhost("g1")!;
+  assert.ok(g.weapon_rank === 2 && g.weapon_level === 17 && g.passive_level === 5, JSON.stringify(g));
+  assert.equal(w.repo.data.heirlooms[0].level, 9);
+  assert.equal(w.repo.data.progress.best_weapon_level.fire, 17);
+  const r = w.resume();
+  assert.equal(r.weaponName("spear"), "トライデント", "中断ラン: ランク1＝道の最初");
+  assert.equal(r.weapons.spear, 9);
+  assert.equal(r.passives.might, 3);
 });

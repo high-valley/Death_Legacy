@@ -3,7 +3,7 @@
 //   出撃予約 → チェックポイント → ラン終了処理（冪等）
 // 亡霊と形見の状態: stored → reserved（出撃中）→ consumed / 使用済み（喰らった亡霊は wraith → 祓うと purified、弔うと released）。異常終了しても reserved のまま残り、同じランを再開できる。
 import type { Balance, Facility, FacilityStep, Lineage, RunMode, Tier, TreeEffect, TreeNode } from "../data/types.ts";
-import { weaponGrade } from "../data/weapons.ts";
+import { gradeAt } from "../data/weapons.ts";
 import type { RunOpts } from "../sim/runSim.ts";
 import type { ActiveRun, CardMods, FacilityBuff, GhostMode, GhostPick, GhostRecord, Heirloom, HeirOption, RunRecord, RunResult, SaveData, Snapshot, Summary } from "./records.ts";
 import type { SaveRepository } from "./saveRepository.ts";
@@ -90,15 +90,15 @@ export class MetaService {
     const house = lin.id === this.D.lineages[0].id ? "" : `${lin.name}・`;
     return {
       ghost_id: uuid(), origin_run_id: sm.run_id, created_at: now(),
-      display_name: `第${this.S.ghost_seq}代・${house}${weaponGrade(this.D.weapons[wid], wlv, !!sm.evolved[wid], sm.branch?.[wid]).name}の${tr.name}`,
+      display_name: `第${this.S.ghost_seq}代・${house}${gradeAt(this.D.weapons[wid], sm.rank?.[wid] ?? 0, !!sm.evolved[wid], sm.branch?.[wid]).name}の${tr.name}`,
       survival_seconds: Math.floor(sm.t), run_length: Math.floor(sm.run_len), tier_id: tr.id,
-      primary_weapon_id: wid, weapon_level: wlv, evolved: !!sm.evolved[wid], weapon_branch: sm.branch?.[wid],
+      primary_weapon_id: wid, weapon_level: wlv, weapon_rank: sm.rank?.[wid] ?? 0, evolved: !!sm.evolved[wid], weapon_branch: sm.branch?.[wid],
       passive_id: pid, passive_level: pid ? sm.passives[pid] ?? 0 : 0,
       kills: sm.kills, boss_kills: sm.boss_kills, death_cause_id: sm.death_cause || "unknown",
       stat_snapshot: {
-        attack_mult: tr.mult * (1 + 0.12 * (pp.might ?? 0)) * (1 + (sm.wbonus[wid] ?? 0)),
-        attack_speed: 1 + 0.1 * (pp.haste ?? 0),
-        area: 1 + 0.12 * (pp.area ?? 0),
+        attack_mult: tr.mult * (1 + (this.D.passives.might.per / 100) * (pp.might ?? 0)) * (1 + (sm.wbonus[wid] ?? 0)),
+        attack_speed: 1 + (this.D.passives.haste.per / 100) * (pp.haste ?? 0),
+        area: 1 + (this.D.passives.area.per / 100) * (pp.area ?? 0),
       },
       data_version: this.D.data_version, lineage_id: lin.id, status: "stored",
     };
@@ -141,7 +141,7 @@ export class MetaService {
   }
 
   heirEffect(o: HeirOption): string {
-    return o.type === "weapon" ? `出撃時から武器を Lv${o.level} で持つ（どの主人公でも）` : `出撃時から${this.itemName(o)}をLv${o.level}で持つ`;
+    return o.type === "weapon" ? `出撃時から武器を Lv${o.level} で持つ（ダメージだけ。どの主人公でも）` : `出撃時から${this.itemName(o)}をLv${o.level}で持つ`;
   }
 
   /** index = 選んだ候補、-1 = 残さない */
@@ -589,9 +589,9 @@ export class MetaService {
       }
     }
     if (res !== "retired") {
-      const cap = D.shelf.max_level;
+      const cap = D.shelf.max_level, wcap = D.shelf.weapon_max_level;
       const options: HeirOption[] = [
-        ...Object.keys(sm.weapons).map((id): HeirOption => ({ type: "weapon", id, level: Math.min(cap, Math.ceil(sm.weapons[id] / 2)) })),
+        ...Object.keys(sm.weapons).map((id): HeirOption => ({ type: "weapon", id, level: Math.min(wcap, Math.ceil(sm.weapons[id] / 2)) })),
         ...Object.keys(sm.passives).map((id): HeirOption => ({ type: "passive", id, level: Math.min(cap, Math.ceil(sm.passives[id] / 2)) })),
       ];
       s.pending_heirloom = { run_id: sm.run_id, generation: s.progress.generation, options };

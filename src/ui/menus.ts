@@ -2,7 +2,7 @@
 // 画面を開くたびに作り直す（状態は MetaService と hub の選択だけが持つ）。
 // 見た目は「暗い石と金の飾り枠」。肖像・背景は art/ に絵があれば使い、無ければ図形の仮表示（src/view/art.ts）。
 import type { Balance, Facility, Lineage, RunMode, Tier } from "../data/types.ts";
-import { weaponGrade } from "../data/weapons.ts";
+import { gradeAt } from "../data/weapons.ts";
 import type { MetaService } from "../meta/metaService.ts";
 import type { ActiveRun, GhostMode, GhostPick, GhostRecord, RunRecord } from "../meta/records.ts";
 import { Platform } from "../platform.ts";
@@ -103,7 +103,7 @@ export class Menus {
   }
 
   private weaponLabel(g: GhostRecord): string {
-    return weaponGrade(this.D.weapons[g.primary_weapon_id], g.weapon_level, g.evolved, g.weapon_branch).name;
+    return gradeAt(this.D.weapons[g.primary_weapon_id], g.weapon_rank ?? 0, g.evolved, g.weapon_branch).name;
   }
 
   /** 亡霊の1行（記録庫・入れ替え・リザルト） */
@@ -236,7 +236,7 @@ export class Menus {
       return `力を取り込む。与ダメージ +${Math.round(pw.might * 100)}%・最大HP +${Math.round(pw.hp * 100)}%。喰らった亡霊は怨霊になり、のちのランで襲ってくる（穢れ +1）。`;
     }
     const W = this.D.weapons[g.primary_weapon_id];
-    return `生前の${weaponGrade(W, g.weapon_level, g.evolved, g.weapon_branch).name}で一緒に戦う。ランが終われば保管庫に戻る。`;
+    return `生前の${gradeAt(W, g.weapon_rank ?? 0, g.evolved, g.weapon_branch).name}で一緒に戦う。ランが終われば保管庫に戻る。`;
   }
 
   /** タグの小さな札（炎2 など） */
@@ -301,7 +301,7 @@ export class Menus {
       h("h4", {}, lin.weapon ? `主人公（${lin.name}は${WS.name}）` : "主人公　使える武器は1種類"),
       heroes,
       h("p", { class: "small hero-desc" }, h("b", {}, WS.name), `　${WS.desc}。`, this.tagChip(WS.tags[0])),
-      h("p", { class: "small hero-desc" }, `${WS.grades[0].name} → Lv3で道を選ぶ（${pa}／${pb}）→ 進化 ${WS.grades[WS.grades.length - 1].name}`)));
+      h("p", { class: "small hero-desc" }, `ランク: ${WS.grades[0].name} → 武器Lv${D.rank_levels[0]}で道を選ぶ（${pa}／${pb}）→ Lv${D.rank_levels[D.rank_levels.length - 1]}で進化 ${WS.grades[WS.grades.length - 1].name}。レベルはダメージ`)));
     if (wr.length > 0) {
       center.append(h("div", { class: "notice taint" },
         h("b", {}, `穢れ ${wr.length}`),
@@ -616,7 +616,7 @@ export class Menus {
       const b = sim.wbonus[id] ?? 0;
       ul.append(h("li", { class: "w" }, iconSvg(id), h("span", { class: "bn" }, sim.weaponName(id), h("small", {}, `Lv${sim.weapons[id]}${b > 0 ? `・+${Math.round(b * 100)}%` : ""}`))));
     }
-    for (const g of sim.ghosts) ul.append(h("li", { class: "g" }, iconSvg(g.rec.primary_weapon_id), h("span", { class: "bn" }, g.rec.display_name.replace(/^(第\d+代)・.*$/, "$1の亡霊"), h("small", {}, weaponGrade(D.weapons[g.rec.primary_weapon_id], g.rec.weapon_level, g.rec.evolved, g.rec.weapon_branch).name))));
+    for (const g of sim.ghosts) ul.append(h("li", { class: "g" }, iconSvg(g.rec.primary_weapon_id), h("span", { class: "bn" }, g.rec.display_name.replace(/^(第\d+代)・.*$/, "$1の亡霊"), h("small", {}, gradeAt(D.weapons[g.rec.primary_weapon_id], g.rec.weapon_rank ?? 0, g.rec.evolved, g.rec.weapon_branch).name))));
     for (const id of Object.keys(sim.passives)) ul.append(h("li", {}, iconSvg(id), h("span", { class: "bn" }, D.passives[id].name, h("small", {}, `Lv${sim.passives[id]}`))));
     if (sim.lineageLv > 0) ul.append(h("li", { class: "l" }, iconSvg(sim.lineage.card.id), h("span", { class: "bn" }, sim.lineage.card.name, h("small", {}, `Lv${sim.lineageLv}`))));
     for (const id of sim.sigils) ul.append(h("li", { class: "s" }, iconSvg("might"), h("span", { class: "bn" }, D.sigils.find((x) => x.id === id)?.name ?? id, h("small", {}, "刻印"))));
@@ -636,9 +636,9 @@ export class Menus {
       const R = sim.rarity(c.rar), d = sim.describe(c);
       const aff = sim.cardMods.affinity?.[c.id] ?? 0;
       const tag = sim.cardTag(c);
-      const special = c.kind === "sigil" ? " sigil-card" : c.kind === "curse" ? " curse-card" : c.branch ? ` branch-card br-${c.branch}` : c.kind === "lineage" ? " house-card" : "";
+      const special = c.kind === "sigil" ? " sigil-card" : c.kind === "curse" ? " curse-card" : c.branch ? ` branch-card br-${c.branch}` : c.kind === "rank" ? " branch-card rank-card" : c.kind === "lineage" ? " house-card" : "";
       const color = c.kind === "sigil" ? "#7fe3dc" : c.kind === "curse" ? "#d65a5e" : R.color;
-      const ribbon = c.kind === "sigil" ? "刻印" : c.kind === "curse" ? "呪い" : c.branch ? `${R.name}・道${c.branch === "a" ? "一" : "二"}` : R.name;
+      const ribbon = c.kind === "sigil" ? "刻印" : c.kind === "curse" ? "呪い" : c.branch ? `ランクアップ・道${c.branch === "a" ? "一" : "二"}` : c.kind === "rank" ? (c.rar === "LR" ? "進化" : "ランクアップ") : R.name;
       const b = h("button", { type: "button", class: `lv-card r-${c.rar}${special}`, style: `--rc:${color}`, onclick: () => onPick(c) },
         this.touchMode ? null : h("span", { class: "key" }, String(i + 1)),
         tag ? h("span", { class: "ctag" }, this.tagChip(tag)) : null,
@@ -652,9 +652,10 @@ export class Menus {
       this.hotkeys.push(b);
     });
     const branchNow = choices.some((c) => c.branch);
+    const rankNow = choices.some((c) => c.kind === "rank");
     p.append(
-      h("header", { class: "lv-head" }, h("h2", {}, branchNow ? "武器の道を選ぶ" : "レベルアップ"),
-        h("p", {}, branchNow ? "ここで選んだ道は、このランの最後まで続く" : `レベル ${sim.level - sim.pending + 1}　新たな力を選択してください`)),
+      h("header", { class: "lv-head" }, h("h2", {}, branchNow ? "武器の道を選ぶ" : rankNow ? "武器のランクアップ" : "レベルアップ"),
+        h("p", {}, branchNow ? "ここで選んだ道は、このランの最後まで続く" : rankNow ? "武器が持ち替わり、攻撃の形が変わる（取らなければ次のレベルアップでまた出る）" : `レベル ${sim.level - sim.pending + 1}　新たな力を選択してください`)),
       h("div", { class: "lv-body" }, cards, this.buildList(sim)));
     if (!this.touchMode) p.append(h("p", { class: "keys" }, h("kbd", {}, "1"), h("kbd", {}, "2"), h("kbd", {}, "3"), " で選択"));
     this.guard(this.hotkeys);

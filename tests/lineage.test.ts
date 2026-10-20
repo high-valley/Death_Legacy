@@ -13,15 +13,15 @@ test("新しいセーブでは無名だけが使え、未解放の家系では�
   assert.equal(w.repo.data.active_run, null, "失敗した出撃で予約が残らない");
 });
 
-test("火守: 魔導書を最大Lvまで育てると解放され、魔導書固定・炎強化・HP減で出撃する", () => {
+test("火守: 魔導書を Lv15 まで育てると解放され、魔導書固定・炎強化・HP減で出撃する", () => {
   const w = new World();
   const r = w.sortie("", "", "short", "fire", 1)!;
-  r.weapons.fire = 4;
+  r.weapons.fire = 14;
   const out1 = w.die(r, 60);
-  assert.deepEqual(out1.unlocked_lineages, [], "Lv4では解放されない");
+  assert.deepEqual(out1.unlocked_lineages, [], "Lv14では解放されない");
   w.meta.resolveHeirloom(-1);
   const r2 = w.sortie("", "", "short", "fire", 2)!;
-  r2.weapons.fire = 5;
+  r2.weapons.fire = 15;
   const out2 = w.die(r2, 60);
   assert.deepEqual(out2.unlocked_lineages, ["firekeeper"]);
   assert.ok(w.meta.lineageUnlocked("firekeeper"));
@@ -34,7 +34,7 @@ test("火守: 魔導書を最大Lvまで育てると解放され、魔導書固�
     const e = s.spawnEnemy("chaser", 100);
     e.hp = 1e6;
     s.grid.rebuild(s.enemies);
-    s.fireWeapon("fire", 1, 0, 0, 1, 0, 1, 1, false, false);
+    s.fireWeapon("fire", 1, 0, 0, 0, 1, 0, 1, 1, false, false);
   }
   assert.ok(f.zones[0].r > n.zones[0].r * 1.19 && f.zones[0].life > n.zones[0].life * 1.29, "炎の範囲・燃える時間が伸びる");
 });

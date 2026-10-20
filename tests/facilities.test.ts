@@ -111,7 +111,7 @@ test("v3 のセーブ: 施設は空、弔った回数は残っている記録か
     run_history: [], settled_runs: [], progress: { generation: 2 },
   }));
   w.reload();
-  assert.equal(w.repo.data.schema_version, 4);
+  assert.equal(w.repo.data.schema_version, 5);
   assert.deepEqual(w.repo.data.buildings, []);
   assert.equal(w.repo.data.progress.mourned_count, 1);
 });

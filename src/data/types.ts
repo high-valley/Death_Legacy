@@ -16,13 +16,14 @@ export interface Weapon {
   slow?: number; slow_time?: number;   // 氷: 移動速度の倍率と時間
   jump?: number;                       // 雷: 飛び移れる距離
 }
-export interface Passive { name: string; per: number; fmt: string; tag?: string }
+/** mod: タグ付きパッシブがそのタグの武器に足す効果（burn / slow_t / cd / length。cd は合計で cd_cut_max まで） */
+export interface Passive { name: string; per: number; fmt: string; tag?: string; mod?: string }
 
 /** タグ（属性）とセット効果。mods はそのタグの武器（霊は亡霊）にかかる */
 export interface TagSet { at: number; text: string; mods: Record<string, number> }
 export interface TagDef { name: string; color: string; sets: TagSet[] }
 export interface Sigil { id: string; tier: number; name: string; desc: string; need?: string }
-export interface Curse { id: string; name: string; desc: string; mods: Record<string, number> }
+export interface Curse { id: string; name: string; desc: string; mods: Record<string, number>; need?: string }
 export interface Rarity { id: RarityId; name: string; weight: number; color: string; wlv: number; wbonus: number; pmul: number; evolve?: boolean }
 export type RarityId = "N" | "R" | "SR" | "UR" | "LR";
 export interface EnemyDef {
@@ -75,11 +76,15 @@ export interface Balance {
   xp: { base: number; per_level: number };
   weapons: Record<string, Weapon>;
   weapon_max_level: number;
-  evolve_min_level: number;   // レジェンドレアで進化できる最低Lv
+  /** 武器ランクが上がるLv（[道を選ぶ, 道の先, 進化]）。レベルはダメージだけ、ランクで武器が変わる（ADR 024） */
+  rank_levels: number[];
   sub_weapon_slots: number;
   passives: Record<string, Passive>;
   passive_slots: number;
   passive_max_level: number;
+  cd_cut_max: number;     // 攻撃間隔の短縮（セット効果＋パッシブ）の上限
+  guard_floor: number;    // 受けるダメージはこの割合より下がらない
+  crit_mult: number;      // 会心のダメージ倍率
   rarities: Rarity[];
   maxed_weapon_bonus: Record<RarityId, number>;
   offerings: { per_tenth_survived: number; per_100_kills: number; clear_bonus: number; retire_rate: number };
@@ -87,7 +92,7 @@ export interface Balance {
   library: { affinity_step: number; affinity_max: number };
   tree: TreeNode[];
   rites: Rites;
-  shelf: { unlock_generation: number; capacity: number; max_level: number };
+  shelf: { unlock_generation: number; capacity: number; max_level: number; weapon_max_level: number };
   enemies: Record<string, EnemyDef>;
   spawn: {
     base_per_sec: number; per_progress: number; max_alive: number; hp_growth: number; dmg_growth: number; full_hp_growth: number; full_dmg_growth: number; full_curve: number; shooter_from: number; charger_from: number;

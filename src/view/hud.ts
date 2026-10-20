@@ -1,7 +1,7 @@
 // 戦闘HUD（表示専用）。キャンバスの上に重ねて描く。
 // 左上: 紋章・HP・経験値・Lv / 中央上: 残り時間・ボスと怨霊のHP / 右上: ミニマップ・撃破数
 // 左下: 武器スロット（段階の色）とパッシブ / 下: 同行する亡霊の札 / 右下（PC）: 回避キー
-import { gradeIndex, weaponGrade } from "../data/weapons.ts";
+import { gradeAt } from "../data/weapons.ts";
 import type { GhostRecord } from "../meta/records.ts";
 import type { RunSim } from "../sim/runSim.ts";
 import { Art } from "./art.ts";
@@ -168,7 +168,7 @@ export class Hud {
         sx += ss + gap;
         continue;
       }
-      const lv = sim.weapons[id], gi = gradeIndex(D.weapons[id], lv, !!sim.evolved[id]);   // 段階の高さで枠の色
+      const lv = sim.weapons[id], gi = sim.evolved[id] ? 3 : (sim.rank[id] ?? 0);   // 段階の高さで枠の色
       const col = GRADE_COLORS[Math.min(gi, GRADE_COLORS.length - 1)];
       plate(ctx, sx, sy, ss, ss, col);
       if (gi >= 2) { ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 10; rrect(ctx, sx, sy, ss, ss, 4); ctx.strokeStyle = col; ctx.stroke(); ctx.restore(); }
@@ -238,7 +238,7 @@ export class Hud {
           ctx.fillText(`喰らった力　与ダメ +${Math.round(sim.devourMight * 100)}%`, tx, cy + chh / 2 + 2);
         } else {
           const u = sim.setMods(["spirit"]).ghost_full ? 1 : sim.ghostUnlock();
-          ctx.fillText(`${weaponGrade(D.weapons[rec.primary_weapon_id], rec.weapon_level, rec.evolved, rec.weapon_branch).name}　解放 ${Math.round(u * 100)}%`, tx, cy + chh / 2 + 2);
+          ctx.fillText(`${gradeAt(D.weapons[rec.primary_weapon_id], rec.weapon_rank ?? 0, rec.evolved, rec.weapon_branch).name}　解放 ${Math.round(u * 100)}%`, tx, cy + chh / 2 + 2);
           bar(ctx, tx, cy + chh - 11, cw - ps2 - 22, 4, u, C.soul, "rgba(134,224,210,.3)");
         }
         cx += cw + 6;

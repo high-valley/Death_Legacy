@@ -55,7 +55,10 @@ export const ICONS: Record<string, Part[]> = {
 };
 
 /** カードやスロットに出すアイコン名（武器・パッシブ・家系の札はそのまま id） */
-const ALIAS: Record<string, string> = { ember: "fire", frost: "ice", volt: "thunder", edge: "sword", point: "spear", hawk: "bow", medium: "ghost" };
+const ALIAS: Record<string, string> = {
+  ember: "fire", frost: "ice", volt: "thunder", edge: "sword", point: "spear", hawk: "bow", medium: "ghost",
+  kindle: "fire", chill: "ice", static: "thunder", tempo: "sword", reach: "spear", quiver: "bow", crit: "might", guard: "grit", regen: "heal", hunter: "swift",
+};
 export function iconFor(id: string): string {
   const a = ALIAS[id] ?? id;
   return ICONS[a] ? a : "heal";
