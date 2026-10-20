@@ -954,10 +954,13 @@ export class RunSim {
     const id0 = this.mainWeapon, lv0 = this.weapons[id0] ?? 0;
     if (lv0 < D.weapon_max_level || !this.evolved[id0]) opts.push({ kind: "weapon", id: id0, lv: lv0 });
     const nPass = Object.keys(this.passives).length;
+    const pts = this.tagPoints();
     for (const id in D.passives) {
       const lv = this.passives[id] ?? 0;
+      const tag = D.passives[id].tag;
       if (lv > 0 && lv < D.passive_max_level) opts.push({ kind: "passive", id, lv });
-      else if (lv === 0 && nPass < D.passive_slots && !seals.includes(id)) opts.push({ kind: "passive", id, lv: 0 }); // 封印は新規取得だけを止める
+      // タグ付きのパッシブは、ビルドにそのタグがある時だけ（剣の主人公に「炎」は出さない。亡霊・武具の間で入ったタグは出る）。封印は新規取得だけを止める
+      else if (lv === 0 && nPass < D.passive_slots && !seals.includes(id) && (!tag || (pts[tag] ?? 0) > 0)) opts.push({ kind: "passive", id, lv: 0 });
     }
     // 家系の札（その家系で出撃した時だけ）。パッシブの枠は使わない
     if (this.lineageLv < this.lineage.card.max) opts.push({ kind: "lineage", id: this.lineage.card.id, lv: this.lineageLv });

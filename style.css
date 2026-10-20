@@ -528,3 +528,19 @@ kbd { display: inline-block; min-width: 24px; padding: 1px 6px; border: 1px soli
 .facility .steps li.on { color: var(--gold-hi); }
 @media (max-width: 640px) { .maus-grid { grid-template-columns: 1fr; } .facility .seat { grid-template-columns: 1fr; } }
 .ghost-row.stationed { opacity: .55; filter: saturate(.6); border-style: dashed; }
+
+/* ---------- 説明書 ---------- */
+.manual .man-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px 22px; align-items: start; }
+.man-sec { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid rgba(201,163,90,.25); border-radius: var(--r); background: rgba(10,13,18,.55); }
+.man-sec h3 { font: 600 16px var(--f-serif); color: var(--gold); letter-spacing: .06em; }
+.man-sec p, .man-sec li { color: var(--bone); font-size: 14px; line-height: 1.75; max-width: 70ch; }
+.man-sec ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.man-sec .tag { margin: 0 2px; vertical-align: 1px; }
+.man-sets { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.man-set { display: grid; gap: 4px; }
+.man-set ul { padding-left: 4px; list-style: none; }
+.man-set li { font-size: 13px; color: var(--mute); }
+.man-set li b { color: var(--bone); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .manual .man-body { grid-template-columns: 1fr; } }
+.man-body > .man-sec:has(.man-sets) { grid-column: 1 / -1; }
+.man-set > .tag { justify-self: start; }

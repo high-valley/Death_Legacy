@@ -114,3 +114,11 @@ test("中断・再開しても道・刻印・呪い・欠片は保たれる", ()
   r2.weapons.spear = 3;
   assert.equal(r2.weaponName("spear"), "トライデント");
 });
+
+test("一人で出撃した時、主人公の武器と関係ない属性のパッシブは候補に出ない", () => {
+  const r = new RunSim(D, { run_id: "solo", seed: 3, mode: "short", weapon: "sword" });
+  const ids = r.cardPool().filter((o) => o.kind === "passive").map((o) => o.id);
+  assert.ok(ids.includes("edge"), "斬撃（剣）は出る");
+  for (const x of ["ember", "frost", "volt", "point", "hawk", "medium"]) assert.ok(!ids.includes(x), `${x} は出ない`);
+  assert.ok(ids.includes("might"), "属性のないパッシブは出る");
+});

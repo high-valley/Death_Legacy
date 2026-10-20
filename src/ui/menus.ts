@@ -12,6 +12,7 @@ import { Art } from "../view/art.ts";
 import { fmt } from "../view/hud.ts";
 import { iconSvg } from "../view/icons.ts";
 import { button, h } from "./dom.ts";
+import { CHAPTERS, manualPage, type Chapter } from "./manual.ts";
 
 export interface SortieRequest { ghosts: GhostPick[]; heirId: string; weapon: string; mode: RunMode; seed: number; lineage: string }
 
@@ -158,6 +159,7 @@ export class Menus {
     } else {
       menu.append(item(S.progress.runs > 0 ? "Continue" : "New Game", S.progress.runs > 0 ? `納骨堂へ・第${kanjiNum(S.progress.generation + 1)}代` : "はじめる", on.hub, true));
     }
+    menu.append(item("Guide", "説明書", () => this.showManual(() => this.showTitle(active, on))));
     menu.append(item("Settings", "設定", on.settings));
     if (Platform.canQuit()) menu.append(item("Quit", "終了", () => Platform.quit()));
     const logoSrc = Art.file("logo");
@@ -218,6 +220,7 @@ export class Menus {
       h("div", { class: "row purses" },
         taint > 0 ? h("span", { class: "purse taint" }, "穢れ", h("b", {}, String(taint))) : null,
         h("span", { class: "purse" }, "供物", h("b", {}, String(this.meta.offeringsFree())), `/ ${S.offerings.earned}`),
+        button("説明書", () => this.showManual(re, this.hub.tab === "mausoleum" || this.hub.tab === "tree" || this.hub.tab === "shelf" ? "crypt" : "resonance"), "quiet"),
         button("タイトル", onBack, "quiet"))));
     if (this.hub.tab === "tree") this.hubTree(p, re);
     else if (this.hub.tab === "shelf") this.hubShelf(p);
@@ -664,6 +667,7 @@ export class Menus {
     p.append(h("h2", {}, "一時停止"), this.buildList(sim),
       h("div", { class: "row" },
         button("続ける", on.resume, "primary"),
+        button("説明書", () => this.showManual(() => this.showPause(sim, on), "resonance")),
         button("設定", on.settings),
         button("リタイア", () => {
           if (!armed) {
@@ -675,6 +679,18 @@ export class Menus {
           on.retire();
         }, "danger")),
       warn);
+  }
+
+  /** 説明書（章ごとのタブ） */
+  showManual(back: () => void, ch: Chapter = "basics"): void {
+    const p = this.open("wide manual", "ov-manual");
+    p.dataset.screen = "manual";
+    const tabs = h("div", { class: "tabs", role: "tablist" });
+    for (const [id, name] of CHAPTERS) {
+      tabs.append(h("button", { type: "button", role: "tab", "aria-selected": String(ch === id), onclick: () => this.showManual(back, id) }, name));
+    }
+    p.append(h("header", { class: "hub-head" }, h("h2", {}, "説明書"), tabs, h("div", { class: "row purses" }, button("閉じる", back, "primary"))),
+      manualPage(this.D, ch, this.touchMode));
   }
 
   showSettings(on: { back: () => void; volume: (v: number) => void; loadTest: () => void; wipe: () => void }, loadText = ""): void {
