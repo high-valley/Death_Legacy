@@ -21,10 +21,14 @@
   - 拠点（納骨堂）の施設が増えていく仕組み
 - 公開URL: https://high-valley.github.io/Death_Legacy/
 
+## 作業の進め方（2026-10-21 オーナーと合意）
+- **大きめの機能は役割分担で進める**: 提案者（案を2〜3個）→ 仕様確認者（GDD の[確定]・設計のルール・スマホ負荷に照らしてふるい分け）→ **オーナーが案を選ぶ** → 実装 → レビュー担当（実装を見ていない別の担当がテスト・画面を確認）。仕様の変更・絵・遊んだ感想はオーナーの判断を待つ。
+- 絵の組み込み・小さな修正・数値調整は役割分担しない（1人で進める方が速く安い）。
+
 ## よく使うコマンド
 ```bash
 npm install            # 初回（この作業環境では npm に繋がらないので、ln -s /opt/npm-tools/node_modules node_modules で代用できる）
-npm test               # 単体テスト 74件（Node 22.18+ が TypeScript をそのまま実行）
+npm test               # 単体テスト 75件（Node 22.18+ が TypeScript をそのまま実行）
 npm run typecheck      # tsc --noEmit
 npm run build          # dist/ に書き出し
 npm run dev            # http://localhost:8000

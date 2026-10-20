@@ -1014,7 +1014,8 @@ export class RunSim {
     const wi = out.findIndex((c) => c.kind === "weapon");
     if (wi >= 0) {
       const c = out[wi], W = D.weapons[c.id], bl = branchLevel(W), R = this.rarity(c.rar);
-      if (bl > 0 && !this.branch[c.id] && !(R.evolve && c.lv > 0) && c.lv < bl && c.lv + R.wlv >= bl) {
+      // 形見などで最初から分岐のLv以上の時も、まだ道を選んでいなければ次の武器カードで選ばせる
+      if (bl > 0 && !this.branch[c.id] && !(R.evolve && c.lv > 0) && c.lv + R.wlv >= bl) {
         const rest = out.filter((_, i) => i !== wi).slice(0, 1);
         out = [{ ...c, branch: "a" }, { ...c, branch: "b" }, ...rest];
       }

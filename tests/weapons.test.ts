@@ -180,3 +180,11 @@ test("氷と雷でも最後まで遊べる（簡易ボット）", () => {
     assert.ok(r.kills > 30, `${w}: 撃破 ${r.kills}`);
   }
 });
+
+test("形見で最初から Lv3 以上でも、次の武器カードで道を選べる", () => {
+  const r = sim("sword", 5);
+  r.weapons.sword = 3;
+  let seen = false;
+  for (let i = 0; i < 200 && !seen; i++) seen = r.rollChoices().some((c) => c.kind === "weapon" && c.id === "sword" && !!c.branch);
+  assert.ok(seen, "道を選ぶカードが出る");
+});
