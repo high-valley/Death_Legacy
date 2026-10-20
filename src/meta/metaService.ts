@@ -2,10 +2,10 @@
 //   亡霊の保管・入れ替え / 死亡した主人公から亡霊を作る / 供物と祭壇の樹 / 形見 / 亡霊の3択と穢れ・怨霊 /
 //   出撃予約 → チェックポイント → ラン終了処理（冪等）
 // 亡霊と形見の状態: stored → reserved（出撃中）→ consumed / 使用済み（喰らった亡霊は wraith → 祓うと purified、弔うと released）。異常終了しても reserved のまま残り、同じランを再開できる。
-import type { Balance, Lineage, RunMode, Tier, TreeEffect, TreeNode } from "../data/types.ts";
+import type { Balance, Facility, FacilityStep, Lineage, RunMode, Tier, TreeEffect, TreeNode } from "../data/types.ts";
 import { weaponGrade } from "../data/weapons.ts";
 import type { RunOpts } from "../sim/runSim.ts";
-import type { ActiveRun, CardMods, GhostMode, GhostPick, GhostRecord, Heirloom, HeirOption, RunRecord, RunResult, SaveData, Snapshot, Summary } from "./records.ts";
+import type { ActiveRun, CardMods, FacilityBuff, GhostMode, GhostPick, GhostRecord, Heirloom, HeirOption, RunRecord, RunResult, SaveData, Snapshot, Summary } from "./records.ts";
 import type { SaveRepository } from "./saveRepository.ts";
 
 export function uuid(): string {
@@ -34,6 +34,11 @@ export class MetaService {
   // ================================================================ ghosts
   storedGhosts(): GhostRecord[] {
     return this.S.ghosts.filter((g) => g.status === "stored");
+  }
+
+  /** 出撃に選べる亡霊（施設に住んでいる亡霊は除く） */
+  availableGhosts(): GhostRecord[] {
+    return this.storedGhosts().filter((g) => !g.stationed_at);
   }
 
   getGhost(id: string): GhostRecord | null {
@@ -109,6 +114,7 @@ export class MetaService {
       const g = this.getGhost(releaseId);
       if (!g || g.status !== "stored") return false;
       g.status = "released";
+      g.stationed_at = undefined;
       ng.status = "stored";
     }
     this.S.ghosts.push(ng);
@@ -167,8 +173,15 @@ export class MetaService {
     return n;
   }
 
+  /** 建てた施設に払った供物（戻らない） */
+  buildingsCost(): number {
+    let n = 0;
+    for (const f of this.D.facilities) if (this.S.buildings.includes(f.id)) n += f.cost;
+    return n;
+  }
+
   offeringsFree(): number {
-    return this.S.offerings.earned - this.offeringsUsed();
+    return this.S.offerings.earned - this.offeringsUsed() - this.buildingsCost();
   }
 
   treeNode(id: string): TreeNode | null {
@@ -306,6 +319,8 @@ export class MetaService {
     const n = this.mournOfferings(g);
     g.status = "released";
     g.consumed_at = now();
+    g.stationed_at = undefined;
+    this.S.progress.mourned_count += 1;
     this.S.offerings.earned += n;
     this.S.offerings.mourned += n;
     this.repo.write();
@@ -321,7 +336,95 @@ export class MetaService {
       devours: picks.filter((x) => x.p.mode === "devour").map((x) => ({ rec: x.g, ...this.devourPower(x.g) })),
       wraith: ar.wraith_id ? this.getGhost(ar.wraith_id) : null, taint_hp: this.taintHpBonus(),
       heirloom: ar.heirloom_id ? this.getHeir(ar.heirloom_id) : null, card_mods: this.cardMods(), checkpoint: ar.checkpoint,
+      facility: ar.facility,
     };
+  }
+
+  // ================================================================ 拠点の施設（堂守の亡霊、ADR 023）
+  facility(id: string): Facility | null {
+    return this.D.facilities.find((f) => f.id === id) ?? null;
+  }
+
+  built(id: string): boolean {
+    return this.S.buildings.includes(id);
+  }
+
+  /** 建てる条件の進み具合 */
+  facilityProgress(f: Facility): { cur: number; need: number } {
+    const u = f.unlock, need = u.count;
+    const cur = u.type === "ghosts_born" ? this.S.ghost_seq : u.type === "vault" ? this.storedGhosts().length : this.S.progress.mourned_count;
+    return { cur: Math.min(cur, need), need };
+  }
+
+  /** 建てられない理由（建てられる時は ""） */
+  buildBlock(id: string): string {
+    const f = this.facility(id);
+    if (!f) return "存在しない施設";
+    if (this.built(id)) return "建てた";
+    const pr = this.facilityProgress(f);
+    if (pr.cur < pr.need) {
+      const what = f.unlock.type === "ghosts_born" ? "亡霊が生まれる" : f.unlock.type === "vault" ? "保管庫に亡霊がそろう" : "亡霊を弔う";
+      return `${what}（${pr.cur}/${pr.need}）`;
+    }
+    if (this.offeringsFree() < f.cost) return "供物が足りない";
+    return "";
+  }
+
+  /** 建てる（供物を払う。戻せない） */
+  build(id: string): boolean {
+    if (this.S.active_run || this.buildBlock(id) !== "") return false;
+    this.S.buildings.push(id);
+    this.repo.write();
+    return true;
+  }
+
+  /** 施設に住んでいる亡霊 */
+  residents(fid: string): GhostRecord[] {
+    return this.S.ghosts.filter((g) => g.status === "stored" && g.stationed_at === fid);
+  }
+
+  /** 住まわせる（別の施設からの引っ越しも可）。満員・未建設・出撃中は不可 */
+  station(ghostId: string, fid: string): boolean {
+    const f = this.facility(fid), g = this.getGhost(ghostId);
+    if (!f || !g || this.S.active_run || !this.built(fid) || f.slots <= 0 || g.status !== "stored") return false;
+    if (g.stationed_at === fid) return true;
+    if (this.residents(fid).length >= f.slots) return false;
+    g.stationed_at = fid;
+    this.repo.write();
+    return true;
+  }
+
+  /** 施設から外す（保管庫へ戻る） */
+  unstation(ghostId: string): boolean {
+    const g = this.getGhost(ghostId);
+    if (!g || !g.stationed_at || this.S.active_run) return false;
+    g.stationed_at = undefined;
+    this.repo.write();
+    return true;
+  }
+
+  /** 供養塔に刻まれた力（建てていれば、弔った回数 every 回ごとに1つ） */
+  memorialSteps(): FacilityStep[] {
+    const f = this.D.facilities.find((x) => x.effect.steps);
+    if (!f || !this.built(f.id)) return [];
+    const st = f.effect.steps ?? [], every = f.effect.every ?? 1;
+    return st.slice(0, Math.min(st.length, Math.floor(this.S.progress.mourned_count / every)));
+  }
+
+  /** いまの施設の効果（出撃時に active_run へ写す） */
+  facilityBuff(): FacilityBuff {
+    const out: FacilityBuff = { tags: [], ghost_atk: 0, hp: 0, offer: 0 };
+    for (const f of this.D.facilities) {
+      if (!this.built(f.id)) continue;
+      for (const g of this.residents(f.id)) {
+        if (f.effect.offer_per_mult) out.offer += this.tier(g.tier_id).mult * f.effect.offer_per_mult;
+        if (f.effect.tag_points) {
+          for (const t of this.D.weapons[g.primary_weapon_id]?.tags ?? []) for (let i = 0; i < f.effect.tag_points; i++) out.tags.push(t);
+        }
+      }
+    }
+    for (const st of this.memorialSteps()) { out.ghost_atk += st.ghost_atk ?? 0; out.hp += st.hp ?? 0; }
+    return out;
   }
 
   // ================================================================ lineages
@@ -370,7 +473,7 @@ export class MetaService {
     const gs: GhostRecord[] = [];
     for (const p of picks) {
       const g = this.getGhost(p.id);
-      if (!g || g.status !== "stored") return false; // 出撃中・怨霊・成仏済みは選べない
+      if (!g || g.status !== "stored" || g.stationed_at) return false; // 出撃中・怨霊・成仏済み・施設に住んでいる亡霊は選べない
       gs.push(g);
     }
     let h: Heirloom | null = null;
@@ -384,7 +487,7 @@ export class MetaService {
     const wraith = this.wraiths()[0];
     this.S.active_run = {
       run_id: runId, seed, mode, weapon, heirloom_id: heirId, lineage_id: lin.id, started_at: now(), checkpoint: null,
-      ghosts: picks, wraith_id: wraith ? wraith.ghost_id : "",
+      ghosts: picks, wraith_id: wraith ? wraith.ghost_id : "", facility: this.facilityBuff(),
     };
     this.repo.write();
     return true;
@@ -468,7 +571,11 @@ export class MetaService {
     const frac = Math.min(1, sm.t / sm.run_len);
     let offer = Math.floor(frac * 10) * of.per_tenth_survived + Math.floor(sm.kills / 100) * of.per_100_kills + (res === "boss_cleared" ? of.clear_bonus : 0);
     if (res === "retired") offer = Math.floor(offer * of.retire_rate);
-    offer += purifyOffer;
+    // 鎮魂堂: 住む亡霊の等級 × 生き延びた割合（リタイアでは増えない＝すぐ辞めて稼ぐことはできない）
+    const ar = s.active_run && s.active_run.run_id === sm.run_id ? s.active_run : null;
+    const fOffer = res === "retired" ? 0 : Math.round((ar?.facility?.offer ?? 0) * frac);
+    out.facility_offer = fOffer;
+    offer += purifyOffer + fOffer;
     s.offerings.earned += offer;
     out.offerings = offer;
     s.progress.generation += 1;

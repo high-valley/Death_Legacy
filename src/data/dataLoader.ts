@@ -28,7 +28,7 @@ export function loadBalance(raw: unknown): Loaded {
 
   const D = raw as Balance;
   if (!need(raw, ["schema_version", "data_version", "run_length", "vault_capacity", "tiers", "ghost_unlock", "player", "xp", "weapons", "evolve_min_level",
-    "passives", "rarities", "maxed_weapon_bonus", "offerings", "altar", "library", "tree", "rites", "shelf", "enemies", "spawn", "checkpoint_interval", "lineages", "tags", "tag_points", "sigils", "sigil_chance", "curses", "curse_chance", "ghost_slots", "ghost_birth"], "balance")) {
+    "passives", "rarities", "maxed_weapon_bonus", "offerings", "altar", "library", "tree", "rites", "shelf", "enemies", "spawn", "checkpoint_interval", "lineages", "tags", "tag_points", "sigils", "sigil_chance", "curses", "curse_chance", "ghost_slots", "ghost_birth", "facilities"], "balance")) {
     return { D, errors };
   }
   // 等級は生存割合の昇順で、最初は0から
@@ -99,6 +99,17 @@ export function loadBalance(raw: unknown): Loaded {
     }
   });
   if (D.lineages.length === 0) errors.push("lineages: 1つ以上必要");
+  const fids = new Set<string>();
+  D.facilities.forEach((f, i) => {
+    if (!need(f, ["id", "name", "icon", "desc", "cost", "slots", "unlock", "effect"], `facilities[${i}]`)) return;
+    if (fids.has(f.id)) errors.push(`facilities: id '${f.id}' が重複`);
+    fids.add(f.id);
+    if (!["ghosts_born", "vault", "mourned"].includes(f.unlock.type)) errors.push(`facilities[${f.id}].unlock: type は ghosts_born / vault / mourned`);
+    if (!(f.cost >= 0) || !(f.slots >= 0)) errors.push(`facilities[${f.id}]: cost と slots は0以上`);
+    const e = f.effect;
+    if (e.steps && !(Number(e.every) >= 1)) errors.push(`facilities[${f.id}].effect: steps には every（1以上）が要る`);
+    for (const k of Object.keys(e)) if (!["offer_per_mult", "tag_points", "every", "steps"].includes(k)) errors.push(`facilities[${f.id}].effect: 知らない項目 '${k}'`);
+  });
   // 祭壇の樹: 根は1つ（費用0・親なし）、親は先に定義された節、レア度の合計は altar.max 以下
   const nids = new Set<string>();
   let altarSum = 0;

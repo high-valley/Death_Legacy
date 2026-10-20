@@ -32,6 +32,7 @@ export interface GhostRecord {
   consumed_by_run?: string;
   consumed_at?: string;
   wraith_since?: string;
+  stationed_at?: string;   // v4: 住んでいる施設（住んでいる間は連れていけない・喰らえない）
 }
 
 export interface HeirOption { type: "weapon" | "passive"; id: string; level: number }
@@ -84,7 +85,11 @@ export interface ActiveRun {
   lineage_id: string; started_at: string; checkpoint: Snapshot | null;
   ghosts: GhostPick[];      // v3: 最大2体（古いセーブの ghost_id / ghost_mode は migrate で移す）
   wraith_id?: string;       // このランに現れる怨霊（出撃時に決める）
+  facility?: FacilityBuff;  // v4: 出撃時の施設の効果（再開しても変わらないよう出撃時に写す）
 }
+
+/** 施設から戦闘に渡す効果 */
+export interface FacilityBuff { tags: string[]; ghost_atk: number; hp: number; offer: number }
 
 export interface RunRecord {
   run_id: string; seed: number; mode: RunMode; duration_seconds: number; result: RunResult;
@@ -98,6 +103,7 @@ export interface RunRecord {
   devoured_all?: string[];
   ghost_failed?: "" | "time" | "fragments";     // 亡霊になれなかった理由
   fragments?: number;
+  facility_offer?: number;                      // 鎮魂堂で増えた供物
 }
 
 export interface SaveData {
@@ -114,6 +120,7 @@ export interface SaveData {
     clears: number; deaths: number; runs: number; generation: number; total_survival: number;
     companion_runs: number;                      // 亡霊を連れて出撃して終えたラン数（墓守の解放条件）
     best_weapon_level: Record<string, number>;   // 武器ごとの最高Lv（火守の解放条件）
+    mourned_count: number;                       // v4: 弔った回数（供養塔）
   };
   lineages: string[];                            // 解放済みの家系
   offerings: { earned: number; mourned: number };   // mourned = 弔って得た分（earned に含む）
@@ -121,4 +128,5 @@ export interface SaveData {
   alloc: Alloc;
   heirlooms: Heirloom[];
   heir_seq: number;
+  buildings: string[];                           // v4: 建てた施設（戻せない）
 }

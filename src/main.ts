@@ -402,6 +402,11 @@ class Game {
     d.alloc = { affinity: { fire: 2 }, seals: [] };
     this.repo.data.lineages = ["nameless", "firekeeper"];
     this.repo.data.progress.companion_runs = 1;
+    // 見本: 鎮魂堂を建てて1体住まわせ、武具の間は建てられる状態（供物を少し足す）
+    d.offerings.earned += 16;
+    d.buildings = ["chinkon"];
+    const st = d.ghosts.filter((g) => g.status === "stored");
+    if (st[2]) st[2].stationed_at = "chinkon";
     this.repo.write();
   }
 }

@@ -1,7 +1,7 @@
-// 戦闘以外の画面: タイトル / 納骨堂（出撃準備・祭壇の樹・形見の棚）/ 確認 / レベルアップ / ポーズ / 設定 / リザルト。
+// 戦闘以外の画面: タイトル / 納骨堂（出撃準備・祭壇の樹・霊廟・形見の棚）/ 確認 / レベルアップ / ポーズ / 設定 / リザルト。
 // 画面を開くたびに作り直す（状態は MetaService と hub の選択だけが持つ）。
 // 見た目は「暗い石と金の飾り枠」。肖像・背景は art/ に絵があれば使い、無ければ図形の仮表示（src/view/art.ts）。
-import type { Balance, Lineage, RunMode, Tier } from "../data/types.ts";
+import type { Balance, Facility, Lineage, RunMode, Tier } from "../data/types.ts";
 import { weaponGrade } from "../data/weapons.ts";
 import type { MetaService } from "../meta/metaService.ts";
 import type { ActiveRun, GhostMode, GhostPick, GhostRecord, RunRecord } from "../meta/records.ts";
@@ -36,7 +36,7 @@ export class Menus {
   readonly root: HTMLElement;
   readonly meta: MetaService;
   readonly D: Balance;
-  hub = { tab: "sortie", ghosts: [] as GhostPick[], heir: "", weapon: "sword", mode: "short" as RunMode, seed: 0, lineage: "nameless", node: "" };
+  hub = { tab: "sortie" as string, ghosts: [] as GhostPick[], heir: "", weapon: "sword", mode: "short" as RunMode, seed: 0, lineage: "nameless", node: "" };
   touchMode = false;
   onSortie: (r: SortieRequest) => void = () => {};
   private hotkeys: HTMLButtonElement[] = [];
@@ -207,7 +207,7 @@ export class Menus {
     if (bd) p.before(bd);
     const re = (): void => this.showHub(onBack);
     const tabs = h("div", { class: "tabs", role: "tablist" });
-    for (const [id, name, ok] of [["sortie", "出撃準備", true], ["tree", "祭壇の樹", true], ["shelf", "形見の棚", this.meta.shelfUnlocked()]] as const) {
+    for (const [id, name, ok] of [["sortie", "出撃準備", true], ["tree", "祭壇の樹", true], ["mausoleum", "霊廟", S.ghost_seq > 0 || S.buildings.length > 0], ["shelf", "形見の棚", this.meta.shelfUnlocked()]] as const) {
       tabs.append(h("button", { type: "button", role: "tab", "aria-selected": String(this.hub.tab === id), onclick: () => { this.hub.tab = id; re(); } },
         name, ok ? null : h("span", { class: "lock" }, "未解放")));
     }
@@ -221,6 +221,7 @@ export class Menus {
         button("タイトル", onBack, "quiet"))));
     if (this.hub.tab === "tree") this.hubTree(p, re);
     else if (this.hub.tab === "shelf") this.hubShelf(p);
+    else if (this.hub.tab === "mausoleum") this.hubMausoleum(p, re);
     else this.hubSortie(p, re);
     this.restoreScroll(keep);
   }
@@ -247,8 +248,9 @@ export class Menus {
     if (!meta.lineageUnlocked(hub.lineage)) hub.lineage = D.lineages[0].id;
     const lin = meta.lineage(hub.lineage);
     const stored = meta.storedGhosts();
+    const avail = meta.availableGhosts();
     const slots = meta.ghostSlots();
-    hub.ghosts = hub.ghosts.filter((x) => stored.some((g) => g.ghost_id === x.id)).slice(0, slots);
+    hub.ghosts = hub.ghosts.filter((x) => avail.some((g) => g.ghost_id === x.id)).slice(0, slots);
     const heirs = meta.shelfUnlocked() ? meta.storedHeirs() : [];
     if (hub.heir && !heirs.some((x) => x.heir_id === hub.heir)) hub.heir = "";
     const weapon = lin.weapon ?? hub.weapon;
@@ -265,7 +267,11 @@ export class Menus {
 
     // ── 左: 亡霊の記録庫
     const list = h("div", { class: "ghost-list" });
-    for (const g of stored) list.append(this.ghostCard(g, hub.ghosts.some((x) => x.id === g.ghost_id), () => toggle(g.ghost_id)));
+    for (const g of avail) list.append(this.ghostCard(g, hub.ghosts.some((x) => x.id === g.ghost_id), () => toggle(g.ghost_id)));
+    for (const g of stored) {
+      if (!g.stationed_at) continue;
+      list.append(this.ghostCard(g, false, null, `${meta.facility(g.stationed_at)?.name ?? "施設"}の堂守（霊廟で外すと連れていける）`));
+    }
     if (stored.length === 0) list.append(h("div", { class: "empty" }, "まだ亡霊はいない。未練の欠片を集め、ランの3割以上を生き延びて倒れた者だけが亡霊になる。"));
     const archive = h("section", { class: "frame archive", "data-scroll": "archive" },
       this.frameHead("亡霊の記録庫", `${stored.length} / ${D.vault_capacity}`),
@@ -498,6 +504,77 @@ export class Menus {
     p.append(h("div", { class: "hub tree-hub" }, left, aside));
   }
 
+  /** 霊廟: 施設を建て、保管中の亡霊を住まわせる（住んでいる間は連れていけない） */
+  private hubMausoleum(p: HTMLElement, re: () => void): void {
+    const D = this.D, meta = this.meta;
+    const fb = meta.facilityBuff();
+    const eff: string[] = [];
+    const tagN: Record<string, number> = {};
+    for (const t of fb.tags) tagN[t] = (tagN[t] ?? 0) + 1;
+    if (fb.offer > 0) eff.push(`ランの供物 最大 +${Math.round(fb.offer)}`);
+    if (fb.ghost_atk > 0) eff.push(`亡霊の攻撃 +${Math.round(fb.ghost_atk * 100)}%`);
+    if (fb.hp > 0) eff.push(`最大HP +${Math.round(fb.hp * 100)}%`);
+    p.append(h("div", { class: "maus-intro" },
+      h("p", {}, "保管庫の亡霊を施設に住まわせると、拠点で力を貸してくれる。住んでいる間は出撃に連れていけない（外せばまた連れていける）。建てた施設は戻せない。"),
+      h("div", { class: "row maus-eff" }, h("h4", {}, "いまの効果"),
+        ...Object.keys(tagN).map((t) => this.tagChip(t, tagN[t])),
+        ...(eff.length || Object.keys(tagN).length ? eff.map((x) => h("span", { class: "chip on" }, x)) : [h("span", { class: "small faint" }, "なし")]))));
+    const grid = h("div", { class: "maus-grid" });
+    for (const f of D.facilities) grid.append(this.facilityCard(f, re));
+    p.append(grid);
+  }
+
+  /** 施設1つの板（建てる前・建てた後） */
+  private facilityCard(f: Facility, re: () => void): HTMLElement {
+    const meta = this.meta, built = meta.built(f.id);
+    const card = h("section", { class: `frame facility${built ? " built" : ""}` }, this.frameHead(f.name, built ? "建立済み" : f.cost > 0 ? `供物 ${f.cost}` : "無料", f.icon));
+    card.append(h("p", { class: "small" }, f.desc));
+    if (!built) {
+      const why = meta.buildBlock(f.id);
+      card.append(why === ""
+        ? button(f.cost > 0 ? `建てる（供物 ${f.cost}）` : "建てる", () => this.showConfirm(`${f.name}を建てる`, `供物 ${f.cost} を払って建てる。建てた施設は戻せない（祭壇の樹をほどいても供物は戻らない）。`, () => { meta.build(f.id); re(); }, re, "建てる"), "primary")
+        : h("p", { class: "small lockline" }, iconSvg("clock", "icon"), why));
+      return card;
+    }
+    if (f.effect.steps) {
+      const every = f.effect.every ?? 1, n = meta.S.progress.mourned_count, got = meta.memorialSteps();
+      const ul = h("ul", { class: "steps" });
+      f.effect.steps.forEach((st, i) => ul.append(h("li", { class: i < got.length ? "on" : "" }, `${(i + 1) * every}回　${st.text}`)));
+      card.append(h("p", { class: "small" }, `弔った回数 `, h("b", { class: "num gold" }, String(n))), ul);
+      return card;
+    }
+    const res = meta.residents(f.id);
+    const seats = h("div", { class: "seats" });
+    for (const g of res) {
+      seats.append(h("div", { class: "seat" }, this.ghostCard(g, false, null, this.residentEffect(f, g.ghost_id)),
+        button("外す", () => { meta.unstation(g.ghost_id); re(); }, "quiet")));
+    }
+    for (let i = res.length; i < f.slots; i++) seats.append(h("div", { class: "seat empty-seat small faint" }, "空いている台座"));
+    card.append(seats);
+    if (res.length < f.slots) {
+      const cand = meta.storedGhosts().filter((g) => g.stationed_at !== f.id);
+      const pick = h("div", { class: "cands" });
+      for (const g of cand) {
+        const tr = meta.tier(g.tier_id);
+        pick.append(h("button", { type: "button", class: "cand", style: `--tc:${tr.color}`, onclick: () => { meta.station(g.ghost_id, f.id); re(); } },
+          this.rank(tr), h("span", { class: "cn" }, g.display_name), h("span", { class: "ce small" }, this.residentEffect(f, g.ghost_id)),
+          g.stationed_at ? h("span", { class: "small faint" }, `${meta.facility(g.stationed_at)?.name}から移す`) : null));
+      }
+      if (cand.length === 0) pick.append(h("p", { class: "small faint" }, "住まわせられる亡霊がいない。"));
+      card.append(h("h4", {}, "住まわせる亡霊を選ぶ"), pick);
+    }
+    return card;
+  }
+
+  /** その亡霊を住まわせた時の効果の説明 */
+  private residentEffect(f: Facility, ghostId: string): string {
+    const g = this.meta.getGhost(ghostId);
+    if (!g) return "";
+    if (f.effect.offer_per_mult) return `供物 最大 +${Math.round(this.meta.tier(g.tier_id).mult * f.effect.offer_per_mult)}（生き延びた割合を掛ける）`;
+    if (f.effect.tag_points) return (this.D.weapons[g.primary_weapon_id]?.tags ?? []).map((t) => `${this.D.tags[t].name} +${f.effect.tag_points}`).join("・");
+    return "";
+  }
+
   private hubShelf(p: HTMLElement): void {
     const meta = this.meta;
     if (!meta.shelfUnlocked()) {
@@ -649,7 +726,7 @@ export class Menus {
     // 左: 記録 / 右: 新しい亡霊
     const rows: [string, string][] = [
       ["生存時間", fmt(sim.t)], ["撃破数", sim.kills.toLocaleString()], ["ボス撃破数", String(sim.bossKills)], ["到達レベル", String(sim.level)],
-      ["使用武器", sim.weaponName(sim.mainWeapon)], ["未練の欠片", `${sim.fragments} / ${D.ghost_birth.fragments}`], ["家系", sim.lineage.name], ["獲得した供物", out ? `+${out.offerings}` : "—"],
+      ["使用武器", sim.weaponName(sim.mainWeapon)], ["未練の欠片", `${sim.fragments} / ${D.ghost_birth.fragments}`], ["家系", sim.lineage.name], ["獲得した供物", out ? `+${out.offerings}${out.facility_offer ? `（鎮魂堂 +${out.facility_offer}）` : ""}` : "—"],
     ];
     const tbl = h("dl", { class: "res-stats" });
     for (const [k, v] of rows) tbl.append(h("dt", {}, k), h("dd", { class: "num" }, v));

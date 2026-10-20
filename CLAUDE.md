@@ -17,8 +17,8 @@
 - **実装済み**: 武器の段階（7武器×4段階・槍と斧・魔導書は炎/氷/雷の3冊、ADR 017・019）＋ 画面イメージに寄せた作り直しと絵の差し替え口（ADR 018）。
 - **絵はオーナーが用意する**（主人公7人の絵・背景。亡霊には人の絵を使わない、ADR 020）。`art/` に決まった名前で置くと自動で入る。一覧は `docs/art_assets.md`、生成プロンプト（ChatGPT 向け）は `docs/art_prompts.md`。チャットで画像をもらったら切り抜き・縮小（目安300KB以内）・webp 変換して、名前を付けて `art/` に置く（地面は継ぎ目なしに加工）。
 - **実装済み（ADR 021）**: 亡霊は消費しない・最大2体同行・亡霊化は生存30%＋未練の欠片・主人公は武器1種・Lv3で武器の道を選ぶ・タグとセット効果・刻印・呪い。
-- **次（オーナーと合意済みの順）**:
-  - 拠点（納骨堂）の施設が増えていく仕組み
+- **実装済み（ADR 023）**: 拠点の施設「堂守の亡霊」（霊廟タブ。鎮魂堂・武具の間・供養塔。住む亡霊は連れていけない・施設は戻せない）。
+- **次**: オーナーと相談（施設の追加候補＝見張り塔・系譜の間は `docs/proposals/facilities.md`）
 - 公開URL: https://high-valley.github.io/Death_Legacy/
 
 ## 作業の進め方（2026-10-21 オーナーと合意）
@@ -28,7 +28,7 @@
 ## よく使うコマンド
 ```bash
 npm install            # 初回（この作業環境では npm に繋がらないので、ln -s /opt/npm-tools/node_modules node_modules で代用できる）
-npm test               # 単体テスト 75件（Node 22.18+ が TypeScript をそのまま実行）
+npm test               # 単体テスト 83件（Node 22.18+ が TypeScript をそのまま実行）
 npm run typecheck      # tsc --noEmit
 npm run build          # dist/ に書き出し
 npm run dev            # http://localhost:8000
@@ -40,6 +40,7 @@ URL: `?demo`（見本データ・別保存先）`?fps` `?bench` `?lowres`。
 ## 設計のルール（崩さないこと）
 - `src/sim`（戦闘）と `src/meta`（セーブ・亡霊）は DOM・描画・入力に依存しない。セーブとの受け渡しは `summary()` / `snapshot()` だけ。
 - **亡霊・形見の状態**: stored → reserved（`MetaService.reserve` で出撃確定の瞬間に保存）→ 亡霊は stored に戻る / 形見は使用済み（`settle`）。喰らった亡霊は wraith（怨霊）→ 祓うと purified。弔うと released。古いセーブの consumed はそのまま。
+- **施設**: 住んでいる亡霊は `stationed_at`（状態は stored のまま）。効果は出撃時に `active_run.facility` へ写す。建てた施設は戻せない。
 - **穢れ**は保存せず「wraith の数」から計算する。戦闘の材料は `MetaService.runOpts()` の1か所で作る。
 - **`MetaService.settle` は冪等**（`settled_runs` で2回目以降は何もしない）。供物・亡霊生成・消費・世代数はすべてこの中で1回だけ。
 - 異常終了: `active_run` と10秒ごとの `checkpoint` が残る。タイトルで「再開」か「放棄（リタイア扱い・消費）」を選ばせる。

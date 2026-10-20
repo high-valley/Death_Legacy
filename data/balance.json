@@ -219,5 +219,10 @@
       "weapon": null, "mods": { "ghost_unlock_step": 1, "ghost_atk": 0.2, "solo_xp": -1, "speed": -0.1 },
       "card": { "id": "bell", "name": "鎮魂の鐘", "max": 3, "per": 12, "fmt": "亡霊の攻撃間隔 −{v}%" },
       "unlock": { "type": "companion_runs", "count": 3, "text": "亡霊を連れて出撃したランを3回終える" } }
+  ],
+  "facilities": [
+    {"id": "chinkon", "name": "鎮魂堂", "icon": "okuribi", "desc": "住む亡霊の等級に応じて、ランで得る供物が増える（生き延びた割合を掛ける。リタイアでは増えない）", "cost": 6, "slots": 1, "unlock": {"type": "ghosts_born", "count": 1}, "effect": {"offer_per_mult": 2}},
+    {"id": "armory", "name": "武具の間", "icon": "sword", "desc": "住む亡霊の武器のタグが、出撃時に1点ずつ入る（セット効果に届きやすくなる）", "cost": 10, "slots": 1, "unlock": {"type": "vault", "count": 3}, "effect": {"tag_points": 1}},
+    {"id": "memorial", "name": "供養塔", "icon": "bell", "desc": "弔った回数が5回たまるごとに、ずっと続く小さな力が1つ刻まれる", "cost": 0, "slots": 0, "unlock": {"type": "mourned", "count": 1}, "effect": {"every": 5, "steps": [{"text": "亡霊の攻撃 +5%", "ghost_atk": 0.05}, {"text": "最大HP +5%", "hp": 0.05}, {"text": "亡霊の攻撃 +5%", "ghost_atk": 0.05}, {"text": "最大HP +5%", "hp": 0.05}, {"text": "亡霊の攻撃 +10%", "ghost_atk": 0.1}]}}
   ]
 }

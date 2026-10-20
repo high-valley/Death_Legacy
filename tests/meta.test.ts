@@ -222,7 +222,7 @@ test("v1 のセーブ: 祭壇・書庫に払っていた供物は全部戻る", 
     alloc: { altar: 4, affinity: { fire: 2 }, seals: ["bow"] },
   }));
   w.reload();
-  assert.equal(w.repo.data.schema_version, 3);
+  assert.equal(w.repo.data.schema_version, 4);
   assert.deepEqual(w.repo.data.tree, []);
   assert.deepEqual(w.repo.data.alloc, { affinity: {}, seals: [] });
   assert.equal(w.meta.offeringsFree(), 9);

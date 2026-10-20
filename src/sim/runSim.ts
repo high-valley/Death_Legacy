@@ -6,7 +6,7 @@ import { SpatialGrid, pushPair } from "../core/spatialGrid.ts";
 import type { Balance, EnemyDef, Lineage, Rarity, RarityId, RunMode } from "../data/types.ts";
 import { branchLevel, weaponGrade, type Branch } from "../data/weapons.ts";
 export { gradeIndex, weaponGrade } from "../data/weapons.ts";
-import type { CardMods, GhostPick, GhostRecord, Heirloom, RunResult, Snapshot, Summary } from "../meta/records.ts";
+import type { CardMods, FacilityBuff, GhostPick, GhostRecord, Heirloom, RunResult, Snapshot, Summary } from "../meta/records.ts";
 
 export const STEP = 1 / 60;
 const TAU = Math.PI * 2;
@@ -105,6 +105,8 @@ export interface RunOpts {
   wraith?: GhostRecord | null;
   /** 穢れによる敵HPの増分（0.12 = +12%） */
   taint_hp?: number;
+  /** 拠点の施設の効果（武具の間のタグ・供養塔の力） */
+  facility?: FacilityBuff;
 }
 
 export interface Devour { rec: GhostRecord; might: number; hp: number }
@@ -153,6 +155,7 @@ export class RunSim {
   wraithSpawned = false;
   wraithDead = false;
   taintHp = 0;
+  facility: FacilityBuff = { tags: [], ghost_atk: 0, hp: 0, offer: 0 };
   cardMods: CardMods = { altar: 0, affinity: {}, seals: [] };
 
   t = 0;
@@ -204,7 +207,8 @@ export class RunSim {
     if (o.card_mods) this.cardMods = o.card_mods;
     this.rng = new RngStreams(this.seed);
     this.hero.r = D.player.radius;
-    this.maxHp = Math.round(D.player.hp * (1 + (this.lineage.mods.max_hp ?? 0)));
+    if (o.facility) this.facility = structuredClone(o.facility);
+    this.maxHp = Math.round(D.player.hp * (1 + (this.lineage.mods.max_hp ?? 0)) * (1 + this.facility.hp));
     this.hp = this.maxHp;
     this.weapons[this.mainWeapon] = 1;
     const gs = [...(o.ghosts ?? []), ...(o.ghost ? [o.ghost] : [])];
@@ -302,6 +306,7 @@ export class RunSim {
       const t = D.passives[id]?.tag;
       if (t) add(t, P.passive_level * this.passives[id]);
     }
+    for (const t of this.facility.tags) if (t in D.tags) add(t, 1);   // 武具の間
     return (this.tagCache = out);
   }
 
@@ -350,7 +355,7 @@ export class RunSim {
   /** 亡霊の攻撃倍率（祭壇の樹・家系・霊媒・霊のセット） */
   ghostAtkMul(): number {
     const sp = this.setMods(["spirit"]);
-    return (1 + this.mod("ghost_atk")) * (1 + (this.cardMods.ghost_atk ?? 0)) * (1 + (this.D.passives.medium.per / 100) * this.pw("medium")) * (1 + (sp.ghost_atk ?? 0));
+    return (1 + this.mod("ghost_atk")) * (1 + (this.cardMods.ghost_atk ?? 0)) * (1 + this.facility.ghost_atk) * (1 + (this.D.passives.medium.per / 100) * this.pw("medium")) * (1 + (sp.ghost_atk ?? 0));
   }
 
   /** 亡霊の解放率。墓守は1段階早い */

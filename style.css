@@ -507,3 +507,23 @@ kbd { display: inline-block; min-width: 24px; padding: 1px 6px; border: 1px soli
 .lv-card.curse-card { background: linear-gradient(180deg, #3a1214 0%, #0d1015 60%); }
 .lv-card.curse-card .d { color: #f0c4c5; }
 @media (max-height: 520px) { .party { grid-template-columns: 1fr 1fr; } .party .chosen .small { display: none; } .party .chosen { gap: 8px; padding: 8px; } }
+
+/* ---------- 霊廟（施設） ---------- */
+.maus-intro { display: grid; gap: 8px; }
+.maus-eff { gap: 6px; }
+.maus-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+.facility { display: grid; gap: 10px; }
+.facility:not(.built) { opacity: .92; }
+.facility.built { border-color: var(--gold); }
+.facility .lockline { display: flex; gap: 6px; align-items: center; color: var(--faint); }
+.facility .lockline .icon { width: 14px; height: 14px; }
+.facility .seats { display: grid; gap: 8px; }
+.facility .seat { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.facility .empty-seat { display: block; padding: 14px; border: 1px dashed var(--gold-dim); border-radius: var(--r); text-align: center; }
+.facility .cands { display: grid; gap: 6px; max-height: 260px; overflow-y: auto; }
+.facility .cand { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; text-align: left; padding: 8px 10px; border-left: 3px solid var(--tc, var(--gold-dim)); }
+.facility .cand .cn { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.facility .cand .ce, .facility .cand .faint { grid-column: 2; color: var(--mute); font-family: inherit; font-weight: 400; }
+.facility .steps { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--faint); font-size: 13px; }
+.facility .steps li.on { color: var(--gold-hi); }
+@media (max-width: 640px) { .maus-grid { grid-template-columns: 1fr; } .facility .seat { grid-template-columns: 1fr; } }

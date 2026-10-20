@@ -4,7 +4,7 @@
 // ブラウザでは localStorage、テストではメモリ、将来の Steam 版（Electron）ではファイルに差し替える。
 import type { SaveData } from "./records.ts";
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /** localStorage と同じ形の保存先 */
 export interface KV {
@@ -25,10 +25,10 @@ export function freshSave(dataVersion = 1): SaveData {
     schema_version: SCHEMA_VERSION, data_version: dataVersion,
     ghost_seq: 0, ghosts: [], run_history: [], settled_runs: [],
     active_run: null, pending_ghost: null, pending_heirloom: null,
-    progress: { clears: 0, deaths: 0, runs: 0, generation: 0, total_survival: 0, companion_runs: 0, best_weapon_level: {} },
+    progress: { clears: 0, deaths: 0, runs: 0, generation: 0, total_survival: 0, companion_runs: 0, best_weapon_level: {}, mourned_count: 0 },
     lineages: ["nameless"],
     offerings: { earned: 0, mourned: 0 }, tree: [], alloc: { affinity: {}, seals: [] },
-    heirlooms: [], heir_seq: 0,
+    heirlooms: [], heir_seq: 0, buildings: [],
   };
 }
 
@@ -45,6 +45,8 @@ export function migrate(d: SaveData): SaveData {
     d.tree = [];
     d.alloc = { affinity: {}, seals: [] };
   }
+  // v3 → v4: 施設。弔った回数は、残っている記録（弔うと consumed_at が付く）から数える
+  const oldMourned = (d.schema_version ?? 1) < 4 ? (d.ghosts ?? []).filter((g) => g.status === "released" && !!g.consumed_at).length : -1;
   const base = freshSave() as unknown as Record<string, unknown>;
   const o = d as unknown as Record<string, unknown>;
   for (const k of Object.keys(base)) if (!(k in o)) o[k] = structuredClone(base[k]);
@@ -61,6 +63,8 @@ export function migrate(d: SaveData): SaveData {
     delete old.ghost_id; delete old.ghost_mode;
   }
   if (!Array.isArray(d.tree)) d.tree = [];
+  if (!Array.isArray(d.buildings)) d.buildings = [];
+  if (oldMourned >= 0) d.progress.mourned_count = Math.max(d.progress.mourned_count ?? 0, oldMourned);
   d.schema_version = SCHEMA_VERSION;
   return d;
 }

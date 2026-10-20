@@ -95,6 +95,7 @@ export interface Balance {
   };
   checkpoint_interval: number;
   lineages: Lineage[];
+  facilities: Facility[];
   tags: Record<string, TagDef>;
   tag_points: { hero_weapon: number; ghost_weapon: number; ghost_spirit: number; passive_level: number };
   sigils: Sigil[];
@@ -106,3 +107,13 @@ export interface Balance {
 }
 
 export type RunMode = "full" | "short";
+
+/** 拠点（納骨堂）の施設。亡霊を住まわせて効果を出す（ADR 023） */
+export interface FacilityStep { text: string; ghost_atk?: number; hp?: number }
+export interface Facility {
+  id: string; name: string; icon: string; desc: string;
+  cost: number;     // 建てる供物（建てたら戻せない）
+  slots: number;    // 住まわせられる亡霊の数（0 = 住まわせない施設）
+  unlock: { type: "ghosts_born" | "vault" | "mourned"; count: number };
+  effect: { offer_per_mult?: number; tag_points?: number; every?: number; steps?: FacilityStep[] };
+}
