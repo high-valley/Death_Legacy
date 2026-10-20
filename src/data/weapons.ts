@@ -57,5 +57,6 @@ export function gradeAt(W: Weapon, rank: number, evo: boolean, branch?: Branch |
 /** 古い（ランクとレベルが一緒だった頃の Lv1〜5）武器Lvから、ランクと新しいレベルを求める */
 export function legacyWeapon(oldLv: number): { rank: number; level: number } {
   const lv = Math.max(1, Math.round(oldLv));
-  return { rank: lv >= 5 ? 2 : lv >= 3 ? 1 : 0, level: Math.min(20, 1 + (lv - 1) * 4) };
+  // 旧 Lv5 はダメージ1.8倍×攻撃間隔0.8（実質約2.3倍）→ 新しいレベル（1Lv +12%）で同じくらいの Lv12 に
+  return { rank: lv >= 5 ? 2 : lv >= 3 ? 1 : 0, level: Math.min(20, Math.round(1 + (lv - 1) * 2.75)) };
 }

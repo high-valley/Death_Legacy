@@ -338,7 +338,8 @@ class Game {
     s.hp = 1e9;
     s.maxHp = 1e9;
     s.t = 300;
-    s.weapons = { sword: 5, bow: 5, fire: 5 };
+    s.weapons = { sword: 10, bow: 10, fire: 10 };
+    s.rank = { sword: 2, bow: 2, fire: 2 };   // 重い形（最上位のランク）で測る
     for (let i = 0; i < 300; i++) {
       const e = s.spawnEnemy(["chaser", "charger", "shooter"][i % 3]);
       e.hp = 1e6;
@@ -383,7 +384,8 @@ class Game {
       this.meta.reserve(rid, k, "short", ws[k], "", "");
       const r = new RunSim(this.D, { run_id: rid, seed: k, mode: "short", weapon: ws[k] });
       r.t = [100, 150, 172, 120, 110][k];
-      r.weapons[r.mainWeapon] = 4;
+      r.weapons[r.mainWeapon] = 6;
+      r.rank[r.mainWeapon] = 2;
       r.branch[r.mainWeapon] = k % 2 ? "b" : "a";
       r.passives = { haste: 2 };
       r.ppow = { haste: 3 };

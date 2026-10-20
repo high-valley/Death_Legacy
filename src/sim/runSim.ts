@@ -578,13 +578,13 @@ export class RunSim {
     // 受けるダメージの軽減は掛け合わせても guard_floor（4割）より下がらない
     d *= Math.max(this.D.guard_floor, (1 + this.curseMod("dmg_taken")) * (this.has("iron_vow") ? 0.75 : 1) * (1 - this.pv("guard")));
     this.hp -= d;
+    this.hero.iframe = this.D.player.hit_iframe;
     if (this.hp <= 0 && this.has("undying") && !this.undyingUsed) {   // 刻印: 不屈
       this.undyingUsed = true;
       this.hp = 1;
       this.hero.iframe = Math.max(this.hero.iframe, 1.5);
       this.emit({ type: "toast", text: "不屈: 倒れずに踏みとどまった" });
     }
-    this.hero.iframe = this.D.player.hit_iframe;
     this.hero.flash = 0.15;
     this.deathCause = cause;
     this.emit({ type: "sfx", name: "hurt" });
@@ -1097,7 +1097,7 @@ export class RunSim {
 
   /** カードのタグ（表示用） */
   cardTag(c: Card): string {
-    if (c.kind === "weapon") return this.D.weapons[c.id].tags[0] ?? "";
+    if (c.kind === "weapon" || c.kind === "rank") return this.D.weapons[c.id].tags[0] ?? "";
     if (c.kind === "passive") return this.D.passives[c.id].tag ?? "";
     return "";
   }

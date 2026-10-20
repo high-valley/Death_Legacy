@@ -144,7 +144,10 @@ function migrateLevels(d: SaveData): void {
   const heir = (o: HeirOption): void => {
     o.level = o.type === "weapon" ? Math.min(10, legacyWeapon(o.level).level) : Math.min(5, Math.round(o.level * 1.6));
   };
-  for (const h of d.heirlooms ?? []) heir(h);
+  for (const h of d.heirlooms ?? []) {
+    heir(h);
+    h.name = h.name.replace(/Lv\d+$/, `Lv${h.level}`);   // 名前に入っている古いLvも直す
+  }
   for (const o of d.pending_heirloom?.options ?? []) heir(o);
   const best = d.progress?.best_weapon_level ?? {};
   for (const k in best) best[k] = legacyWeapon(best[k]).level;

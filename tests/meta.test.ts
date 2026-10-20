@@ -328,18 +328,19 @@ test("v4 のセーブ: 古い武器Lv（1〜5）をランクと新しいレベ�
   w.kv.setItem("test", JSON.stringify({
     schema_version: 4, run_history: [], settled_runs: [],
     ghosts: [{ ghost_id: "g1", status: "stored", primary_weapon_id: "sword", weapon_level: 5, weapon_branch: "b", passive_level: 3, tier_id: "hero", display_name: "x", stat_snapshot: { attack_mult: 1, attack_speed: 1, area: 1 } }],
-    heirlooms: [{ heir_id: "h1", type: "weapon", id: "sword", level: 3, name: "x", from_generation: 1, status: "stored" }],
+    heirlooms: [{ heir_id: "h1", type: "weapon", id: "sword", level: 3, name: "第1代の形見・剣 Lv3", from_generation: 1, status: "stored" }],
     progress: { best_weapon_level: { fire: 5 } },
     active_run: { run_id: "r", seed: 1, mode: "short", weapon: "spear", heirloom_id: "", lineage_id: "nameless", started_at: "", ghosts: [],
       checkpoint: { t: 60, hp: 50, max_hp: 120, level: 5, xp: 0, weapons: { spear: 3 }, passives: { might: 2 }, ppow: { might: 2 }, wbonus: {}, evolved: {}, kills: 0, boss_kills: 0, boss_spawned: false, elite_idx: 0, spawn_acc: 0, branch: { spear: "b" } } },
   }));
   w.reload();
   const g = w.meta.getGhost("g1")!;
-  assert.ok(g.weapon_rank === 2 && g.weapon_level === 17 && g.passive_level === 5, JSON.stringify(g));
-  assert.equal(w.repo.data.heirlooms[0].level, 9);
-  assert.equal(w.repo.data.progress.best_weapon_level.fire, 17);
+  assert.ok(g.weapon_rank === 2 && g.weapon_level === 12 && g.passive_level === 5, JSON.stringify(g));
+  assert.equal(w.repo.data.heirlooms[0].level, 7);
+  assert.match(w.repo.data.heirlooms[0].name, /Lv7$/);
+  assert.equal(w.repo.data.progress.best_weapon_level.fire, 12);
   const r = w.resume();
   assert.equal(r.weaponName("spear"), "トライデント", "中断ラン: ランク1＝道の最初");
-  assert.equal(r.weapons.spear, 9);
+  assert.equal(r.weapons.spear, 7);
   assert.equal(r.passives.might, 3);
 });

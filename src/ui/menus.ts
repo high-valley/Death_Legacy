@@ -623,7 +623,7 @@ export class Menus {
     for (const id of sim.curses) ul.append(h("li", { class: "c" }, iconSvg("ghost"), h("span", { class: "bn" }, D.curses.find((x) => x.id === id)?.name ?? id, h("small", {}, "呪い"))));
     const pts = sim.tagPoints(), sets = sim.activeSets();
     return h("aside", { class: "frame build-side" }, h("h4", {}, "現在のビルド"), ul,
-      h("p", { class: "small faint" }, `パッシブ ${Object.keys(sim.passives).length} / ${D.passive_slots}`),
+      h("p", { class: "small faint" }, `パッシブ ${Object.keys(sim.passives).length} / ${sim.passiveSlots()}`),
       h("h4", {}, "共鳴"),
       h("div", { class: "row tags" }, ...Object.keys(pts).map((t) => this.tagChip(t, pts[t]))),
       sets.length ? h("ul", { class: "sets" }, ...sets.map((st) => h("li", {}, this.tagChip(st.tag, st.at), st.text))) : h("p", { class: "small faint" }, "同じタグを2つ集めるとセット効果"));
@@ -841,7 +841,7 @@ export class Menus {
     const meta = this.meta, pend = meta.S.pending_heirloom!;
     const full = meta.storedHeirs().length >= this.D.shelf.capacity;
     p.append(h("div", { class: "notice" }, h("b", {}, `第${pend.generation}代の形見を1つ残す`),
-      h("span", { class: "small mute" }, `次からの世代が1回だけ身につけて出撃できる（元の半分ほどの強さ、最大Lv${this.D.shelf.max_level}）。${full ? "棚がいっぱいなので、一番古い形見を手放す。" : ""}`)));
+      h("span", { class: "small mute" }, `次からの世代が1回だけ身につけて出撃できる（元の半分ほどの強さ。武器は最大Lv${this.D.shelf.weapon_max_level}・パッシブは最大Lv${this.D.shelf.max_level}）。${full ? "棚がいっぱいなので、一番古い形見を手放す。" : ""}`)));
     const g = h("div", { class: "picks" });
     pend.options.forEach((o, i) => {
       const card = this.pick([h("span", { class: "tier" }, o.type === "weapon" ? "武器" : "パッシブ"), h("span", { class: "name" }, meta.heirLabel(o)), h("span", { class: "meta" }, meta.heirEffect(o))],
