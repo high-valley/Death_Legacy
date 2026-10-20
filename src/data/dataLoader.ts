@@ -107,7 +107,12 @@ export function loadBalance(raw: unknown): Loaded {
     if (!["ghosts_born", "vault", "mourned"].includes(f.unlock.type)) errors.push(`facilities[${f.id}].unlock: type は ghosts_born / vault / mourned`);
     if (!(f.cost >= 0) || !(f.slots >= 0)) errors.push(`facilities[${f.id}]: cost と slots は0以上`);
     const e = f.effect;
+    if (!(Number(f.unlock.count) >= 1)) errors.push(`facilities[${f.id}].unlock: count は1以上`);
     if (e.steps && !(Number(e.every) >= 1)) errors.push(`facilities[${f.id}].effect: steps には every（1以上）が要る`);
+    (e.steps ?? []).forEach((st, j) => {
+      if (typeof st.text !== "string") errors.push(`facilities[${f.id}].steps[${j}]: text が要る`);
+      for (const k of Object.keys(st)) if (!["text", "ghost_atk", "hp"].includes(k)) errors.push(`facilities[${f.id}].steps[${j}]: 知らない項目 '${k}'`);
+    });
     for (const k of Object.keys(e)) if (!["offer_per_mult", "tag_points", "every", "steps"].includes(k)) errors.push(`facilities[${f.id}].effect: 知らない項目 '${k}'`);
   });
   // 祭壇の樹: 根は1つ（費用0・親なし）、親は先に定義された節、レア度の合計は altar.max 以下

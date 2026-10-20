@@ -527,3 +527,4 @@ kbd { display: inline-block; min-width: 24px; padding: 1px 6px; border: 1px soli
 .facility .steps { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--faint); font-size: 13px; }
 .facility .steps li.on { color: var(--gold-hi); }
 @media (max-width: 640px) { .maus-grid { grid-template-columns: 1fr; } .facility .seat { grid-template-columns: 1fr; } }
+.ghost-row.stationed { opacity: .55; filter: saturate(.6); border-style: dashed; }

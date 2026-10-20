@@ -270,7 +270,9 @@ export class Menus {
     for (const g of avail) list.append(this.ghostCard(g, hub.ghosts.some((x) => x.id === g.ghost_id), () => toggle(g.ghost_id)));
     for (const g of stored) {
       if (!g.stationed_at) continue;
-      list.append(this.ghostCard(g, false, null, `${meta.facility(g.stationed_at)?.name ?? "施設"}の堂守（霊廟で外すと連れていける）`));
+      const c = this.ghostCard(g, false, null, `${meta.facility(g.stationed_at)?.name ?? "施設"}の堂守（霊廟で外すと連れていける）`);
+      c.classList.add("stationed");
+      list.append(c);
     }
     if (stored.length === 0) list.append(h("div", { class: "empty" }, "まだ亡霊はいない。未練の欠片を集め、ランの3割以上を生き延びて倒れた者だけが亡霊になる。"));
     const archive = h("section", { class: "frame archive", "data-scroll": "archive" },
@@ -330,7 +332,7 @@ export class Menus {
     }
     center.append(h("div", { class: "section" }, h("h4", {}, `連れていく亡霊　${picks.length} / ${slots}`), party));
     // 共鳴の見込み（主人公の武器＋連れていく亡霊のタグ）
-    const preview = new RunSim(D, { weapon, lineage: lin.id, ghosts: picks.filter((x) => x.mode === "bring").map((x) => x.g) });
+    const preview = new RunSim(D, { weapon, lineage: lin.id, ghosts: picks.filter((x) => x.mode === "bring").map((x) => x.g), facility: meta.facilityBuff() });
     const pts = preview.tagPoints(), sets = preview.activeSets();
     center.append(h("div", { class: "section resonance" },
       h("h4", {}, "共鳴　同じタグを集めるとセット効果（2・4・6）"),
@@ -811,7 +813,10 @@ export class Menus {
     p.append(h("div", { class: "notice soul" }, h("b", {}, "成仏させる亡霊を1体選ぶ"), h("span", { class: "small mute" }, `保管庫は${this.D.vault_capacity}体まで。新しい亡霊を残すなら、ほかの1体を成仏させる。`)));
     const g = h("div", { class: "picks" });
     g.append(this.ghostCard(ng, true, () => { meta.resolvePendingGhost(ng.ghost_id); done(); }, "新しい亡霊を成仏させる"));
-    for (const x of meta.storedGhosts()) g.append(this.ghostCard(x, false, () => { meta.resolvePendingGhost(x.ghost_id); done(); }, "この亡霊を成仏させる"));
+    for (const x of meta.storedGhosts()) {
+      const fac = x.stationed_at ? meta.facility(x.stationed_at)?.name : "";
+      g.append(this.ghostCard(x, false, () => { meta.resolvePendingGhost(x.ghost_id); done(); }, fac ? `${fac}の堂守。成仏させると施設の効果も消える` : "この亡霊を成仏させる"));
+    }
     p.append(g);
   }
 
