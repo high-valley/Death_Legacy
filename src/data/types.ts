@@ -78,6 +78,7 @@ export interface Balance {
   weapon_max_level: number;
   /** 武器ランクが上がるLv（[道を選ぶ, 道の先, 進化]）。レベルはダメージだけ、ランクで武器が変わる（ADR 024） */
   rank_levels: number[];
+  weapon_card_weight: number;   // 武器カードの出やすさ（パッシブ1種を1とした重み）
   sub_weapon_slots: number;
   passives: Record<string, Passive>;
   passive_slots: number;
@@ -95,7 +96,7 @@ export interface Balance {
   shelf: { unlock_generation: number; capacity: number; max_level: number; weapon_max_level: number };
   enemies: Record<string, EnemyDef>;
   spawn: {
-    base_per_sec: number; per_progress: number; max_alive: number; hp_growth: number; dmg_growth: number; full_hp_growth: number; full_dmg_growth: number; full_curve: number; shooter_from: number; charger_from: number;
+    base_per_sec: number; per_progress: number; max_alive: number; hp_growth: number; dmg_growth: number; full_hp_growth: number; full_dmg_growth: number; full_curve: number; curve: number; shooter_from: number; charger_from: number;
     shooter_share: number; charger_share: number; elites_at: number[]; boss_phase_rate: number;
   };
   checkpoint_interval: number;

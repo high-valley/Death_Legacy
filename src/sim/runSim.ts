@@ -273,8 +273,8 @@ export class RunSim {
   dmgScale(): number { return 1 + (this.mode === "full" ? this.D.spawn.full_dmg_growth : this.D.spawn.dmg_growth) * this.growthT(); }
   /** 敵HPの伸び（10分モードは長いぶん主人公が育つので、大きく伸ばす） */
   hpGrowth(): number { return this.mode === "full" ? this.D.spawn.full_hp_growth : this.D.spawn.hp_growth; }
-  /** 伸び方の曲線。10分モードは序盤ゆるやか・後半に急（3分時点で3分モードの終盤と同じくらい） */
-  growthT(): number { return this.mode === "full" ? Math.pow(this.progress(), this.D.spawn.full_curve) : this.progress(); }
+  /** 伸び方の曲線（進み具合の curve 乗）。序盤はゆるやか・後半に急（最初は一人でも楽、後半は一人では厳しい） */
+  growthT(): number { return Math.pow(this.progress(), this.mode === "full" ? this.D.spawn.full_curve : this.D.spawn.curve); }
   xpNeed(): number { return this.D.xp.base + this.level * this.D.xp.per_level; }
   pw(id: string): number { return this.ppow[id] ?? 0; }
   /** パッシブの効果（1 = 100%）。数値は balance.json の per */
@@ -1053,7 +1053,7 @@ export class RunSim {
     while (out.length < 3 && opts.length > 0) {
       const ws = opts.map((o) => {
         const t = o.kind === "passive" ? D.passives[o.id].tag : undefined;
-        return (1 + (aff[o.id] ?? 0) * step) * (t && (pts[t] ?? 0) > 0 ? 2 : 1) * (o.kind === "weapon" ? 1.6 : 1);
+        return (1 + (aff[o.id] ?? 0) * step) * (t && (pts[t] ?? 0) > 0 ? 2 : 1) * (o.kind === "weapon" ? D.weapon_card_weight : 1);
       });
       const total = ws.reduce((a, b) => a + b, 0);
       let r = this.rng.cards.randf() * total;

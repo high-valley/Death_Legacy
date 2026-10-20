@@ -9,28 +9,29 @@ import { D } from "./helpers.ts";
 const sim = (weapon: string, mods: Partial<CardMods> = {}, seed = 1): RunSim =>
   new RunSim(D, { run_id: "b", seed, mode: "short", weapon, card_mods: { altar: 0, affinity: {}, seals: [], ...mods } });
 
-test("武器が Lv5 に届くと、次のレベルアップでランクアップの札（道 a / b）が出て、選んだ道で名前と攻撃が変わる", () => {
+test("武器が rank_levels のLvに届くと、次のレベルアップでランクアップの札（最初は道 a / b）が出て、選んだ道で名前と攻撃が変わる", () => {
+  const [l1, l2, l3] = D.rank_levels;
   const r = sim("sword");
-  r.weapons.sword = 4;
-  assert.ok(!r.rollChoices().some((c) => c.kind === "rank"), "Lv4 ではまだ出ない");
-  r.weapons.sword = 5;
+  r.weapons.sword = l1 - 1;
+  assert.ok(!r.rollChoices().some((c) => c.kind === "rank"), "届く前は出ない");
+  r.weapons.sword = l1;
   const pair = r.rollChoices();
   assert.deepEqual(pair.filter((c) => c.kind === "rank").map((c) => c.branch), ["a", "b"], "必ず出る");
   const b = pair.find((c) => c.branch === "b")!;
   assert.match(r.describe(b).n, /短剣 → レイピア/);
   r.applyChoice(b);
   assert.equal(r.weaponName("sword"), "レイピア");
-  assert.equal(r.weapons.sword, 5, "ランクアップでレベルは変わらない");
-  r.weapons.sword = 9;
-  assert.ok(!r.rollChoices().some((c) => c.kind === "rank"), "次は Lv10");
-  r.weapons.sword = 10;
+  assert.equal(r.weapons.sword, l1, "ランクアップでレベルは変わらない");
+  r.weapons.sword = l2 - 1;
+  assert.ok(!r.rollChoices().some((c) => c.kind === "rank"), "次の段階の前は出ない");
+  r.weapons.sword = l2;
   const next = r.rollChoices().filter((c) => c.kind === "rank");
   assert.equal(next.length, 1);
   r.applyChoice(next[0]);
   assert.equal(r.weaponName("sword"), "エストック", "同じ道の先");
   assert.ok(r.weaponCd("sword", 1, false, "b") < r.weaponCd("sword", 1, false, "a"), "レイピアは速い");
   assert.equal(gradeAt(D.weapons.fire, 2, false, "b").name, "メテオ");
-  r.weapons.sword = 15;
+  r.weapons.sword = l3;
   const evo = r.rollChoices().filter((c) => c.kind === "rank");
   assert.equal(evo[0].rar, "LR");
   r.applyChoice(evo[0]);

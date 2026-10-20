@@ -18,6 +18,7 @@
 - **絵はオーナーが用意する**（主人公7人の絵・背景。亡霊には人の絵を使わない、ADR 020）。`art/` に決まった名前で置くと自動で入る。一覧は `docs/art_assets.md`、生成プロンプト（ChatGPT 向け）は `docs/art_prompts.md`。チャットで画像をもらったら切り抜き・縮小（目安300KB以内）・webp 変換して、名前を付けて `art/` に置く（地面は継ぎ目なしに加工）。
 - **実装済み（ADR 021）**: 亡霊は消費しない・最大2体同行・亡霊化は生存30%＋未練の欠片・主人公は武器1種・Lv3で武器の道を選ぶ・タグとセット効果・刻印・呪い。
 - **実装済み（ADR 023）**: 拠点の施設「堂守の亡霊」（霊廟タブ。鎮魂堂・武具の間・供養塔。住む亡霊は連れていけない・施設は戻せない）。
+- **実装済み（ADR 024）**: 武器のランク（武器が変わる）とレベル（ダメージ）を分けた・パッシブLv8・カード追加（パッシブ・呪い・刻印）・説明書・ランの後半ほど厳しい難度。
 - **次**: オーナーと相談（施設の追加候補＝見張り塔・系譜の間は `docs/proposals/facilities.md`）
 - 公開URL: https://high-valley.github.io/Death_Legacy/
 
@@ -28,7 +29,7 @@
 ## よく使うコマンド
 ```bash
 npm install            # 初回（この作業環境では npm に繋がらないので、ln -s /opt/npm-tools/node_modules node_modules で代用できる）
-npm test               # 単体テスト 83件（Node 22.18+ が TypeScript をそのまま実行）
+npm test               # 単体テスト 88件（Node 22.18+ が TypeScript をそのまま実行）
 npm run typecheck      # tsc --noEmit
 npm run build          # dist/ に書き出し
 npm run dev            # http://localhost:8000
@@ -46,10 +47,10 @@ URL: `?demo`（見本データ・別保存先）`?fps` `?bench` `?lowres`。
 - 異常終了: `active_run` と10秒ごとの `checkpoint` が残る。タイトルで「再開」か「放棄（リタイア扱い・消費）」を選ばせる。
 - 戦闘中の亡霊は保管データの**コピー**（structuredClone）から作る。
 - セーブは `SaveRepository`: 一時キー→検証→.bak退避→本体。読み込み失敗時は .bak。項目を足したら `migrate()` にも足し、`schema_version` を上げる時は段階変換を書く。
-- 乱数は `RngStreams`（spawn / cards / misc / lineage / build）。新しい用途で既存ストリームを使うと seed 再現性が壊れる。`Math.random` は描画の揺れ以外で使わない。
+- 乱数は `RngStreams`（spawn / cards / misc / lineage / build / crit）。新しい用途で既存ストリームを使うと seed 再現性が壊れる。`Math.random` は描画の揺れ以外で使わない。
 - バランス値は `data/balance.json`（祭壇の樹は `tree`、3択と怨霊は `rites`）。項目を足したら `src/data/types.ts` と `loadBalance()` の検証にも足す。
 - TypeScript は「型を消すだけで動く」書き方にする（`enum`・引数プロパティ禁止、import は `.ts` 付き）。Node がそのまま実行するため。
-- 武器の段階は `src/data/weapons.ts` の `weaponGrade()`。アイコンは `src/view/icons.ts`（DOM・キャンバス共通）、絵は `src/view/art.ts`、主人公の動きは `src/view/heroAnim.ts`。
+- 武器はランク（`rank`、`gradeAt()`）とレベル（`weapons`、ダメージだけ）が別。ランクアップは `rank_levels` に届いた次のレベルアップで札が出る。アイコンは `src/view/icons.ts`（DOM・キャンバス共通）、絵は `src/view/art.ts`、主人公の動きは `src/view/heroAnim.ts`。
 - 入力は `InputRouter` / `TouchControls` 経由。スティックは指に付いてくる（`src/input/stick.ts`、テストあり）。
 
 ## 負荷（スマホ）
@@ -57,7 +58,6 @@ URL: `?demo`（見本データ・別保存先）`?fps` `?bench` `?lowres`。
 - 毎ティックの処理を増やしたら `npm run bench` と `?bench` で確認。
 
 ## 既知の課題
-- 2026-10-18「ぬるい」の感想で強化（hp_growth 3.2・dmg_growth 1.0・出現数増）。簡易ボット（武器優先）で3分モード単独 各武器 4〜8/12 クリア。人が遊んだ感想を聞いてから難度を調整する（`player.weapon_mult`・`spawn.hp_growth`）。
-- 10分モードは別の値（`full_hp_growth` 36・`full_dmg_growth` 4.0・`full_curve` 2 ＝ 序盤ゆるく終盤に急に硬く）。同ボットで 16/42 クリアと3分より難しい。弓・氷が長期戦で弱め（未調整）。
+- 難度（2026-10-21、ADR 024）: 簡易ボットで3分 単独 16/42・亡霊2体 28/42。剣は呪術師（遠距離）に弱い。敵の硬さは後半でも雑魚 1〜1.5発（10分モードは 2.5〜3.4発）。人が遊んだ感想で `spawn.hp_growth`・`spawn.curve`・`solo_xp_bonus`・`rank_levels` を調整する。
 - 仮アセット（絵はオーナーが用意中。効果音はコード生成）。
 - Steam 版（Electron＋Steamworks）は未着手。入口は `src/platform.ts`。

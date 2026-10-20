@@ -56,6 +56,7 @@ export function botPick(r: RunSim): ReturnType<RunSim["rollChoices"]>[number] {
   const cs = r.rollChoices();
   const pts = r.tagPoints();
   const score = (c: (typeof cs)[number]): number => {
+    if (c.kind === "rank") return 200;
     if (c.kind === "weapon") return 100 + (c.rar === "LR" ? 50 : 0);
     if (c.kind === "sigil") return 70;
     if (c.kind === "passive") {
