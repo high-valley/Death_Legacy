@@ -93,7 +93,6 @@ export class Menus {
     if (!g) return h("div", { class: `portrait empty ${cls}` }, iconSvg("ghost", "icon ph"));
     const el = h("div", { class: `portrait spirit ${cls}`, style: `--tc:${this.meta.ghostColor(g)}` });
     el.append(iconSvg("ghost", "icon ph"), iconSvg(g.primary_weapon_id, "icon pw"));
-    el.append(h("span", { class: "gen" }, kanjiNum(Number(/第(\d+)代/.exec(g.display_name)?.[1] ?? 0))));
     return el;
   }
 
@@ -158,7 +157,7 @@ export class Menus {
       menu.append(item("Continue", `中断したランを再開（${fmt(active.checkpoint?.t ?? 0)}・${gs.length ? `${gs.map((g) => g.display_name.replace(/・.*$/, "")).join("・")}と` : "単独"}）`, on.resume, true),
         item("Abandon", "放棄する（リタイア扱い）", on.abandon));
     } else {
-      menu.append(item(S.progress.runs > 0 ? "Continue" : "New Game", S.progress.runs > 0 ? `ホームへ・第${kanjiNum(S.progress.generation + 1)}代` : "はじめる", on.hub, true));
+      menu.append(item(S.progress.runs > 0 ? "Continue" : "New Game", S.progress.runs > 0 ? "ホームへ" : "はじめる", on.hub, true));
     }
     menu.append(item("Guide", "説明書", () => this.showManual(() => this.showTitle(active, on))));
     menu.append(item("Settings", "設定", on.settings));
@@ -260,7 +259,6 @@ export class Menus {
     const weapon = lin.weapon ?? hub.weapon;
     const picks = hub.ghosts.map((x) => ({ ...x, g: meta.getGhost(x.id)! }));
     const wr = meta.wraiths();
-    const gen = S.progress.generation + 1;
     const toggle = (id: string): void => {
       const i = hub.ghosts.findIndex((x) => x.id === id);
       if (i >= 0) hub.ghosts.splice(i, 1);
@@ -286,7 +284,7 @@ export class Menus {
 
     // ── 中: 主人公・連れていく亡霊・支度
     const center = h("section", { class: "frame sortie", "data-scroll": "sortie" });
-    center.append(this.frameHead(`第${kanjiNum(gen)}代の出撃`, D.lineages_enabled ? lin.name : "", "sword"));
+    center.append(this.frameHead("出撃", D.lineages_enabled ? lin.name : "", "sword"));
     // 主人公（＝武器）を絵で選ぶ。武器は育つと持ち替える
     const heroes = h("div", { class: "heroes" });
     for (const id of Object.keys(D.weapons)) {
@@ -356,8 +354,7 @@ export class Menus {
       for (const x of heirs) {
         const bonus = lin.mods.heir_level_bonus ?? 0;
         hg.append(this.pick([
-          h("span", { class: "tier" }, `第${x.from_generation}代より`),
-          h("span", { class: "name" }, x.name.replace(/^第\d+代の形見・/, "")),
+          h("span", { class: "name" }, x.name.replace(/^(第\d+代の)?形見・/, "")),
           h("span", { class: "meta" }, meta.heirEffect(x) + (bonus ? `（${lin.name}なら +${bonus}Lv）` : "")),
         ], { edge: "var(--gold)", pressed: hub.heir === x.heir_id, onPress: () => { hub.heir = x.heir_id; re(); } }));
       }
@@ -591,7 +588,7 @@ export class Menus {
     const st = meta.storedHeirs();
     p.append(h("p", {}, `ランを終えるたび（死亡・生還）に、主人公の武器かパッシブを1つ形見として残せる。出撃時に1つだけ身につけられ、そのランで使い切る。棚は${this.D.shelf.capacity}つまでで、あふれた時は一番古い形見から手放す。`));
     const g = h("div", { class: "picks" });
-    for (const x of st) g.append(this.pick([h("span", { class: "tier" }, `第${x.from_generation}代より`), h("span", { class: "name" }, x.name), h("span", { class: "meta" }, meta.heirEffect(x))], { edge: "var(--candle)" }));
+    for (const x of st) g.append(this.pick([h("span", { class: "name" }, x.name), h("span", { class: "meta" }, meta.heirEffect(x))], { edge: "var(--candle)" }));
     p.append(h("h3", {}, `棚　${st.length} / ${this.D.shelf.capacity}`), g);
     if (st.length === 0) p.append(h("div", { class: "empty" }, "まだ形見はない。"));
   }
@@ -861,8 +858,8 @@ export class Menus {
   private heirChoiceUi(p: HTMLElement, done: () => void): void {
     const meta = this.meta, pend = meta.S.pending_heirloom!;
     const full = meta.storedHeirs().length >= this.D.shelf.capacity;
-    p.append(h("div", { class: "notice" }, h("b", {}, `第${pend.generation}代の形見を1つ残す`),
-      h("span", { class: "small mute" }, `次からの世代が1回だけ身につけて出撃できる（元の半分ほどの強さ。武器は最大Lv${this.D.shelf.weapon_max_level}・パッシブは最大Lv${this.D.shelf.max_level}）。${full ? "棚がいっぱいなので、一番古い形見を手放す。" : ""}`)));
+    p.append(h("div", { class: "notice" }, h("b", {}, "形見を1つ残す"),
+      h("span", { class: "small mute" }, `次からのランで1回だけ身につけて出撃できる（元の半分ほどの強さ。武器は最大Lv${this.D.shelf.weapon_max_level}・パッシブは最大Lv${this.D.shelf.max_level}）。${full ? "棚がいっぱいなので、一番古い形見を手放す。" : ""}`)));
     const g = h("div", { class: "picks" });
     pend.options.forEach((o, i) => {
       const card = this.pick([h("span", { class: "tier" }, o.type === "weapon" ? "武器" : "パッシブ"), h("span", { class: "name" }, meta.heirLabel(o)), h("span", { class: "meta" }, meta.heirEffect(o))],

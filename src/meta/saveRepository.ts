@@ -53,6 +53,11 @@ export function migrate(d: SaveData): SaveData {
     }
     if (d.pending_ghost && !d.pending_ghost_kind) d.pending_ghost_kind = "full";
   }
+  // 世代（第N代）の表示はなくした（2026-10-22）。名前に残っている「第N代・」「第N代の」を外す（何度読み込んでも同じ結果）
+  for (const g of [...(d.ghosts ?? []), ...(d.pending_ghost ? [d.pending_ghost] : [])]) {
+    if (typeof g.display_name === "string") g.display_name = g.display_name.replace(/^第\d+代・/, "");
+  }
+  for (const h of d.heirlooms ?? []) if (typeof h.name === "string") h.name = h.name.replace(/^第\d+代の/, "");
   // v4 → v5: 武器のランクとレベルを分けた（ADR 024）。古い武器Lv（1〜5）→ ランク＋新しいレベル（1〜20）、パッシブLv（〜5）→ 〜8
   if ((d.schema_version ?? 1) < 5) migrateLevels(d);
   // v3 → v4: 施設。弔った回数は、残っている記録（弔うと consumed_at が付く）から数える

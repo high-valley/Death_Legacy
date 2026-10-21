@@ -44,6 +44,18 @@ export class MetaService {
     return this.S.ghosts.find((g) => g.ghost_id === id) ?? null;
   }
 
+  /** 同じ名前の亡霊がいれば「・二」「・三」と番号を付けて見分ける（世代の数え方はなくした） */
+  ghostName(base: string): string {
+    const KAN = ["", "", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+    const used = new Set(this.S.ghosts.filter((g) => g.status === "stored" || g.status === "reserved" || g.status === "wraith").map((g) => g.display_name));
+    if (!used.has(base)) return base;
+    for (let i = 2; i < 100; i++) {
+      const n = `${base}・${KAN[i] ?? i}`;
+      if (!used.has(n)) return n;
+    }
+    return base;
+  }
+
   /** 亡霊の特技（生前に一番育てたパッシブで決まる小さな効果） */
   trait(g: GhostRecord): GhostTrait {
     return this.D.ghost_traits[g.passive_id] ?? this.D.ghost_traits._;
@@ -78,7 +90,7 @@ export class MetaService {
     const house = !this.D.lineages_enabled || lin.id === this.D.lineages[0].id ? "" : `${lin.name}・`;
     return {
       ghost_id: uuid(), origin_run_id: sm.run_id, created_at: now(),
-      display_name: `第${this.S.progress.generation}代・${house}${this.D.weapons[wid].name}の${cleared ? "英霊" : "亡霊"}`,
+      display_name: this.ghostName(`${house}${this.D.weapons[wid].name}の${cleared ? "英霊" : "亡霊"}`),
       survival_seconds: Math.floor(sm.t), run_length: Math.floor(sm.run_len), tier_id: "",
       primary_weapon_id: wid, weapon_level: wlv, weapon_rank: sm.rank?.[wid] ?? 0, evolved: !!sm.evolved[wid], weapon_branch: sm.branch?.[wid],
       passive_id: pid, passive_level: pid ? sm.passives[pid] ?? 0 : 0,
@@ -167,7 +179,7 @@ export class MetaService {
       const o = p.options[index];
       this.S.heir_seq += 1;
       this.S.heirlooms.push({
-        heir_id: uuid(), name: `第${p.generation}代の形見・${this.heirLabel(o)}`, type: o.type, id: o.id,
+        heir_id: uuid(), name: `形見・${this.heirLabel(o)}`, type: o.type, id: o.id,
         level: o.level, from_generation: p.generation, status: "stored",
       });
       const st = this.storedHeirs();

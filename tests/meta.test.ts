@@ -20,14 +20,17 @@ test("t01 新規データで出撃 → レベルアップ → ボス → 敗北�
   assert.ok(out.result === "player_death" && w.meta.storedGhosts().length === 1);
 });
 
-test("t02 亡霊は等級を持たず、武器の種類と特技（一番育てたパッシブ）だけを持つ。名前は第N代・武器の亡霊", () => {
+test("t02 亡霊は等級を持たず、武器の種類と特技（一番育てたパッシブ）だけを持つ。名前は「武器の亡霊」（同じ名前は・二、・三）", () => {
   const w = new World();
   const r = w.sortie("", "", "full", "bow", 12)!;
   r.weapons.bow = 9; r.passives = { might: 2 }; r.ppow = { might: 2 };
   w.die(r, 300);
   const g = w.meta.storedGhosts()[0];
   assert.ok(g.survival_seconds === 300 && g.tier_id === "" && g.primary_weapon_id === "bow" && g.passive_id === "might", g.display_name);
-  assert.equal(g.display_name, "第1代・弓の亡霊");
+  assert.equal(g.display_name, "弓の亡霊");
+  w.meta.resolveHeirloom(-1);
+  w.die(w.sortie("", "", "full", "bow", 13), 300);
+  assert.deepEqual(w.meta.storedGhosts().map((x) => x.display_name), ["弓の亡霊", "弓の亡霊・二"]);
   assert.equal(w.meta.trait(g).text, D.ghost_traits.might.text);
 });
 
@@ -395,7 +398,7 @@ test("v4 のセーブ: 古い武器Lv（1〜5）をランクと新しいレベ�
   const g = w.meta.getGhost("g1")!;
   assert.ok(g.weapon_rank === 2 && g.weapon_level === 12 && g.passive_level === 5, JSON.stringify(g));
   assert.equal(w.repo.data.heirlooms[0].level, 7);
-  assert.match(w.repo.data.heirlooms[0].name, /Lv7$/);
+  assert.equal(w.repo.data.heirlooms[0].name, "形見・剣 Lv7");
   assert.equal(w.repo.data.progress.best_weapon_level.fire, 12);
   const r = w.resume();
   assert.equal(r.weaponName("spear"), "トライデント", "中断ラン: ランク1＝道の最初");
@@ -422,8 +425,8 @@ test("v5 のセーブ: 亡霊の名前の等級名を「亡霊」に、入れ替
     pending_ghost: { ghost_id: "g2", status: "pending", primary_weapon_id: "bow", weapon_level: 1, weapon_rank: 0, passive_level: 0, passive_id: "", tier_id: "echo", display_name: "第4代・ショートボウの残響", stat_snapshot: { attack_mult: 1, attack_speed: 1, area: 1 } },
   }));
   w.reload();
-  assert.equal(w.meta.getGhost("g1")!.display_name, "第3代・フロストの亡霊");
-  assert.equal(w.repo.data.pending_ghost!.display_name, "第4代・ショートボウの亡霊");
+  assert.equal(w.meta.getGhost("g1")!.display_name, "フロストの亡霊", "等級名も「第N代」も外れる");
+  assert.equal(w.repo.data.pending_ghost!.display_name, "ショートボウの亡霊");
   assert.equal(w.repo.data.pending_ghost_kind, "full");
   const r = w.sortie("g1", "", "short", "sword", 1)!;
   assert.ok(r.ghost!.lv === 1 && r.ghost!.rank === 0, "古い亡霊も Lv1 から");
