@@ -101,6 +101,7 @@ export interface Balance {
   };
   checkpoint_interval: number;
   lineages: Lineage[];
+  lineages_enabled: boolean;   // false = 家系の仕組みを使わない（2026-10 一旦なし）。データは残す
   facilities: Facility[];
   tags: Record<string, TagDef>;
   tag_points: { hero_weapon: number; ghost_weapon: number; ghost_spirit: number; passive_level: number };

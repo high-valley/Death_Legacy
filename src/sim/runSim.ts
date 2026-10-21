@@ -130,6 +130,12 @@ const angleDiff = (a: number, b: number): number => {
 
 const SEP_MAX_R = 12; // これ以下の半径の敵は sepGrid で押し合い
 
+/** 家系を使わない時の「何もない家系」（特性・弱点・専用カードなし） */
+export function neutralLineage(D: Balance): Lineage {
+  const b = D.lineages[0];
+  return { ...b, weapon: null, mods: {}, card: { ...b.card, max: 0 }, unlock: null };
+}
+
 export class RunSim {
   readonly D: Balance;
   readonly run_id: string;
@@ -206,7 +212,7 @@ export class RunSim {
     this.seed = o.seed ?? 1;
     this.mode = o.mode ?? "short";
     this.runLen = D.run_length[this.mode];
-    this.lineage = D.lineages.find((l) => l.id === o.lineage) ?? D.lineages[0];
+    this.lineage = D.lineages_enabled ? D.lineages.find((l) => l.id === o.lineage) ?? D.lineages[0] : neutralLineage(D);
     this.mainWeapon = this.lineage.weapon ?? o.weapon ?? "sword";
     if (o.card_mods) this.cardMods = o.card_mods;
     this.rng = new RngStreams(this.seed);

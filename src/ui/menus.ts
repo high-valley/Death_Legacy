@@ -285,7 +285,7 @@ export class Menus {
 
     // ── 中: 主人公・連れていく亡霊・支度
     const center = h("section", { class: "frame sortie", "data-scroll": "sortie" });
-    center.append(this.frameHead(`第${kanjiNum(gen)}代の出撃`, lin.name, "sword"));
+    center.append(this.frameHead(`第${kanjiNum(gen)}代の出撃`, D.lineages_enabled ? lin.name : "", "sword"));
     // 主人公（＝武器）を絵で選ぶ。武器は育つと持ち替える
     const heroes = h("div", { class: "heroes" });
     for (const id of Object.keys(D.weapons)) {
@@ -341,10 +341,12 @@ export class Menus {
       h("h4", {}, "共鳴　同じタグを集めるとセット効果（2・4・6）"),
       h("div", { class: "row" }, ...Object.keys(pts).map((t) => this.tagChip(t, pts[t]))),
       sets.length ? h("ul", { class: "sets" }, ...sets.map((st) => h("li", {}, this.tagChip(st.tag, st.at), st.text))) : h("p", { class: "small faint" }, "まだセット効果はない。レベルアップでタグ付きのパッシブを取ると伸ばせる。")));
-    // 家系
-    const houses = h("div", { class: "picks houses" });
-    for (const l of D.lineages) houses.append(this.houseCard(l, hub.lineage === l.id, () => { hub.lineage = l.id; re(); }));
-    center.append(h("div", { class: "section" }, h("h4", {}, "家系"), houses));
+    // 家系（使う時だけ）
+    if (D.lineages_enabled) {
+      const houses = h("div", { class: "picks houses" });
+      for (const l of D.lineages) houses.append(this.houseCard(l, hub.lineage === l.id, () => { hub.lineage = l.id; re(); }));
+      center.append(h("div", { class: "section" }, h("h4", {}, "家系"), houses));
+    }
     // 形見
     if (meta.shelfUnlocked()) {
       const hg = h("div", { class: "picks" });
@@ -745,7 +747,7 @@ export class Menus {
     // 左: 記録 / 右: 新しい亡霊
     const rows: [string, string][] = [
       ["生存時間", fmt(sim.t)], ["撃破数", sim.kills.toLocaleString()], ["ボス撃破数", String(sim.bossKills)], ["到達レベル", String(sim.level)],
-      ["使用武器", sim.weaponName(sim.mainWeapon)], ["未練の欠片", `${sim.fragments} / ${D.ghost_birth.fragments}`], ["家系", sim.lineage.name], ["獲得した供物", out ? `+${out.offerings}${out.facility_offer ? `（鎮魂堂 +${out.facility_offer}）` : ""}` : "—"],
+      ["使用武器", sim.weaponName(sim.mainWeapon)], ["未練の欠片", `${sim.fragments} / ${D.ghost_birth.fragments}`], ...(D.lineages_enabled ? [["家系", sim.lineage.name] as [string, string]] : []), ["獲得した供物", out ? `+${out.offerings}${out.facility_offer ? `（鎮魂堂 +${out.facility_offer}）` : ""}` : "—"],
     ];
     const tbl = h("dl", { class: "res-stats" });
     for (const [k, v] of rows) tbl.append(h("dt", {}, k), h("dd", { class: "num" }, v));

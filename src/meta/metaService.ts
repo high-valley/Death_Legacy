@@ -433,6 +433,7 @@ export class MetaService {
   }
 
   lineageUnlocked(id: string): boolean {
+    if (!this.D.lineages_enabled) return id === this.D.lineages[0].id;
     return this.D.lineages[0].id === id || this.S.lineages.includes(id);
   }
 
@@ -448,6 +449,7 @@ export class MetaService {
   /** 条件を満たした家系を解放し、新しく解放した id を返す */
   private checkUnlocks(): string[] {
     const out: string[] = [];
+    if (!this.D.lineages_enabled) return out;
     for (const l of this.D.lineages) {
       if (this.lineageUnlocked(l.id)) continue;
       const pr = this.unlockProgress(l);

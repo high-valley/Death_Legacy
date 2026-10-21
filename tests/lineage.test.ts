@@ -5,6 +5,9 @@ import { SaveRepository } from "../src/meta/saveRepository.ts";
 import { RunSim, STEP } from "../src/sim/runSim.ts";
 import { D, World } from "./helpers.ts";
 
+// 家系は 2026-10 に一旦なし（lineages_enabled: false）。仕組みは残っているので、このファイルだけ有効にして確かめる
+(D as { lineages_enabled: boolean }).lineages_enabled = true;
+
 test("新しいセーブでは無名だけが使え、未解放の家系では出撃できない", () => {
   const w = new World();
   assert.ok(w.meta.lineageUnlocked("nameless"));

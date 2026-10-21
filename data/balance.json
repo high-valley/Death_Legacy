@@ -223,6 +223,7 @@
   "spawn": { "base_per_sec": 1.4, "per_progress": 7, "max_alive": 300, "hp_growth": 6.5, "dmg_growth": 1.3, "full_hp_growth": 36, "full_dmg_growth": 4.0, "full_curve": 2, "curve": 2, "shooter_from": 0.15, "charger_from": 0.3,
              "shooter_share": 0.15, "charger_share": 0.15, "elites_at": [0.3, 0.6, 0.85], "boss_phase_rate": 0.4 },
   "checkpoint_interval": 10,
+  "lineages_enabled": false,
   "lineages": [
     { "id": "nameless", "name": "無名", "motto": "名も無き者は、何にでもなれる",
       "trait": "初期武器を自由に選べる。形見の効果 +1Lv",

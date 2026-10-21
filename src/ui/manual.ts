@@ -75,7 +75,7 @@ export function manualPage(D: Balance, ch: Chapter, touch: boolean): HTMLElement
       sec("刻印", para("まれに混ざる特別なカード（青緑の枠）。一度取るとそのラン中ずっと効く強い効果。祭壇の樹の書架を開くと種類が増える。")),
       sec("呪い", para("良いことと悪いことがセットになったカード（赤い枠）。祭壇の樹の「禁忌の頁」を開くと出るようになる。取るかどうかは自由。"),
         list(D.curses.map((c) => [h("b", {}, c.name), `　${c.desc}`]))),
-      sec("家系の札", para("家系（無名・火守・墓守など）ごとの専用カード。その家系で出撃した時だけ出る。")),
+      ...(D.lineages_enabled ? [sec("家系の札", para("家系（無名・火守・墓守など）ごとの専用カード。その家系で出撃した時だけ出る。"))] : []),
     );
   } else if (ch === "ghosts") {
     box.append(

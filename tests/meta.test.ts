@@ -281,7 +281,7 @@ test("形見: 候補 → 棚 → 身につけて出撃 → 使い切り", () => 
   const h = w.meta.storedHeirs()[0];
   assert.ok(h.type === "passive" && h.id === "haste" && h.level === 2, h.name);
   const r2 = w.sortie("", h.heir_id, "short", "sword", 23)!;
-  assert.ok(w.meta.getHeir(h.heir_id)!.status === "reserved" && r2.passives.haste === 3, "形見 Lv2 ＋ 無名の効果 1");
+  assert.ok(w.meta.getHeir(h.heir_id)!.status === "reserved" && r2.passives.haste === 2, "形見 Lv2（家系なし）");
   w.die(r2, 50);
   assert.equal(w.meta.getHeir(h.heir_id), null);
 });
@@ -343,4 +343,15 @@ test("v4 のセーブ: 古い武器Lv（1〜5）をランクと新しいレベ�
   assert.equal(r.weaponName("spear"), "トライデント", "中断ラン: ランク1＝道の最初");
   assert.equal(r.weapons.spear, 7);
   assert.equal(r.passives.might, 3);
+});
+
+test("家系なし: 出撃は無名でも特性・専用カードなし、家系は解放されない", () => {
+  const w = new World();
+  assert.equal(w.sortie("", "", "short", "sword", 1, "firekeeper"), null, "他の家系では出撃できない");
+  const r = w.sortie("", "", "short", "fire", 1)!;
+  assert.ok(!r.cardPool().some((o) => o.kind === "lineage"), "家系の札は出ない");
+  assert.equal(r.maxHp, D.player.hp);
+  r.weapons.fire = 20;
+  const out = w.die(r, 60);
+  assert.deepEqual(out.unlocked_lineages, []);
 });
