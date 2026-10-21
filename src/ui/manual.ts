@@ -7,7 +7,7 @@ export const CHAPTERS = [
   ["resonance", "共鳴"],
   ["cards", "カード"],
   ["ghosts", "亡霊"],
-  ["crypt", "納骨堂"],
+  ["crypt", "ホーム"],
 ] as const;
 export type Chapter = (typeof CHAPTERS)[number][0];
 
@@ -41,7 +41,7 @@ export function manualPage(D: Balance, ch: Chapter, touch: boolean): HTMLElement
         ["主人公が使える武器は1種類。カードで武器そのものを育てるか、パッシブ（攻撃力・速度など）を取るかを選ぶ。"],
         ["序盤は一人でも楽に進めるが、時間がたつほど敵が硬く、痛くなる。後半は亡霊の助けや、共鳴（同じタグを集める）が効いてくる。"],
       ])),
-      sec("死んだら", para(`倒れても終わりではない。条件を満たして倒れた主人公は「亡霊」になり、次のランに連れていける（「亡霊」の章）。ランを終えるたびに供物がもらえ、納骨堂で拠点を育てられる。`)),
+      sec("死んだら", para(`倒れても終わりではない。条件を満たして倒れた主人公は「亡霊」になり、次のランに連れていける（「亡霊」の章）。ランを終えるたびに供物がもらえ、ホームで拠点を育てられる。`)),
     );
   } else if (ch === "resonance") {
     const ex = Object.keys(D.tags).find((t) => t === "slash") ?? Object.keys(D.tags)[0];

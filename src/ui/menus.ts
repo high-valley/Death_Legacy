@@ -158,7 +158,7 @@ export class Menus {
       menu.append(item("Continue", `中断したランを再開（${fmt(active.checkpoint?.t ?? 0)}・${gs.length ? `${gs.map((g) => g.display_name.replace(/・.*$/, "")).join("・")}と` : "単独"}）`, on.resume, true),
         item("Abandon", "放棄する（リタイア扱い）", on.abandon));
     } else {
-      menu.append(item(S.progress.runs > 0 ? "Continue" : "New Game", S.progress.runs > 0 ? `納骨堂へ・第${kanjiNum(S.progress.generation + 1)}代` : "はじめる", on.hub, true));
+      menu.append(item(S.progress.runs > 0 ? "Continue" : "New Game", S.progress.runs > 0 ? `ホームへ・第${kanjiNum(S.progress.generation + 1)}代` : "はじめる", on.hub, true));
     }
     menu.append(item("Guide", "説明書", () => this.showManual(() => this.showTitle(active, on))));
     menu.append(item("Settings", "設定", on.settings));
@@ -216,7 +216,7 @@ export class Menus {
     }
     const taint = this.meta.taint();
     p.append(h("header", { class: "hub-head" },
-      h("h2", {}, "納骨堂"),
+      h("h2", {}, "ホーム"),
       tabs,
       h("div", { class: "row purses" },
         taint > 0 ? h("span", { class: "purse taint" }, "穢れ", h("b", {}, String(taint))) : null,

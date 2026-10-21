@@ -118,7 +118,7 @@ export type RunMode = "short" | "full" | "long";   // 3分 / 10分 / 30分（本
 /** モードごとの敵の伸び。boss_hp・wraith_hp は冥王・怨霊のHPの倍率 */
 export interface SpawnMode { hp_growth: number; dmg_growth: number; curve: number; elites_at: number[]; boss_hp: number; wraith_hp: number; solo_xp: number; ghost_guard: number }
 
-/** 拠点（納骨堂）の施設。亡霊を住まわせて効果を出す（ADR 023） */
+/** 拠点（ホーム）の施設。亡霊を住まわせて効果を出す（ADR 023） */
 export interface FacilityStep { text: string; ghost_atk?: number; hp?: number }
 export interface Facility {
   id: string; name: string; icon: string; desc: string;
