@@ -544,3 +544,26 @@ kbd { display: inline-block; min-width: 24px; padding: 1px 6px; border: 1px soli
 @media (max-width: 640px) { .manual .man-body { grid-template-columns: 1fr; } }
 .man-body > .man-sec:has(.man-sets) { grid-column: 1 / -1; }
 .man-set > .tag { justify-self: start; }
+
+/* ---------- 横向きのスマホ（低い画面）で文字が重ならないように（2026-10-22） ---------- */
+/* 祭壇の樹: 節の名前が箱からはみ出さない（長い名前は折り返す） */
+.node .nn { max-width: 100%; overflow: hidden; text-overflow: clip; }
+@media (max-height: 520px) {
+  .node .nn { white-space: normal; line-height: 1.15; font-size: 12px; letter-spacing: -.03em; word-break: keep-all; overflow-wrap: anywhere; }
+  .node .nc { font-size: 10px; }
+}
+/* 主人公の札: 「炎の魔導書」などが切れないよう、狭い時は2行に */
+.hero-card .hn { min-width: 0; }
+@media (max-height: 520px), (max-width: 720px) {
+  .hero-card .hn { white-space: normal; flex-wrap: wrap; line-height: 1.2; font-size: 11px; letter-spacing: -.02em; padding: 4px 2px 5px; }
+  .hero-card .hn .icon { width: 12px; height: 12px; }
+}
+/* レベルアップ: 横向きでは3枚を横一列に。下の帯と説明文が重ならないよう余白を取る */
+@media (max-height: 520px) and (min-width: 560px) {
+  .lv-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lv-card { padding: 8px 8px 36px; }
+  .lv-card .d { font-size: 11px; line-height: 1.45; }
+  .lv-card .what { font-size: 12px; }
+  .lv-card .ribbon { min-width: 0; width: calc(100% - 24px); padding: 2px 6px; font-size: 11px; letter-spacing: .04em; }
+}
+@media (max-height: 520px) and (max-width: 760px) { .lv-body { grid-template-columns: 1fr; } .build-side { display: none; } }
