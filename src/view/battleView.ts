@@ -490,18 +490,20 @@ export class BattleView {
   }
 
   private drawGhost(ctx: CanvasRenderingContext2D, sim: RunSim, g: Companion): void {
-    const tier = sim.D.tiers.find((t) => t.id === g.rec.tier_id) ?? sim.D.tiers[0];
+    const tg = sim.D.weapons[g.rec.primary_weapon_id]?.tags[0];
+    const tier = { color: (tg && sim.D.tags[tg]?.color) || "#7fe3dc" };   // 亡霊の色は武器のタグの色
+    const grow = Math.min(1, (g.rank + (g.evolved ? 1 : 0)) / 3);       // 育つほど濃く
     const gim = this.sprite(`sprite_ghost_${g.rec.primary_weapon_id}`) ?? this.sprite("sprite_ghost");
     if (gim) {
-      // 亡霊は半透明に、等級の色の光をまとわせる
+      // 亡霊は半透明に、武器の色の光をまとわせる
       ctx.save();
-      ctx.globalAlpha = 0.55 + 0.3 * sim.ghostUnlock();
+      ctx.globalAlpha = 0.55 + 0.3 * grow;
       ctx.shadowColor = tier.color; ctx.shadowBlur = 14;
       this.drawSprite(ctx, gim, g.x, g.y - 6, 40 + Math.sin(g.phase * 2) * 1.5, sim.hero.x < g.x);
       ctx.restore();
       return;
     }
-    ctx.globalAlpha = 0.45 + 0.25 * sim.ghostUnlock();
+    ctx.globalAlpha = 0.45 + 0.25 * grow;
     ctx.fillStyle = "#d9fff8";
     ctx.beginPath();
     ctx.arc(g.x, g.y - 4, 11, Math.PI, 0);

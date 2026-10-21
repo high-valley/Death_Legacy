@@ -5,7 +5,7 @@
 import { legacyWeapon } from "../data/weapons.ts";
 import type { GhostRecord, HeirOption, SaveData, Snapshot } from "./records.ts";
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /** localStorage と同じ形の保存先 */
 export interface KV {
@@ -25,7 +25,7 @@ export function freshSave(dataVersion = 1): SaveData {
   return {
     schema_version: SCHEMA_VERSION, data_version: dataVersion,
     ghost_seq: 0, ghosts: [], run_history: [], settled_runs: [],
-    active_run: null, pending_ghost: null, pending_heirloom: null,
+    active_run: null, pending_ghost: null, pending_ghost_kind: "", pending_heirloom: null,
     progress: { clears: 0, deaths: 0, runs: 0, generation: 0, total_survival: 0, companion_runs: 0, best_weapon_level: {}, mourned_count: 0 },
     lineages: ["nameless"],
     offerings: { earned: 0, mourned: 0 }, tree: [], alloc: { affinity: {}, seals: [] },
@@ -45,6 +45,13 @@ export function migrate(d: SaveData): SaveData {
   if ((d.schema_version ?? 1) < 2) {
     d.tree = [];
     d.alloc = { affinity: {}, seals: [] };
+  }
+  // v5 → v6: 亡霊の等級をなくした（ADR 025）。名前の等級名を「亡霊」に、入れ替え待ちの亡霊は満杯の入れ替えとして扱う
+  if ((d.schema_version ?? 1) < 6) {
+    for (const g of [...(d.ghosts ?? []), ...(d.pending_ghost ? [d.pending_ghost] : [])]) {
+      if (typeof g.display_name === "string") g.display_name = g.display_name.replace(/の(伝説の英霊|大英霊|英霊|戦霊|下級霊|残響)$/, "の亡霊");
+    }
+    if (d.pending_ghost && !d.pending_ghost_kind) d.pending_ghost_kind = "full";
   }
   // v4 → v5: 武器のランクとレベルを分けた（ADR 024）。古い武器Lv（1〜5）→ ランク＋新しいレベル（1〜20）、パッシブLv（〜5）→ 〜8
   if ((d.schema_version ?? 1) < 5) migrateLevels(d);

@@ -14,7 +14,7 @@ export interface GhostRecord {
   display_name: string;
   survival_seconds: number;
   run_length: number;
-  tier_id: string;
+  tier_id: string;          // v6 からは空（等級はなくなった。古い亡霊の記録だけに残る）
   primary_weapon_id: string;
   weapon_level: number;
   evolved: boolean;
@@ -67,6 +67,8 @@ export interface Snapshot {
   wraith_spawned?: boolean; wraith_dead?: boolean;
   fragments?: number; branch?: Record<string, "a" | "b">; sigils?: string[]; curses?: string[];
   rank?: Record<string, number>; undying_used?: boolean;
+  gstate?: { id: string; lv: number; rank: number; branch: "a" | "b" | ""; evolved: boolean; bonus: number }[];   // v6: 亡霊の育ち
+  ghost_dry?: number;
 }
 
 /** ラン終了処理（MetaService.settle）に渡す要約 */
@@ -107,6 +109,7 @@ export interface RunRecord {
   ghost_failed?: "" | "time" | "fragments";     // 亡霊になれなかった理由
   fragments?: number;
   facility_offer?: number;                      // 鎮魂堂で増えた供物
+  ghost_declined?: boolean;                     // 亡霊にしなかった
 }
 
 export interface SaveData {
@@ -118,6 +121,7 @@ export interface SaveData {
   settled_runs: string[];
   active_run: ActiveRun | null;
   pending_ghost: GhostRecord | null;
+  pending_ghost_kind: "" | "offer" | "full";     // v6: offer = 亡霊にするか選ぶ / full = 保管庫が満杯で入れ替え
   pending_heirloom: { run_id: string; generation: number; options: HeirOption[] } | null;
   progress: {
     clears: number; deaths: number; runs: number; generation: number; total_survival: number;

@@ -27,18 +27,18 @@ export function loadBalance(raw: unknown): Loaded {
   };
 
   const D = raw as Balance;
-  if (!need(raw, ["schema_version", "data_version", "run_length", "vault_capacity", "tiers", "ghost_unlock", "player", "xp", "weapons", "rank_levels", "weapon_card_weight", "cd_cut_max", "guard_floor", "crit_mult",
+  if (!need(raw, ["schema_version", "data_version", "run_length", "vault_capacity", "ghost_cards", "ghost_traits", "player", "xp", "weapons", "rank_levels", "weapon_card_weight", "cd_cut_max", "guard_floor", "crit_mult",
     "passives", "rarities", "maxed_weapon_bonus", "offerings", "altar", "library", "tree", "rites", "shelf", "enemies", "spawn", "checkpoint_interval", "lineages", "tags", "tag_points", "sigils", "sigil_chance", "curses", "curse_chance", "ghost_slots", "ghost_birth", "facilities", "lineages_enabled"], "balance")) {
     return { D, errors };
   }
-  // 等級は生存割合の昇順で、最初は0から
-  let prev = -1;
-  D.tiers.forEach((t, i) => {
-    if (!need(t, ["id", "name", "from", "mult", "rank", "color"], `tiers[${i}]`)) return;
-    if (t.from <= prev) errors.push("tiers: from は昇順にする");
-    prev = t.from;
-  });
-  if (D.tiers.length > 0 && D.tiers[0].from !== 0) errors.push("tiers[0].from は 0");
+  if (need(D.ghost_cards, ["weight_one", "weight_two", "rank_levels", "base_mult", "dry_limit"], "ghost_cards")) {
+    D.ghost_cards.rank_levels.forEach((v, i, a) => { if (!(v >= 1) || (i > 0 && v <= a[i - 1])) errors.push("ghost_cards.rank_levels: 1以上で昇順"); });
+  }
+  if (!D.ghost_traits || !D.ghost_traits._) errors.push("ghost_traits に _（どのパッシブにも当てはまらない時）が要る");
+  for (const [k, tr] of Object.entries(D.ghost_traits ?? {})) {
+    if (k !== "_" && !(k in D.passives)) errors.push(`ghost_traits.${k}: パッシブにない`);
+    for (const kk of Object.keys(tr)) if (!["text", "atk", "cd", "area"].includes(kk)) errors.push(`ghost_traits.${k}: 知らない項目 '${kk}'`);
+  }
   if (need(D.spawn, ["base_per_sec", "per_progress", "max_alive", "modes"], "spawn")) {
     for (const m of Object.keys(D.run_length)) {
       const sm = D.spawn.modes[m as keyof typeof D.spawn.modes];
@@ -126,7 +126,7 @@ export function loadBalance(raw: unknown): Loaded {
       if (typeof st.text !== "string") errors.push(`facilities[${f.id}].steps[${j}]: text が要る`);
       for (const k of Object.keys(st)) if (!["text", "ghost_atk", "hp"].includes(k)) errors.push(`facilities[${f.id}].steps[${j}]: 知らない項目 '${k}'`);
     });
-    for (const k of Object.keys(e)) if (!["offer_per_mult", "tag_points", "every", "steps"].includes(k)) errors.push(`facilities[${f.id}].effect: 知らない項目 '${k}'`);
+    for (const k of Object.keys(e)) if (!["offer", "tag_points", "every", "steps"].includes(k)) errors.push(`facilities[${f.id}].effect: 知らない項目 '${k}'`);
   });
   // 祭壇の樹: 根は1つ（費用0・親なし）、親は先に定義された節、レア度の合計は altar.max 以下
   const nids = new Set<string>();
@@ -144,14 +144,14 @@ export function loadBalance(raw: unknown): Loaded {
   });
   if (altarSum > D.altar.max) errors.push(`tree: altar の合計 ${altarSum} が altar.max ${D.altar.max} を超える`);
   if (need(D.rites, ["devour", "mourn", "wraith"], "rites")) {
-    need(D.rites.devour, ["might_per_mult", "hp_per_mult"], "rites.devour");
-    need(D.rites.mourn, ["base", "per_mult"], "rites.mourn");
-    need(D.rites.wraith, ["at", "hp_per_mult", "short_hp_mult", "purify_offerings", "enemy_hp_per_taint"], "rites.wraith");
+    need(D.rites.devour, ["might", "hp"], "rites.devour");
+    need(D.rites.mourn, ["offerings"], "rites.mourn");
+    need(D.rites.wraith, ["at", "hp_bonus", "purify_offerings", "enemy_hp_per_taint"], "rites.wraith");
     if (!(D.rites.wraith.at > 0 && D.rites.wraith.at < 1)) errors.push("rites.wraith.at は 0〜1");
   }
   if (!isDict(D.enemies.wraith) || D.enemies.wraith.ai !== "wraith") errors.push("enemies.wraith（ai: wraith）が必要");
   // タグとセット効果・刻印・呪い・亡霊の枠と誕生条件
-  const MODS = ["dmg", "cd", "area", "burn", "explode", "slow_t", "freeze", "shatter", "chain", "nodecay", "count", "pierce", "length", "ghost_atk", "ghost_cd", "ghost_full"];
+  const MODS = ["dmg", "cd", "area", "burn", "explode", "slow_t", "freeze", "shatter", "chain", "nodecay", "count", "pierce", "length", "ghost_atk", "ghost_cd", "ghost_lv"];
   for (const [t, def] of Object.entries(D.tags)) {
     if (!need(def, ["name", "color", "sets"], `tags.${t}`)) continue;
     let pa = 0;
@@ -171,6 +171,5 @@ export function loadBalance(raw: unknown): Loaded {
   }
   if (need(D.ghost_slots, ["base", "max"], "ghost_slots") && !(D.ghost_slots.base >= 1 && D.ghost_slots.max >= D.ghost_slots.base)) errors.push("ghost_slots: 1 <= base <= max");
   need(D.ghost_birth, ["fragments", "min_survival", "drops"], "ghost_birth");
-  for (const [lv, u] of D.ghost_unlock) if (!(lv >= 1 && u > 0 && u <= 1)) errors.push("ghost_unlock は [レベル, 0〜1]");
   return { D, errors };
 }

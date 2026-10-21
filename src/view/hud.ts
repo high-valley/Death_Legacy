@@ -3,7 +3,7 @@
 // 左下: 武器スロット（段階の色）とパッシブ / 下: 同行する亡霊の札 / 右下（PC）: 回避キー
 import { gradeAt } from "../data/weapons.ts";
 import type { GhostRecord } from "../meta/records.ts";
-import type { RunSim } from "../sim/runSim.ts";
+import type { RunSim, Companion } from "../sim/runSim.ts";
 import { Art } from "./art.ts";
 import { drawIcon } from "./icons.ts";
 import { C, FONT, MONO, SERIF } from "./theme.ts";
@@ -208,16 +208,17 @@ export class Hud {
 
     // ── 下: 同行する亡霊（最大2体）。喰らった時はその力
     const cw = small ? 176 : 220, chh = small ? 46 : 56;
-    const cards: { rec: GhostRecord; devour: boolean }[] = [
-      ...sim.ghosts.map((g) => ({ rec: g.rec, devour: false })),
-      ...sim.devours.map((d) => ({ rec: d.rec, devour: true })),
+    const cards: { rec: GhostRecord; devour: boolean; comp: Companion | null }[] = [
+      ...sim.ghosts.map((g) => ({ rec: g.rec, devour: false, comp: g })),
+      ...sim.devours.map((d) => ({ rec: d.rec, devour: true, comp: null })),
     ].slice(0, 2);
     const total = cards.length * cw + (cards.length - 1) * 6;
     let cx = touch ? W / 2 - total / 2 : W - pad - total - 128;
     const cy = H - pad - chh;
     if (cards.length && cx > px + 8) {
-      for (const { rec, devour } of cards) {
-        const tier = D.tiers.find((t) => t.id === rec.tier_id) ?? D.tiers[0];
+      for (const { rec, devour, comp } of cards) {
+        const tg = D.weapons[rec.primary_weapon_id]?.tags[0];
+        const tier = { color: (tg && D.tags[tg]?.color) || "#7fe3dc" };   // 亡霊の色は武器のタグの色
         plate(ctx, cx, cy, cw, chh, devour ? "rgba(183,139,224,.6)" : "rgba(134,224,210,.5)");
         const ps2 = chh - 10;
         // 亡霊は人の絵ではなく、等級の色の霊光と紋で表す
@@ -237,9 +238,12 @@ export class Hud {
         if (devour) {
           ctx.fillText(`喰らった力　与ダメ +${Math.round(sim.devourMight * 100)}%`, tx, cy + chh / 2 + 2);
         } else {
-          const u = sim.setMods(["spirit"]).ghost_full ? 1 : sim.ghostUnlock();
-          ctx.fillText(`${gradeAt(D.weapons[rec.primary_weapon_id], rec.weapon_rank ?? 0, rec.evolved, rec.weapon_branch).name}　解放 ${Math.round(u * 100)}%`, tx, cy + chh / 2 + 2);
-          bar(ctx, tx, cy + chh - 11, cw - ps2 - 22, 4, u, C.soul, "rgba(134,224,210,.3)");
+          // 亡霊の育ち（このランの武器 Lv とランク）
+          const lv = comp?.lv ?? 1, rk = (comp?.rank ?? 0) + (comp?.evolved ? 1 : 0);
+          ctx.fillText(`${comp ? sim.ghostWeaponName(comp) : gradeAt(D.weapons[rec.primary_weapon_id], 0, false).name}　Lv${lv}`, tx, cy + chh / 2 + 2);
+          bar(ctx, tx, cy + chh - 11, cw - ps2 - 22, 4, Math.min(1, lv / D.weapon_max_level), tier.color, "rgba(134,224,210,.2)");
+          ctx.fillStyle = tier.color;
+          ctx.fillText("★".repeat(rk), tx + cw - ps2 - 22 - ctx.measureText("★★★").width, cy + chh / 2 + 2);
         }
         cx += cw + 6;
       }

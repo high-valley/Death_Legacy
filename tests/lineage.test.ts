@@ -56,9 +56,6 @@ test("墓守: 亡霊を連れたランを3回終えると解放。亡霊の解�
   }
   assert.deepEqual(outs[1].unlocked_lineages, []);
   assert.deepEqual(outs[2].unlocked_lineages, ["gravekeeper"], "3回目で解放");
-  const gid = w.meta.storedGhosts()[0].ghost_id;
-  const g = w.sortie(gid, "", "short", "bow", 30, "gravekeeper")!;
-  assert.equal(g.ghostUnlock(), 0.5, "Lv1から解放率50%（無名は25%）");
   const solo = new RunSim(D, { run_id: "s", seed: 1, mode: "short", weapon: "sword", lineage: "gravekeeper" });
   solo.gems.push({ x: 0, y: 0, v: 1, mag: false });
   solo.step(STEP, 0, 0);

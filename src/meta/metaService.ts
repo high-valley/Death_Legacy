@@ -2,8 +2,7 @@
 //   亡霊の保管・入れ替え / 死亡した主人公から亡霊を作る / 供物と祭壇の樹 / 形見 / 亡霊の3択と穢れ・怨霊 /
 //   出撃予約 → チェックポイント → ラン終了処理（冪等）
 // 亡霊と形見の状態: stored → reserved（出撃中）→ consumed / 使用済み（喰らった亡霊は wraith → 祓うと purified、弔うと released）。異常終了しても reserved のまま残り、同じランを再開できる。
-import type { Balance, Facility, FacilityStep, Lineage, RunMode, Tier, TreeEffect, TreeNode } from "../data/types.ts";
-import { gradeAt } from "../data/weapons.ts";
+import type { Balance, Facility, FacilityStep, GhostTrait, Lineage, RunMode, TreeEffect, TreeNode } from "../data/types.ts";
 import type { RunOpts } from "../sim/runSim.ts";
 import type { ActiveRun, CardMods, FacilityBuff, GhostMode, GhostPick, GhostRecord, Heirloom, HeirOption, RunRecord, RunResult, SaveData, Snapshot, Summary } from "./records.ts";
 import type { SaveRepository } from "./saveRepository.ts";
@@ -45,15 +44,15 @@ export class MetaService {
     return this.S.ghosts.find((g) => g.ghost_id === id) ?? null;
   }
 
-  tierFor(sec: number, runLen: number): Tier {
-    const f = sec / runLen;
-    let out = this.D.tiers[0];
-    for (const x of this.D.tiers) if (f >= x.from - 1e-6) out = x;
-    return out;
+  /** 亡霊の特技（生前に一番育てたパッシブで決まる小さな効果） */
+  trait(g: GhostRecord): GhostTrait {
+    return this.D.ghost_traits[g.passive_id] ?? this.D.ghost_traits._;
   }
 
-  tier(id: string): Tier {
-    return this.D.tiers.find((x) => x.id === id) ?? this.D.tiers[0];
+  /** 亡霊の色（武器のタグの色） */
+  ghostColor(g: GhostRecord): string {
+    const t = this.D.weapons[g.primary_weapon_id]?.tags[0];
+    return (t && this.D.tags[t]?.color) || "#7fe3dc";
   }
 
   /** 亡霊になれるか（生存時間の最低ラインと未練の欠片）。なれない時は理由 */
@@ -64,19 +63,9 @@ export class MetaService {
     return "";
   }
 
-  /** 生存時間 → 等級（余った欠片1つにつき1段上がる）、最も育った武器と代表パッシブを継承 */
-  createGhost(sm: Summary): GhostRecord {
-    const base = this.tierFor(sm.t, sm.run_len);
-    const extra = Math.max(0, (sm.fragments ?? 0) - this.D.ghost_birth.fragments);
-    const tr = this.D.tiers[Math.min(this.D.tiers.length - 1, this.D.tiers.indexOf(base) + extra)];
-    let wid = sm.main_weapon, wlv = -1;
-    for (const id in sm.weapons) {
-      const lv = sm.weapons[id];
-      if (lv > wlv || (lv === wlv && id === sm.main_weapon)) {
-        wid = id;
-        wlv = lv;
-      }
-    }
+  /** 亡霊を作る。武器の種類と特技（代表パッシブ）だけが戦闘に効く。生前の Lv・ランクは記録として残すだけ（ADR 025） */
+  createGhost(sm: Summary, cleared = false): GhostRecord {
+    const wid = sm.main_weapon, wlv = sm.weapons[wid] ?? 1;
     let pid = "", pbest = -1;
     for (const id in sm.ppow) {
       if (sm.ppow[id] > pbest) {
@@ -85,23 +74,46 @@ export class MetaService {
       }
     }
     this.S.ghost_seq += 1;
-    const pp = sm.ppow;
     const lin = this.lineage(sm.lineage_id);
-    const house = lin.id === this.D.lineages[0].id ? "" : `${lin.name}・`;
+    const house = !this.D.lineages_enabled || lin.id === this.D.lineages[0].id ? "" : `${lin.name}・`;
     return {
       ghost_id: uuid(), origin_run_id: sm.run_id, created_at: now(),
-      display_name: `第${this.S.ghost_seq}代・${house}${gradeAt(this.D.weapons[wid], sm.rank?.[wid] ?? 0, !!sm.evolved[wid], sm.branch?.[wid]).name}の${tr.name}`,
-      survival_seconds: Math.floor(sm.t), run_length: Math.floor(sm.run_len), tier_id: tr.id,
+      display_name: `第${this.S.progress.generation}代・${house}${this.D.weapons[wid].name}の${cleared ? "英霊" : "亡霊"}`,
+      survival_seconds: Math.floor(sm.t), run_length: Math.floor(sm.run_len), tier_id: "",
       primary_weapon_id: wid, weapon_level: wlv, weapon_rank: sm.rank?.[wid] ?? 0, evolved: !!sm.evolved[wid], weapon_branch: sm.branch?.[wid],
       passive_id: pid, passive_level: pid ? sm.passives[pid] ?? 0 : 0,
-      kills: sm.kills, boss_kills: sm.boss_kills, death_cause_id: sm.death_cause || "unknown",
-      stat_snapshot: {
-        attack_mult: tr.mult * (1 + (this.D.passives.might.per / 100) * (pp.might ?? 0)) * (1 + (sm.wbonus[wid] ?? 0)),
-        attack_speed: 1 + (this.D.passives.haste.per / 100) * (pp.haste ?? 0),
-        area: 1 + (this.D.passives.area.per / 100) * (pp.area ?? 0),
-      },
+      kills: sm.kills, boss_kills: sm.boss_kills, death_cause_id: cleared ? "cleared" : sm.death_cause || "unknown",
+      stat_snapshot: { attack_mult: 1, attack_speed: 1, area: 1 },
       data_version: this.D.data_version, lineage_id: lin.id, status: "stored",
     };
+  }
+
+  /**
+   * 生まれた亡霊を「亡霊にする / しない」で決める（pending_ghost_kind = offer の時）。
+   * 保管庫に空きがなければ入れ替え（full）へ進む。決めたらすぐ保存するので、2回押しても何も起きない
+   */
+  decideOffer(keep: boolean): "stored" | "declined" | "full" | "" {
+    const ng = this.S.pending_ghost;
+    if (!ng || this.S.pending_ghost_kind !== "offer") return "";
+    if (!keep) {
+      this.S.pending_ghost = null;
+      this.S.pending_ghost_kind = "";
+      const h = this.S.run_history.find((r) => r.new_ghost_id === ng.ghost_id);
+      if (h) h.ghost_declined = true;
+      this.repo.write();
+      return "declined";
+    }
+    if (this.storedGhosts().length >= this.D.vault_capacity) {
+      this.S.pending_ghost_kind = "full";
+      this.repo.write();
+      return "full";
+    }
+    ng.status = "stored";
+    this.S.ghosts.push(ng);
+    this.S.pending_ghost = null;
+    this.S.pending_ghost_kind = "";
+    this.repo.write();
+    return "stored";
   }
 
   /** 保管庫が満杯の時の入れ替え。releaseId が新しい亡霊なら、新しい方を成仏させる */
@@ -119,6 +131,7 @@ export class MetaService {
     }
     this.S.ghosts.push(ng);
     this.S.pending_ghost = null;
+    this.S.pending_ghost_kind = "";
     this.repo.write();
     return true;
   }
@@ -301,15 +314,15 @@ export class MetaService {
     return this.taint() * this.D.rites.wraith.enemy_hp_per_taint * (1 - Math.min(1, this.treeTotal("taint_resist")));
   }
 
-  /** 喰らった時の力（与ダメージ・最大HPの増分） */
-  devourPower(g: GhostRecord): { might: number; hp: number } {
-    const R = this.D.rites.devour, m = this.tier(g.tier_id).mult * (1 + this.treeTotal("devour_bonus"));
-    return { might: R.might_per_mult * m, hp: R.hp_per_mult * m };
+  /** 喰らった時の力（与ダメージ・最大HPの増分。どの亡霊も同じ） */
+  devourPower(_g: GhostRecord): { might: number; hp: number } {
+    const R = this.D.rites.devour, m = 1 + this.treeTotal("devour_bonus");
+    return { might: R.might * m, hp: R.hp * m };
   }
 
-  mournOfferings(g: GhostRecord): number {
+  mournOfferings(_g: GhostRecord): number {
     const R = this.D.rites.mourn;
-    return Math.round((R.base + R.per_mult * this.tier(g.tier_id).mult) * (1 + this.treeTotal("mourn_bonus")));
+    return Math.round(R.offerings * (1 + this.treeTotal("mourn_bonus")));
   }
 
   /** 弔う: その場で成仏させ、供物を得る。戻せない */
@@ -417,7 +430,7 @@ export class MetaService {
     for (const f of this.D.facilities) {
       if (!this.built(f.id)) continue;
       for (const g of this.residents(f.id)) {
-        if (f.effect.offer_per_mult) out.offer += this.tier(g.tier_id).mult * f.effect.offer_per_mult;
+        if (f.effect.offer) out.offer += f.effect.offer;
         if (f.effect.tag_points) {
           for (const t of this.D.weapons[g.primary_weapon_id]?.tags ?? []) for (let i = 0; i < f.effect.tag_points; i++) out.tags.push(t);
         }
@@ -546,19 +559,18 @@ export class MetaService {
         }
       }
     }
-    // ② 死亡時、生存時間と未練の欠片が足りていれば新しい亡霊。満杯なら pending にして入れ替えを選ばせる（捨てない）
+    // ② 亡霊の候補: 死亡（生存時間と未練の欠片が足りた時）とクリア（無条件）。「亡霊にする / しない」を選ばせる（ADR 025）。
+    //    世代数を先に進めて、亡霊の「第N代」と形見の世代をそろえる
+    s.progress.generation += 1;
     const fail = res === "player_death" ? this.birthCheck(sm) : "";
     out.ghost_failed = fail;
     if (res === "player_death") s.progress.deaths += 1;
-    if (res === "player_death" && fail === "") {
-      const ng = this.createGhost(sm);
-      if (this.storedGhosts().length < D.vault_capacity) {
-        s.ghosts.push(ng);
-      } else {
-        ng.status = "pending";
-        s.pending_ghost = ng;
-        out.new_ghost_pending = true;
-      }
+    if ((res === "player_death" && fail === "") || res === "boss_cleared") {
+      const ng = this.createGhost(sm, res === "boss_cleared");
+      ng.status = "pending";
+      s.pending_ghost = ng;
+      s.pending_ghost_kind = "offer";
+      out.new_ghost_pending = true;
       out.new_ghost_id = ng.ghost_id;
       out.new_ghost = ng.display_name;
     }
@@ -580,7 +592,6 @@ export class MetaService {
     offer += purifyOffer + fOffer;
     s.offerings.earned += offer;
     out.offerings = offer;
-    s.progress.generation += 1;
     s.progress.total_survival += Math.floor(sm.t);
     out.generation = s.progress.generation;
     if (sm.heirloom_id) {

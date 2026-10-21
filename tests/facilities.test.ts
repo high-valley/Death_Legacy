@@ -65,15 +65,14 @@ test("武具の間: 住む亡霊の武器のタグが1点入り、出撃時に�
   assert.equal(w.resume().tagPoints().fire, 1, "出撃時の効果のまま");
 });
 
-test("鎮魂堂: 住む亡霊の等級×生き延びた割合で供物が増え、リタイアでは増えない", () => {
+test("鎮魂堂: 住む亡霊1体につき決まった供物×生き延びた割合で増え、リタイアでは増えない", () => {
   const w = withGhosts(1);
   w.meta.build("chinkon");
   const g = w.meta.storedGhosts()[0];
   w.meta.station(g.ghost_id, "chinkon");
-  const mult = w.meta.tier(g.tier_id).mult;
   const r = w.sortie()!;
   const rec = w.die(r, 90);
-  assert.equal(rec.facility_offer, Math.round(mult * 2 * 0.5));
+  assert.equal(rec.facility_offer, Math.round(D.facilities.find((f) => f.id === "chinkon")!.effect.offer! * 0.5));
   w.meta.resolveHeirloom(-1);
   const r2 = w.sortie()!;
   r2.t = 170; r2.end("retired");
@@ -111,7 +110,7 @@ test("v3 のセーブ: 施設は空、弔った回数は残っている記録か
     run_history: [], settled_runs: [], progress: { generation: 2 },
   }));
   w.reload();
-  assert.equal(w.repo.data.schema_version, 5);
+  assert.equal(w.repo.data.schema_version, 6);
   assert.deepEqual(w.repo.data.buildings, []);
   assert.equal(w.repo.data.progress.mourned_count, 1);
 });

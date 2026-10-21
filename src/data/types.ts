@@ -1,6 +1,7 @@
 // data/balance.json の型。バランス値はコードに書かず、すべてここから参照する。
 
-export interface Tier { id: string; name: string; from: number; mult: number; rank: string; color: string }
+/** 亡霊の特技（生前に一番育てたパッシブで決まる、その亡霊だけの小さな効果） */
+export interface GhostTrait { text: string; atk?: number; cd?: number; area?: number }
 /** 武器の段階（グレード）。lv 以上で持ち替え、evo はレジェンドレアで進化した最終段階。数値は武器の基本値への倍率 */
 export interface WeaponGrade {
   branch?: "a" | "b";  // Lv3 で選ぶ道
@@ -59,9 +60,9 @@ export interface TreeNode {
   req_survival?: number; effect: TreeEffect;
 }
 export interface Rites {
-  devour: { might_per_mult: number; hp_per_mult: number };
-  mourn: { base: number; per_mult: number };
-  wraith: { at: number; hp_per_mult: number; short_hp_mult: number; purify_offerings: number; enemy_hp_per_taint: number };
+  devour: { might: number; hp: number };
+  mourn: { offerings: number };
+  wraith: { at: number; hp_bonus: number; purify_offerings: number; enemy_hp_per_taint: number };
 }
 
 export interface Balance {
@@ -70,8 +71,9 @@ export interface Balance {
   run_length: Record<RunMode, number>;
   vault_capacity: number;
   solo_xp_bonus: number;
-  tiers: Tier[];
-  ghost_unlock: [number, number][];
+  /** 亡霊の札（ADR 025）: weight_one/two = 亡霊1体あたりの出やすさ、rank_levels = ランクアップのLv、base_mult = 主人公に対する強さ、dry_limit = この回数続けて出なければ次は必ず出す */
+  ghost_cards: { weight_one: number; weight_two: number; rank_levels: number[]; base_mult: number; dry_limit: number };
+  ghost_traits: Record<string, GhostTrait>;
   player: { weapon_mult: number; hp: number; speed: number; radius: number; dash_speed: number; dash_time: number; dash_cd: number; hit_iframe: number; pickup: number };
   xp: { base: number; per_level: number };
   weapons: Record<string, Weapon>;
@@ -104,7 +106,7 @@ export interface Balance {
   lineages_enabled: boolean;   // false = 家系の仕組みを使わない（2026-10 一旦なし）。データは残す
   facilities: Facility[];
   tags: Record<string, TagDef>;
-  tag_points: { hero_weapon: number; ghost_weapon: number; ghost_spirit: number; passive_level: number };
+  tag_points: { hero_weapon: number; ghost_weapon: number; ghost_spirit: number; passive_level: number; ghost_rank: number };
   sigils: Sigil[];
   sigil_chance: number;
   curses: Curse[];
@@ -124,5 +126,5 @@ export interface Facility {
   cost: number;     // 建てる供物（建てたら戻せない）
   slots: number;    // 住まわせられる亡霊の数（0 = 住まわせない施設）
   unlock: { type: "ghosts_born" | "vault" | "mourned"; count: number };
-  effect: { offer_per_mult?: number; tag_points?: number; every?: number; steps?: FacilityStep[] };
+  effect: { offer?: number; tag_points?: number; every?: number; steps?: FacilityStep[] };
 }

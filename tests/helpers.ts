@@ -40,14 +40,16 @@ export class World {
     return new RunSim(D, this.meta.runOpts(this.repo.data.active_run!));
   }
 
-  /** 死亡して終了。frags を省略すると、亡霊になれるだけの未練の欠片を持って死ぬ */
-  die(r: RunSim | null, at = -1, frags = -1): RunRecord {
+  /** 死亡して終了。frags を省略すると、亡霊になれるだけの未練の欠片を持って死ぬ。keep = 亡霊として残す（空きがあれば保管庫へ） */
+  die(r: RunSim | null, at = -1, frags = -1, keep = true): RunRecord {
     if (!r) throw new Error("出撃できていない");
     if (at >= 0) r.t = at;
     r.fragments = frags >= 0 ? frags : Math.max(r.fragments, D.ghost_birth.fragments);
     r.hp = 0;
     r.end("player_death");
-    return this.meta.settle(r.summary(), "player_death")!;
+    const out = this.meta.settle(r.summary(), "player_death")!;
+    if (keep && this.repo.data.pending_ghost_kind === "offer") this.meta.decideOffer(true);
+    return out;
   }
 }
 
@@ -57,6 +59,8 @@ export function botPick(r: RunSim): ReturnType<RunSim["rollChoices"]>[number] {
   const pts = r.tagPoints();
   const score = (c: (typeof cs)[number]): number => {
     if (c.kind === "rank") return 200;
+    if (c.kind === "grank") return 190;
+    if (c.kind === "gweapon") return 95;
     if (c.kind === "weapon") return 100 + (c.rar === "LR" ? 50 : 0);
     if (c.kind === "sigil") return 70;
     if (c.kind === "passive") {

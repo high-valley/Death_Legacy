@@ -47,7 +47,7 @@ test("怨霊はランの途中で現れ、倒すと祓える（穢れ −1・供
   r.t = D.run_length.short * D.rites.wraith.at - STEP / 2;
   r.step(STEP, 0, 0);
   assert.ok(r.wraith && r.wraithSpawned, "予定の時間に現れる");
-  assert.equal(r.wraith.def.color, w.meta.tier(w.meta.getGhost(gid)!.tier_id).color, "色は元の亡霊の等級");
+  assert.equal(r.wraith.def.color, w.meta.ghostColor(w.meta.getGhost(gid)!), "色は元の亡霊の武器の色");
   r.wraith.hp = 0;
   r.step(STEP, 0, 0);
   assert.ok(r.wraithDead && r.wraith === null);
@@ -94,7 +94,7 @@ test("弔う: その場で成仏して供物になり、もう選べない", () 
   const gid = makeGhost(w);
   const g = w.meta.getGhost(gid)!;
   const n = w.meta.mournOfferings(g);
-  assert.equal(n, Math.round(D.rites.mourn.base + D.rites.mourn.per_mult * w.meta.tier(g.tier_id).mult));
+  assert.equal(n, D.rites.mourn.offerings);
   const before = w.meta.offeringsFree();
   assert.equal(w.meta.mourn(gid), n);
   assert.equal(w.meta.offeringsFree(), before + n);

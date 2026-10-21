@@ -3,7 +3,7 @@
 // 表示や効果音への通知は events キュー、セーブへの受け渡しは summary() / snapshot()。
 import { RngStreams } from "../core/rng.ts";
 import { SpatialGrid, pushPair } from "../core/spatialGrid.ts";
-import type { Balance, EnemyDef, Lineage, Rarity, RarityId, RunMode, SpawnMode } from "../data/types.ts";
+import type { Balance, EnemyDef, GhostTrait, Lineage, Rarity, RarityId, RunMode, SpawnMode } from "../data/types.ts";
 import { gradeAt, rankCount, type Branch } from "../data/weapons.ts";
 export { gradeAt, gradeIndex, weaponGrade } from "../data/weapons.ts";
 import type { CardMods, FacilityBuff, GhostPick, GhostRecord, Heirloom, RunResult, Snapshot, Summary } from "../meta/records.ts";
@@ -48,19 +48,28 @@ export class Hero {
   cds: Record<string, number> = {};
 }
 
+/** 同行する亡霊。生前の Lv・ランクは引き継がず、Lv1・最初のランクから「亡霊の札」で育つ（ADR 025） */
 export class Companion {
-  rec: GhostRecord;       // 保管データのコピー（元データは触らない）
+  rec: GhostRecord;       // 保管データのコピー（元データは触らない。育ちは書き戻さない）
   x = -40; y = 20;
   cd = 0;
   echoCd = 0;             // 刻印「霊の共鳴」で主人公の武器を撃つ間隔
   phase = 0;
-  slot = 0;               // 何体目か（並ぶ位置）
+  slot = 0;               // 何体目か（並ぶ位置・札の見分け）
+  lv = 1;                 // このランでの武器Lv（ダメージ）
+  rank = 0;               // このランでの武器ランク
+  branch: Branch | "" = "";
+  evolved = false;
+  bonus = 0;              // ダメージの上乗せ（レア度・最大Lv後）
   constructor(rec: GhostRecord, slot = 0) {
     this.rec = rec;
     this.slot = slot;
     this.phase = slot * 2.1;
   }
 }
+
+/** 中断セーブに残す亡霊の育ち */
+export interface GhostState { id: string; lv: number; rank: number; branch: Branch | ""; evolved: boolean; bonus: number }
 
 /** 弾。斧は ret 秒たつと持ち主へ戻る（戻り始めで当たり判定を取り直す） */
 export interface Shot {
@@ -83,8 +92,8 @@ export type SimEvent =
   | { type: "toast"; text: string }
   | { type: "shake"; amount: number };
 
-export type CardKind = "weapon" | "rank" | "passive" | "lineage" | "heal" | "sigil" | "curse";
-export interface Card { kind: CardKind; id: string; lv: number; rar: RarityId; branch?: Branch }
+export type CardKind = "weapon" | "rank" | "gweapon" | "grank" | "passive" | "lineage" | "heal" | "sigil" | "curse";
+export interface Card { kind: CardKind; id: string; lv: number; rar: RarityId; branch?: Branch; slot?: number }
 type Option = Omit<Card, "rar">;
 
 export interface RunOpts {
@@ -177,6 +186,7 @@ export class RunSim {
   evolved: Record<string, boolean> = {};
   rank: Record<string, number> = {};       // 武器ランク（0〜。進化は evolved）。レベル（weapons）とは別
   undyingUsed = false;                     // 刻印「不屈」を使ったか
+  ghostDry = 0;                            // 亡霊の札が続けて出なかった回数
   private regenT = 0;
   private gloryT = 0;                      // 刻印「狩人の誉れ」の攻撃速度アップの残り時間
   kills = 0;
@@ -325,7 +335,9 @@ export class RunSim {
     const add = (t: string, n: number): void => { out[t] = (out[t] ?? 0) + n; };
     for (const t of D.weapons[this.mainWeapon].tags) add(t, P.hero_weapon);
     for (const g of this.ghosts) {
-      for (const t of D.weapons[g.rec.primary_weapon_id]?.tags ?? []) add(t, P.ghost_weapon);
+      // 亡霊の武器: 1点＋ランク1つにつき ghost_rank 点（育てるほど共鳴に近づく）
+      const gr = g.rank + (g.evolved ? 1 : 0);
+      for (const t of D.weapons[g.rec.primary_weapon_id]?.tags ?? []) add(t, P.ghost_weapon + P.ghost_rank * gr);
       add("spirit", P.ghost_spirit);
     }
     for (const id in this.passives) {
@@ -390,13 +402,22 @@ export class RunSim {
     return (1 + this.mod("ghost_atk")) * (1 + (this.cardMods.ghost_atk ?? 0)) * (1 + this.facility.ghost_atk) * (1 + (this.D.passives.medium.per / 100) * this.pw("medium")) * (1 + (sp.ghost_atk ?? 0));
   }
 
-  /** 亡霊の解放率。墓守は1段階早い */
-  ghostUnlock(): number {
-    const steps = this.D.ghost_unlock;
-    let i = -1;
-    for (let k = 0; k < steps.length; k++) if (this.level >= steps[k][0]) i = k;
-    if (i < 0) return 0;
-    return steps[Math.min(steps.length - 1, i + (this.lineage.mods.ghost_unlock_step ?? 0))][1];
+  /** 亡霊の特技（生前に一番育てたパッシブで決まる） */
+  ghostTrait(g: Companion): GhostTrait {
+    const T = this.D.ghost_traits;
+    return T[g.rec.passive_id] ?? T._;
+  }
+
+  /** 亡霊の札のランクアップ（rank_levels に届いて、まだ上がっていない時） */
+  ghostRankDue(g: Companion): boolean {
+    if (g.evolved) return false;
+    const need = this.D.ghost_cards.rank_levels[g.rank];
+    return need !== undefined && g.lv >= need;
+  }
+
+  /** 亡霊の武器の名前（このランでのランクで決まる） */
+  ghostWeaponName(g: Companion): string {
+    return gradeAt(this.D.weapons[g.rec.primary_weapon_id], g.rank, g.evolved, g.branch).name;
   }
 
   mod(key: keyof Lineage["mods"]): number {
@@ -646,17 +667,17 @@ export class RunSim {
     this.emit({ type: "sfx", name: "boss" });
   }
 
-  /** 喰らった亡霊が怨霊になって襲ってくる。等級が高いほど硬い */
+  /** 喰らった亡霊が怨霊になって襲ってくる（色は元の亡霊の武器のタグの色） */
   spawnWraith(): void {
     const rec = this.wraithRec!, W = this.D.rites.wraith;
-    const tier = this.D.tiers.find((x) => x.id === rec.tier_id) ?? this.D.tiers[0];
     const base = this.D.enemies.wraith;
-    const def = { ...base, name: `怨霊・${rec.display_name}`, color: tier.color };
+    const tag = this.D.weapons[rec.primary_weapon_id]?.tags[0];
+    const def = { ...base, name: `怨霊・${rec.display_name}`, color: (tag && this.D.tags[tag]?.color) || base.color };
     const e = new Foe("wraith", def);
     const a = this.rng.spawn.randf() * TAU;
     e.x = this.hero.x + Math.cos(a) * 640;
     e.y = this.hero.y + Math.sin(a) * 640;
-    e.maxHp = (base.hp + W.hp_per_mult * tier.mult) * this.spawnMode().wraith_hp;
+    e.maxHp = (base.hp + W.hp_bonus) * this.spawnMode().wraith_hp;
     e.hp = e.maxHp;
     e.cd = 1.5;
     this.enemies.push(e);
@@ -894,14 +915,16 @@ export class RunSim {
     g.x += (tx - g.x) * k;
     g.y += (ty - g.y) * k;
     const sp = this.setMods(["spirit"]);
-    const unlock = sp.ghost_full ? 1 : this.ghostUnlock();
-    // 鎮魂の鐘・霊4: 亡霊の攻撃間隔が短くなる
-    const bell = (this.lineage.card.id === "bell" ? Math.max(0.4, 1 - this.cardPower()) : 1) * (1 - (sp.ghost_cd ?? 0));
+    const tr = this.ghostTrait(g);
+    // 鎮魂の鐘・霊4・特技: 亡霊の攻撃間隔が短くなる
+    const bell = (this.lineage.card.id === "bell" ? Math.max(0.4, 1 - this.cardPower()) : 1) * (1 - (sp.ghost_cd ?? 0)) * (1 - (tr.cd ?? 0));
     g.cd -= dt;
     if (g.cd <= 0) {
-      const r = g.rec, s = r.stat_snapshot, wid = r.primary_weapon_id, lv = r.weapon_level, rk = r.weapon_rank ?? 0, br = r.weapon_branch ?? "";
-      const ok = this.fireWeapon(wid, lv, rk, g.x, g.y, 1, 0, s.attack_mult * unlock * this.ghostAtkMul(), s.area, true, !!r.evolved, br, g);
-      g.cd = ok ? (this.weaponCd(wid, rk, !!r.evolved, br) / s.attack_speed) * bell : 0.25;
+      // 強さ: 主人公の base_mult 倍（攻撃力・攻撃速度のパッシブは乗らない。タグ付きパッシブとセット効果は乗る）。霊6は Lv+3（ダメージだけ）
+      const wid = g.rec.primary_weapon_id, lv = Math.min(this.D.weapon_max_level, g.lv + (sp.ghost_lv ?? 0));
+      const mul = this.D.ghost_cards.base_mult * this.ghostAtkMul() * (1 + g.bonus) * (1 + (tr.atk ?? 0));
+      const ok = this.fireWeapon(wid, lv, g.rank, g.x, g.y, 1, 0, mul, 1 + (tr.area ?? 0), true, g.evolved, g.branch, g);
+      g.cd = ok ? this.weaponCd(wid, g.rank, g.evolved, g.branch) * bell : 0.25;
     }
     // 刻印: 霊の共鳴（主人公の武器を40%の威力で一緒に撃つ）
     if (this.has("ghost_echo")) {
@@ -1021,6 +1044,8 @@ export class RunSim {
     }
     // 家系の札（その家系で出撃した時だけ）。パッシブの枠は使わない
     if (this.lineageLv < this.lineage.card.max) opts.push({ kind: "lineage", id: this.lineage.card.id, lv: this.lineageLv });
+    // 亡霊の札（連れている亡霊1体につき1枚）
+    for (const g of this.ghosts) opts.push({ kind: "gweapon", id: g.rec.primary_weapon_id, lv: g.lv, slot: g.slot });
     return opts;
   }
 
@@ -1060,6 +1085,7 @@ export class RunSim {
     while (out.length < 3 && opts.length > 0) {
       const ws = opts.map((o) => {
         const t = o.kind === "passive" ? D.passives[o.id].tag : undefined;
+        if (o.kind === "gweapon") return this.ghosts.length > 1 ? D.ghost_cards.weight_two : D.ghost_cards.weight_one;
         return (1 + (aff[o.id] ?? 0) * step) * (t && (pts[t] ?? 0) > 0 ? 2 : 1) * (o.kind === "weapon" ? D.weapon_card_weight : 1);
       });
       const total = ws.reduce((a, b) => a + b, 0);
@@ -1073,29 +1099,54 @@ export class RunSim {
       const o = opts.splice(idx, 1)[0];
       out.push({ ...o, rar: this.rollRarity() });
     }
-    // ランクアップ: 武器が rank_levels のLvに届いていれば、次のレベルアップで必ず出す（最初は道 a / b の2枚）
-    const id0 = this.mainWeapon;
-    if (this.rankDue(id0)) {
-      const rk = this.rank[id0] ?? 0, lv0 = this.weapons[id0] ?? 0;
-      const rc: Card[] = rk === 0 && !this.branch[id0]
-        ? [{ kind: "rank", id: id0, lv: lv0, rar: "UR", branch: "a" }, { kind: "rank", id: id0, lv: lv0, rar: "UR", branch: "b" }]
-        : [{ kind: "rank", id: id0, lv: lv0, rar: rk + 1 >= rankCount(D.weapons[id0]) ? "LR" : "UR" }];
-      out = [...rc, ...out].slice(0, 3);
+    // ランクアップ: Lv が rank_levels に届いていれば、次のレベルアップで必ず出す（最初は道 a / b の2枚、最後は進化）。
+    // 主人公 → 亡霊1体目 → 2体目 の順で、1回に1組だけ
+    const ranked = this.rankCards();
+    if (ranked.length) out = [...ranked, ...out.filter((c) => !(c.kind === "gweapon" && c.slot === ranked[0].slot && ranked[0].kind === "grank"))].slice(0, 3);
+    const isGhostCard = (c: Card): boolean => c.kind === "gweapon" || c.kind === "grank";
+    // 救済: 亡霊の札が dry_limit 回続けて出ていなければ、今回は必ず1枚（一番育っていない亡霊。乱数は使わない）
+    if (this.ghosts.length > 0 && !out.some(isGhostCard) && this.ghostDry >= D.ghost_cards.dry_limit) {
+      const g = this.ghosts.reduce((a, b) => (b.lv < a.lv ? b : a));
+      const card: Card = { kind: "gweapon", id: g.rec.primary_weapon_id, lv: g.lv, slot: g.slot, rar: "N" };
+      const at = out.findIndex((c) => c.kind !== "rank" && c.kind !== "grank" && c.kind !== "weapon");
+      if (at >= 0) out[at] = card;
+      else if (out.length < 3) out.push(card);
+      else out[out.length - 1] = card;
     }
-    // 刻印・呪い（3枚の時だけ、最後の札と入れ替える）
-    if (out.length === 3 && !out.some((c) => c.kind === "rank")) {
+    if (this.ghosts.length > 0) this.ghostDry = out.some(isGhostCard) ? 0 : this.ghostDry + 1;
+    // 刻印・呪い（3枚の時だけ、最後の札と入れ替える。ランクアップの回と、亡霊の札の上には混ぜない）
+    if (out.length === 3 && !out.some((c) => c.kind === "rank" || c.kind === "grank")) {
       const sp = this.sigilPool();
-      if (sp.length > 0 && this.rng.build.randf() < D.sigil_chance) {
+      if (sp.length > 0 && this.rng.build.randf() < D.sigil_chance && !isGhostCard(out[2])) {
         out[2] = { kind: "sigil", id: sp[this.rng.build.randi(sp.length)], lv: 0, rar: "UR" };
       }
       const few = Object.keys(this.passives).length <= 3;
       const cp = D.curses.filter((c) => !this.curses.includes(c.id) && (c.need !== "few_passives" || few));
-      if (this.cardMods.curses && cp.length > 0 && this.rng.build.randf() < D.curse_chance) {
+      if (this.cardMods.curses && cp.length > 0 && this.rng.build.randf() < D.curse_chance && !isGhostCard(out[1])) {
         out[1] = { kind: "curse", id: cp[this.rng.build.randi(cp.length)].id, lv: 0, rar: "SR" };
       }
     }
     if (out.length === 0) out.push({ kind: "heal", id: "", lv: 0, rar: "N" });
     return out;
+  }
+
+  /** いま出すランクアップの札（主人公 → 亡霊1体目 → 2体目 の順で最初の1組） */
+  private rankCards(): Card[] {
+    const D = this.D, id0 = this.mainWeapon;
+    if (this.rankDue(id0)) {
+      const rk = this.rank[id0] ?? 0, lv0 = this.weapons[id0] ?? 0;
+      return rk === 0 && !this.branch[id0]
+        ? [{ kind: "rank", id: id0, lv: lv0, rar: "UR", branch: "a" }, { kind: "rank", id: id0, lv: lv0, rar: "UR", branch: "b" }]
+        : [{ kind: "rank", id: id0, lv: lv0, rar: rk + 1 >= rankCount(D.weapons[id0]) ? "LR" : "UR" }];
+    }
+    for (const g of this.ghosts) {
+      if (!this.ghostRankDue(g)) continue;
+      const id = g.rec.primary_weapon_id, base = { kind: "grank" as const, id, lv: g.lv, slot: g.slot };
+      return g.rank === 0 && !g.branch
+        ? [{ ...base, rar: "UR", branch: "a" }, { ...base, rar: "UR", branch: "b" }]
+        : [{ ...base, rar: g.rank + 1 >= rankCount(D.weapons[id]) ? "LR" : "UR" }];
+    }
+    return [];
   }
 
   rarity(id: RarityId): Rarity {
@@ -1104,7 +1155,7 @@ export class RunSim {
 
   /** カードのタグ（表示用） */
   cardTag(c: Card): string {
-    if (c.kind === "weapon" || c.kind === "rank") return this.D.weapons[c.id].tags[0] ?? "";
+    if (c.kind === "weapon" || c.kind === "rank" || c.kind === "gweapon" || c.kind === "grank") return this.D.weapons[c.id].tags[0] ?? "";
     if (c.kind === "passive") return this.D.passives[c.id].tag ?? "";
     return "";
   }
@@ -1135,6 +1186,29 @@ export class RunSim {
       const next = gradeAt(W, rk + 1, false, br);
       return { k: "ランクアップ", n: `${cur.name} → ${next.name}`, d: next.desc };
     }
+    if (c.kind === "gweapon" || c.kind === "grank") {
+      const g = this.ghosts.find((x) => x.slot === c.slot) ?? this.ghosts[0];
+      const W = D.weapons[c.id], who = `亡霊${(c.slot ?? 0) + 1}`;
+      if (c.kind === "gweapon") {
+        const maxlv = D.weapon_max_level, cur = this.ghostWeaponName(g);
+        if (g.lv >= maxlv) return { k: `${who}　最大Lv`, n: cur, d: `${cur}のダメージ +${Math.round(D.maxed_weapon_bonus[c.rar] * 100)}%` };
+        const to = Math.min(maxlv, g.lv + R.wlv);
+        const need = D.ghost_cards.rank_levels[g.rank];
+        const hint = !g.evolved && need !== undefined && need > g.lv ? (to >= need ? "\n次のレベルアップでランクアップ" : `\nLv${need}でランクアップ`) : "";
+        return { k: `${who}　武器 Lv${g.lv} → ${to}`, n: cur, d: `亡霊のダメージ +${Math.round(W.per_level * (to - g.lv) * 100)}%` + (R.wbonus > 0 ? `\nさらに +${Math.round(R.wbonus * 100)}%` : "") + hint };
+      }
+      const cur = gradeAt(W, g.rank, false, g.branch);
+      if (g.rank + 1 >= rankCount(W)) {
+        const E = W.grades[W.grades.length - 1];
+        return { k: `${who}　ランクアップ・進化`, n: `${cur.name} → ${E.name}`, d: E.desc };
+      }
+      if (c.branch) {
+        const next = gradeAt(W, g.rank + 1, false, c.branch);
+        return { k: `${who}　ランクアップ・道を選ぶ`, n: `${cur.name} → ${next.name}`, d: next.desc };
+      }
+      const next = gradeAt(W, g.rank + 1, false, g.branch);
+      return { k: `${who}　ランクアップ`, n: `${cur.name} → ${next.name}`, d: next.desc };
+    }
     if (c.kind === "lineage") {
       const L = this.lineage.card;
       return { k: c.lv > 0 ? `${this.lineage.name}の札 Lv${c.lv} → ${c.lv + 1}` : `${this.lineage.name}の札`, n: L.name, d: L.fmt.replace("{v}", String(Math.round(L.per * R.pmul))) };
@@ -1158,7 +1232,22 @@ export class RunSim {
 
   applyChoice(c: Card): void {
     const D = this.D, R = this.rarity(c.rar ?? "N"), maxlv = D.weapon_max_level;
-    if (c.kind === "rank") {
+    if (c.kind === "gweapon" || c.kind === "grank") {
+      const g = this.ghosts.find((x) => x.slot === c.slot) ?? this.ghosts[0];
+      if (g && c.kind === "gweapon") {
+        if (g.lv >= maxlv) g.bonus += D.maxed_weapon_bonus[c.rar];
+        else {
+          g.lv = Math.min(maxlv, g.lv + R.wlv);
+          if (R.wbonus > 0) g.bonus += R.wbonus;
+        }
+      } else if (g) {
+        if (c.branch && !g.branch) g.branch = c.branch;
+        if (g.rank + 1 >= rankCount(D.weapons[g.rec.primary_weapon_id])) g.evolved = true;
+        else g.rank++;
+        this.dirtyTags();
+        this.emit({ type: "toast", text: `亡霊が${this.ghostWeaponName(g)}に持ち替えた` });
+      }
+    } else if (c.kind === "rank") {
       const rk = this.rank[c.id] ?? 0;
       if (c.branch && !this.branch[c.id]) this.branch[c.id] = c.branch;
       if (rk + 1 >= rankCount(D.weapons[c.id])) this.evolved[c.id] = true;
@@ -1225,6 +1314,8 @@ export class RunSim {
       wraith_spawned: this.wraithSpawned, wraith_dead: this.wraithDead,
       fragments: this.fragments, branch: { ...this.branch }, sigils: [...this.sigils], curses: [...this.curses],
       rank: { ...this.rank }, undying_used: this.undyingUsed,
+      gstate: this.ghosts.map((g): GhostState => ({ id: g.rec.ghost_id, lv: g.lv, rank: g.rank, branch: g.branch, evolved: g.evolved, bonus: g.bonus })),
+      ghost_dry: this.ghostDry,
     };
   }
 
@@ -1251,6 +1342,11 @@ export class RunSim {
     this.curses = [...(c.curses ?? [])];
     this.rank = { ...(c.rank ?? { [this.mainWeapon]: 0 }) };
     this.undyingUsed = !!c.undying_used;
+    this.ghostDry = c.ghost_dry ?? 0;
+    for (const st of c.gstate ?? []) {
+      const g = this.ghosts.find((x) => x.rec.ghost_id === st.id);
+      if (g) { g.lv = st.lv; g.rank = st.rank; g.branch = st.branch; g.evolved = st.evolved; g.bonus = st.bonus; }
+    }
     this.dirtyTags();
     this.lastCheckpoint = this.t;
     this.rng.advance(Math.floor(this.t * 3)); // 乱数列を経過時間ぶん進めて、同じ seed の流れに乗せる

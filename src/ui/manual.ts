@@ -79,19 +79,22 @@ export function manualPage(D: Balance, ch: Chapter, touch: boolean): HTMLElement
     );
   } else if (ch === "ghosts") {
     box.append(
-      sec("亡霊になる条件", list([
-        [`ランの ${pct(B.min_survival)} 以上を生き延びる`],
-        [`「未練の欠片」を ${B.fragments} つ以上持って倒れる（墓暴きを倒すと ${B.drops.elite ?? 0}・怨霊を倒すと ${B.drops.wraith ?? 0}）`],
-        ["余った欠片1つにつき、亡霊の等級が1段上がる"],
+      sec("亡霊として残す", list([
+        ["冥王を倒して生還した時は、無条件で「英霊」として残せる。"],
+        [`倒れた時は、ランの ${pct(B.min_survival)} 以上を生き延び、「未練の欠片」を ${B.fragments} つ以上持っていれば残せる（墓暴きを倒すと ${B.drops.elite ?? 0}・怨霊を倒すと ${B.drops.wraith ?? 0}）。`],
+        ["どちらも「残す / 残さない」を選べる。"],
       ])),
-      sec("等級", para("長く生き延びて倒れた主人公ほど、強い亡霊になる。"), list(D.tiers.map((t) => [h("b", { style: `color:${t.color}` }, `${t.rank}　${t.name}`), `　ラン ${pct(t.from)} から・力 ×${t.mult}`]))),
+      sec("亡霊は一緒に育つ", para(`亡霊は生前のレベルを引き継がない。連れていくと武器 Lv1 から始まり、レベルアップの3枚に「亡霊の札」（亡霊①・②と書かれた、武器の色の札）が混ざる。主人公と亡霊のどちらを伸ばすかを選ぶ。亡霊の武器が Lv${D.ghost_cards.rank_levels.join("・")} に届くと、亡霊のランクアップの札が必ず出る（武器が変わる）。亡霊の札が ${D.ghost_cards.dry_limit} 回続けて出なかった時は、次は必ず1枚出る。`),
+        para(`亡霊の強さは、同じレベル・ランクの主人公の武器のおよそ ${pct(D.ghost_cards.base_mult)}。攻撃力・攻撃速度のパッシブは乗らないが、タグ付きのパッシブとセット効果は乗る。亡霊を育てるほど、そのタグの共鳴の点数も増える（ランク1つにつき +${D.tag_points.ghost_rank}）。`)),
+      sec("特技", para("亡霊は、生前に一番育てたパッシブで決まる「特技」を1つ持つ。その亡霊にだけ効く小さな効果。"),
+        list(Object.entries(D.ghost_traits).filter(([k]) => k !== "_").map(([k, t]) => [h("b", {}, D.passives[k]?.name ?? k), `　${t.text}`]).concat([[h("b", {}, "そのほか"), `　${D.ghost_traits._.text}`]]))),
       sec("連れていく / 喰らう / 弔う", list([
         [h("b", {}, "連れていく"), `　一緒に戦う。ランが終われば保管庫へ戻る（減らない）。一度に ${D.ghost_slots.base} 体、祭壇の樹で ${D.ghost_slots.max} 体まで。`],
         [h("b", {}, "喰らう"), "　同行はしないが、力を取り込んで主人公が強くなる。喰らった亡霊は怨霊になり、のちのランで襲ってくる。"],
         [h("b", {}, "弔う"), "　その場で成仏させて供物にする。戻せない。"],
       ])),
       sec("穢れと怨霊", para(`まだ祓っていない怨霊の数が「穢れ」。穢れ1つにつき敵のHPが +${pct(D.rites.wraith.enemy_hp_per_taint)}。怨霊はランの途中で現れ、倒すと祓える（供物 +${D.rites.wraith.purify_offerings}）。`)),
-      sec("保管庫", para(`亡霊は ${D.vault_capacity} 体まで。満杯の時に新しい亡霊が生まれたら、どれか1体を成仏させて入れ替える。`)),
+      sec("保管庫", para(`亡霊は ${D.vault_capacity} 体まで。満杯の時に新しい亡霊を残すなら、どれか1体を成仏させて入れ替える。`)),
     );
   } else {
     box.append(

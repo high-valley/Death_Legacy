@@ -4,15 +4,6 @@
   "run_length": { "short": 180, "full": 600, "long": 1800 },
   "vault_capacity": 10,
   "solo_xp_bonus": 0.3,
-  "tiers": [
-    { "id": "echo", "name": "残響", "from": 0.0, "mult": 0.5, "rank": "D", "color": "#8fa39c" },
-    { "id": "lesser", "name": "下級霊", "from": 0.1667, "mult": 0.8, "rank": "C", "color": "#7cc4ff" },
-    { "id": "warrior", "name": "戦霊", "from": 0.3333, "mult": 1.2, "rank": "B", "color": "#8ff0a4" },
-    { "id": "hero", "name": "英霊", "from": 0.5, "mult": 1.7, "rank": "A", "color": "#c9a3ff" },
-    { "id": "greater_hero", "name": "大英霊", "from": 0.6667, "mult": 2.3, "rank": "S", "color": "#f0b35a" },
-    { "id": "legend", "name": "伝説の英霊", "from": 0.8333, "mult": 3.0, "rank": "SS", "color": "#ff7ad9" }
-  ],
-  "ghost_unlock": [[1, 0.25], [6, 0.5], [12, 0.75], [18, 1.0]],
   "player": { "weapon_mult": 1.0, "hp": 120, "speed": 205, "radius": 12, "dash_speed": 720, "dash_time": 0.16, "dash_cd": 1.5, "hit_iframe": 0.6, "pickup": 100 },
   "xp": { "base": 4, "per_level": 3 },
   "weapons": {
@@ -150,9 +141,19 @@
     "spirit":  { "name": "霊", "color": "#7fe3dc", "sets": [
       { "at": 2, "text": "亡霊の攻撃 +20%", "mods": { "ghost_atk": 0.2 } },
       { "at": 4, "text": "亡霊の攻撃間隔 −20%", "mods": { "ghost_cd": 0.2 } },
-      { "at": 6, "text": "亡霊は最初から本来の力で戦う", "mods": { "ghost_full": 1 } } ] }
+      { "at": 6, "text": "亡霊の武器 Lv +3（ダメージ）", "mods": { "ghost_lv": 3 } } ] }
   },
-  "tag_points": { "hero_weapon": 2, "ghost_weapon": 1, "ghost_spirit": 1, "passive_level": 0.5 },
+  "tag_points": { "hero_weapon": 2, "ghost_weapon": 1, "ghost_spirit": 1, "passive_level": 0.5, "ghost_rank": 0.5 },
+  "ghost_cards": { "weight_one": 3, "weight_two": 2, "rank_levels": [2, 4, 8], "base_mult": 0.6, "dry_limit": 2 },
+  "ghost_traits": {
+    "might":  { "text": "亡霊の攻撃 +12%", "atk": 0.12 },
+    "haste":  { "text": "亡霊の攻撃間隔 −10%", "cd": 0.1 },
+    "area":   { "text": "亡霊の攻撃範囲 +12%", "area": 0.12 },
+    "crit":   { "text": "亡霊の攻撃 +10%", "atk": 0.1 },
+    "hunter": { "text": "亡霊の攻撃 +10%", "atk": 0.1 },
+    "medium": { "text": "亡霊の攻撃間隔 −12%", "cd": 0.12 },
+    "_":      { "text": "亡霊の攻撃 +8%", "atk": 0.08 }
+  },
   "sigils": [
     { "id": "ember_step",  "tier": 0, "name": "残り火の歩み", "desc": "回避した場所に炎が残る" },
     { "id": "soul_drain",  "tier": 0, "name": "吸魂",         "desc": "敵を20体倒すごとに HP +5" },
@@ -206,9 +207,9 @@
     { "id": "taboo", "name": "禁忌の頁",   "x": 5, "y": 3, "cost": 4, "parents": ["lore2"], "desc": "呪いカード（強い効果と不利の両方）が出るようになる", "effect": { "curses": 1 } }
   ],
   "rites": {
-    "devour": { "might_per_mult": 0.12, "hp_per_mult": 0.06 },
-    "mourn": { "base": 1, "per_mult": 2 },
-    "wraith": { "at": 0.45, "hp_per_mult": 220, "short_hp_mult": 0.8, "purify_offerings": 3, "enemy_hp_per_taint": 0.06 }
+    "devour": { "might": 0.15, "hp": 0.08 },
+    "mourn": { "offerings": 3 },
+    "wraith": { "at": 0.45, "hp_bonus": 264, "purify_offerings": 3, "enemy_hp_per_taint": 0.06 }
   },
   "shelf": { "unlock_generation": 1, "capacity": 5, "max_level": 5, "weapon_max_level": 10 },
   "enemies": {
@@ -249,7 +250,7 @@
       "unlock": { "type": "companion_runs", "count": 3, "text": "亡霊を連れて出撃したランを3回終える" } }
   ],
   "facilities": [
-    {"id": "chinkon", "name": "鎮魂堂", "icon": "okuribi", "desc": "住む亡霊の等級に応じて、ランで得る供物が増える（生き延びた割合を掛ける。リタイアでは増えない）", "cost": 6, "slots": 1, "unlock": {"type": "ghosts_born", "count": 1}, "effect": {"offer_per_mult": 2}},
+    {"id": "chinkon", "name": "鎮魂堂", "icon": "okuribi", "desc": "住む亡霊が、ランで得る供物を増やす（生き延びた割合を掛ける。リタイアでは増えない）", "cost": 6, "slots": 1, "unlock": {"type": "ghosts_born", "count": 1}, "effect": {"offer": 3}},
     {"id": "armory", "name": "武具の間", "icon": "sword", "desc": "住む亡霊の武器のタグが、出撃時に1点ずつ入る（セット効果に届きやすくなる）", "cost": 10, "slots": 1, "unlock": {"type": "vault", "count": 3}, "effect": {"tag_points": 1}},
     {"id": "memorial", "name": "供養塔", "icon": "bell", "desc": "弔った回数が5回たまるごとに、ずっと続く小さな力が1つ刻まれる", "cost": 0, "slots": 0, "unlock": {"type": "mourned", "count": 1}, "effect": {"every": 5, "steps": [{"text": "亡霊の攻撃 +5%", "ghost_atk": 0.05}, {"text": "最大HP +5%", "hp": 0.05}, {"text": "亡霊の攻撃 +5%", "ghost_atk": 0.05}, {"text": "最大HP +5%", "hp": 0.05}, {"text": "亡霊の攻撃 +10%", "ghost_atk": 0.1}]}}
   ]

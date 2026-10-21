@@ -394,6 +394,7 @@ class Game {
       r.hp = 0;
       r.end("player_death");
       this.meta.settle(r.summary(), "player_death");
+      this.meta.decideOffer(true);
       this.meta.resolveHeirloom(0);
     }
     const d = this.repo.data;
