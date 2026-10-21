@@ -1192,7 +1192,7 @@ export class RunSim {
     }
     if (c.kind === "gweapon" || c.kind === "grank") {
       const g = this.ghosts.find((x) => x.slot === c.slot) ?? this.ghosts[0];
-      const W = D.weapons[c.id], who = `亡霊${(c.slot ?? 0) + 1}`;
+      const W = D.weapons[c.id], who = `亡霊${"①②"[c.slot ?? 0]}`;
       if (c.kind === "gweapon") {
         const maxlv = D.weapon_max_level, cur = this.ghostWeaponName(g);
         if (g.lv >= maxlv) return { k: `${who}　最大Lv`, n: cur, d: `${cur}のダメージ +${Math.round(D.maxed_weapon_bonus[c.rar] * 100)}%` };

@@ -217,7 +217,7 @@
     "shooter": { "name": "呪術師", "hp": 18, "speed": 62, "radius": 10, "damage": 6, "xp": 2, "ai": "shoot", "color": "#7f6bd6", "range": 270, "interval": 2.6, "bullet_speed": 190 },
     "elite":   { "name": "墓暴き", "hp": 300, "speed": 64, "radius": 20, "damage": 14, "xp": 20, "ai": "chase", "color": "#a8b36a" },
     "wraith":  { "name": "怨霊", "hp": 500, "speed": 72, "radius": 17, "damage": 12, "xp": 25, "ai": "wraith", "color": "#b06bd6", "range": 230, "interval": 2.2, "bullet_speed": 200 },
-    "boss":    { "name": "冥王", "hp": 6000, "speed": 58, "radius": 34, "damage": 20, "xp": 0, "ai": "boss", "color": "#e2555a", "short_hp_mult": 0.65,
+    "boss":    { "name": "冥王", "hp": 6000, "speed": 58, "radius": 34, "damage": 20, "xp": 0, "ai": "boss", "color": "#e2555a",
                  "slam": { "damage": 18, "radius": 130, "windup": 1.0 }, "nova": { "count": 14, "speed": 170, "damage": 9 }, "cycle": 3.2 }
   },
   "spawn": { "base_per_sec": 1.4, "per_progress": 7, "max_alive": 300, "shooter_from": 0.15, "charger_from": 0.3,

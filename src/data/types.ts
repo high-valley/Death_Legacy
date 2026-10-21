@@ -30,7 +30,7 @@ export type RarityId = "N" | "R" | "SR" | "UR" | "LR";
 export interface EnemyDef {
   name: string; hp: number; speed: number; radius: number; damage: number; xp: number;
   ai: "chase" | "charge" | "shoot" | "boss" | "wraith"; color: string;
-  dash_speed?: number; range?: number; interval?: number; bullet_speed?: number; short_hp_mult?: number;
+  dash_speed?: number; range?: number; interval?: number; bullet_speed?: number;
   slam?: { damage: number; radius: number; windup: number };
   nova?: { count: number; speed: number; damage: number };
   cycle?: number;

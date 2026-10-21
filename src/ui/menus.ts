@@ -100,7 +100,7 @@ export class Menus {
   /** 亡霊の特技の札（以前の等級 D〜SS の場所） */
   private traitChip(g: GhostRecord): HTMLElement {
     const tr = this.meta.trait(g), P = g.passive_id ? this.D.passives[g.passive_id] : null;
-    return h("span", { class: "rank trait", style: `--tc:${this.meta.ghostColor(g)}`, title: tr.text }, P ? P.name : "特技なし");
+    return h("span", { class: "rank trait", style: `--tc:${this.meta.ghostColor(g)}`, title: tr.text }, P ? P.name : "無心");
   }
 
   private weaponLabel(g: GhostRecord): string {
@@ -619,11 +619,11 @@ export class Menus {
       const b = sim.wbonus[id] ?? 0;
       ul.append(h("li", { class: "w" }, iconSvg(id), h("span", { class: "bn" }, sim.weaponName(id), h("small", {}, `Lv${sim.weapons[id]}${b > 0 ? `・+${Math.round(b * 100)}%` : ""}`))));
     }
-    for (const g of sim.ghosts) ul.append(h("li", { class: "g" }, iconSvg(g.rec.primary_weapon_id), h("span", { class: "bn" }, g.rec.display_name.replace(/^(第\d+代)・.*$/, "$1の亡霊"), h("small", {}, gradeAt(D.weapons[g.rec.primary_weapon_id], g.rec.weapon_rank ?? 0, g.rec.evolved, g.rec.weapon_branch).name))));
+    for (const g of sim.ghosts) ul.append(h("li", { class: "g" }, iconSvg(g.rec.primary_weapon_id), h("span", { class: "bn" }, `亡霊${"①②"[g.slot] ?? ""}　${sim.ghostWeaponName(g)}`, h("small", {}, `Lv${g.lv}`))));
     for (const id of Object.keys(sim.passives)) ul.append(h("li", {}, iconSvg(id), h("span", { class: "bn" }, D.passives[id].name, h("small", {}, `Lv${sim.passives[id]}`))));
     if (sim.lineageLv > 0) ul.append(h("li", { class: "l" }, iconSvg(sim.lineage.card.id), h("span", { class: "bn" }, sim.lineage.card.name, h("small", {}, `Lv${sim.lineageLv}`))));
     for (const id of sim.sigils) ul.append(h("li", { class: "s" }, iconSvg("might"), h("span", { class: "bn" }, D.sigils.find((x) => x.id === id)?.name ?? id, h("small", {}, "刻印"))));
-    for (const id of sim.curses) ul.append(h("li", { class: "c" }, iconSvg("ghost"), h("span", { class: "bn" }, D.curses.find((x) => x.id === id)?.name ?? id, h("small", {}, "呪い"))));
+    for (const id of sim.curses) ul.append(h("li", { class: "c" }, iconSvg("curse"), h("span", { class: "bn" }, D.curses.find((x) => x.id === id)?.name ?? id, h("small", {}, "呪い"))));
     const pts = sim.tagPoints(), sets = sim.activeSets();
     return h("aside", { class: "frame build-side" }, h("h4", {}, "現在のビルド"), ul,
       h("p", { class: "small faint" }, `パッシブ ${Object.keys(sim.passives).length} / ${sim.passiveSlots()}`),
@@ -662,8 +662,10 @@ export class Menus {
     });
     const branchNow = choices.some((c) => c.branch);
     const rankNow = choices.some((c) => c.kind === "rank" || c.kind === "grank");
+    const gr = choices.find((c) => c.kind === "grank");
+    const whose = gr ? `亡霊${"①②"[gr.slot ?? 0]}の` : "";
     p.append(
-      h("header", { class: "lv-head" }, h("h2", {}, branchNow ? "武器の道を選ぶ" : rankNow ? "武器のランクアップ" : "レベルアップ"),
+      h("header", { class: "lv-head" }, h("h2", {}, branchNow ? `${whose}武器の道を選ぶ` : rankNow ? `${whose}武器のランクアップ` : "レベルアップ"),
         h("p", {}, branchNow ? "ここで選んだ道は、このランの最後まで続く" : rankNow ? "武器が持ち替わり、攻撃の形が変わる（取らなければ次のレベルアップでまた出る）" : `レベル ${sim.level - sim.pending + 1}　新たな力を選択してください`)),
       h("div", { class: "lv-body" }, cards, this.buildList(sim)));
     if (!this.touchMode) p.append(h("p", { class: "keys" }, h("kbd", {}, "1"), h("kbd", {}, "2"), h("kbd", {}, "3"), " で選択"));
@@ -720,7 +722,7 @@ export class Menus {
       h("div", { class: "row" }, button("セーブを消去", () => {
         if (!armed) {
           armed = true;
-          wl.textContent = "亡霊・形見・供物・家系・履歴がすべて消える。もう一度押すと消去する。";
+          wl.textContent = "亡霊・形見・供物・施設・履歴がすべて消える。もう一度押すと消去する。";
           return;
         }
         on.wipe();
@@ -763,7 +765,8 @@ export class Menus {
     const ng = nid ? (S.pending_ghost && S.pending_ghost.ghost_id === nid ? S.pending_ghost : meta.getGhost(nid)) : null;
     if (ng) {
       const decided = !(S.pending_ghost && S.pending_ghost.ghost_id === nid);
-      right.append(h("h4", {}, decided ? (out?.ghost_declined ? "亡霊にしなかった" : "亡霊として記録庫に眠る") : res === "boss_cleared" ? "英霊として残せる" : "亡霊として残せる"),
+      const kept = decided && ng.status === "stored";
+      right.append(h("h4", {}, decided ? (kept ? "亡霊として記録庫に眠る" : "亡霊として残さなかった") : res === "boss_cleared" ? "英霊として残せる" : "亡霊として残せる"),
         h("div", { class: "nb" }, this.portrait(ng, "big"),
           h("div", {},
             h("div", { class: "gname" }, h("span", {}, ng.display_name), this.traitChip(ng)),
@@ -844,7 +847,8 @@ export class Menus {
           button("残さない", () => { meta.decideOffer(false); done(); }, "quiet"))));
       return;
     }
-    p.append(h("div", { class: "notice soul" }, h("b", {}, "成仏させる亡霊を1体選ぶ"), h("span", { class: "small mute" }, `保管庫は${this.D.vault_capacity}体まで。新しい亡霊を残すなら、ほかの1体を成仏させる。`)));
+    p.append(h("div", { class: "notice soul" }, h("b", {}, "成仏させる亡霊を1体選ぶ"), h("span", { class: "small mute" }, `保管庫は${this.D.vault_capacity}体まで。新しい亡霊を残すなら、ほかの1体を成仏させる。`),
+      h("div", { class: "row" }, button("やっぱり残さない", () => { meta.resolvePendingGhost(ng.ghost_id); done(); }, "quiet"))));
     const g = h("div", { class: "picks" });
     g.append(this.ghostCard(ng, true, () => { meta.resolvePendingGhost(ng.ghost_id); done(); }, "新しい亡霊を成仏させる"));
     for (const x of meta.storedGhosts()) {

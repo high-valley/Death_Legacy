@@ -150,7 +150,7 @@ test("亡霊の札: 3枚に混ざり、取ると亡霊の Lv が上がる。rank
   assert.equal(r.ghost!.lv, 1 + D.ghost_cards.lv_mult, "亡霊の札は lv_mult 倍上がる");
   const rk = r.rollChoices().filter((c) => c.kind === "grank");
   assert.deepEqual(rk.map((c) => c.branch), ["a", "b"], "亡霊のランクアップ（道）");
-  assert.match(r.describe(rk[0]).k, /亡霊1/);
+  assert.match(r.describe(rk[0]).k, /亡霊①/);
   r.applyChoice(rk[1]);
   assert.equal(r.ghostWeaponName(r.ghost!), "アイスランス");
   assert.ok((r.tagPoints().ice ?? 0) >= D.tag_points.ghost_weapon + D.tag_points.ghost_rank, "育つと共鳴の点も増える");

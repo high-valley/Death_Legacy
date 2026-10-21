@@ -3,7 +3,7 @@
 //   出撃予約 → チェックポイント → ラン終了処理（冪等）
 // 亡霊と形見の状態: stored → reserved（出撃中）→ consumed / 使用済み（喰らった亡霊は wraith → 祓うと purified、弔うと released）。異常終了しても reserved のまま残り、同じランを再開できる。
 import type { Balance, Facility, FacilityStep, GhostTrait, Lineage, RunMode, TreeEffect, TreeNode } from "../data/types.ts";
-import type { RunOpts } from "../sim/runSim.ts";
+import { neutralLineage, type RunOpts } from "../sim/runSim.ts";
 import type { ActiveRun, CardMods, FacilityBuff, GhostMode, GhostPick, GhostRecord, Heirloom, HeirOption, RunRecord, RunResult, SaveData, Snapshot, Summary } from "./records.ts";
 import type { SaveRepository } from "./saveRepository.ts";
 
@@ -122,6 +122,8 @@ export class MetaService {
     if (!ng) return false;
     if (releaseId === ng.ghost_id) {
       ng.status = "released";
+      const h = this.S.run_history.find((r) => r.new_ghost_id === ng.ghost_id);
+      if (h) h.ghost_declined = true;   // 新しい方を成仏させた＝残さなかった
     } else {
       const g = this.getGhost(releaseId);
       if (!g || g.status !== "stored") return false;
@@ -442,6 +444,7 @@ export class MetaService {
 
   // ================================================================ lineages
   lineage(id: string): Lineage {
+    if (!this.D.lineages_enabled) return neutralLineage(this.D);   // 家系なし: 特性も効果もない
     return this.D.lineages.find((l) => l.id === id) ?? this.D.lineages[0];
   }
 
