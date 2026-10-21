@@ -132,9 +132,9 @@ export class BattleView {
     for (const b of this.buckets.values()) b.length = 0;
     for (const e of sim.enemies) {
       if (!vis(e.x, e.y, e.r)) continue;
-      const im = this.sprite(`sprite_enemy_${e.kind}`);
+      const im = this.enemyFrame(e.kind, e, sim.t);
       if (im) {
-        this.drawSprite(ctx, im, e.x, e.y, e.r * 2.7, h.x < e.x);
+        this.drawSprite(ctx, im, e.x, e.y - e.r * 0.3, e.r * (e.kind === "chaser" || e.kind === "shooter" ? 4.6 : e.kind === "charger" ? 3.6 : 3.2), h.x < e.x);
         if (e.flash > 0 || e.freezeT > 0 || e.slowT > 0) {
           ctx.globalAlpha = e.flash > 0 ? 0.55 : 0.35;
           ctx.fillStyle = e.flash > 0 ? "#ffffff" : "#9fdcff";
@@ -163,11 +163,11 @@ export class BattleView {
       if (e.kind === "charger" && e.phase === 1) {
         ctx.strokeStyle = C.blood;
         ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + e.dx * 120, e.y + e.dy * 120); ctx.stroke();
-      } else if ((e.kind === "boss" || e.kind === "elite") && vis(e.x, e.y, e.r)) {
+      } else if ((e.kind === "boss" || e.kind === "elite") && vis(e.x, e.y, e.r) && !this.sprite(`sprite_enemy_${e.kind}`)) {
         ctx.strokeStyle = C.night; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 0.55, 0, 7); ctx.stroke();
         ctx.lineWidth = 1.5;
-      } else if (e.kind === "wraith" && vis(e.x, e.y, e.r + 12)) {
+      } else if (e.kind === "wraith" && vis(e.x, e.y, e.r + 12) && !this.sprite("sprite_enemy_wraith")) {
         // 怨霊: 揺らぐ二重の輪（色は元の亡霊の等級）
         const wob = Math.sin(sim.t * 5) * 3;
         ctx.strokeStyle = C.taint; ctx.lineWidth = 2;
@@ -355,6 +355,19 @@ export class BattleView {
       }
     }
     return this.sprite(base);
+  }
+
+  private enemyPhase = new WeakMap<object, number>();
+  /** 敵の絵（歩きのコマ絵があれば交互に。描画だけの揺れなので Math.random でよい） */
+  private enemyFrame(kind: string, e: object, t: number): HTMLImageElement | null {
+    const f = this.frames(`sprite_enemy_${kind}_walk`);
+    if (f.length) {
+      let ph = this.enemyPhase.get(e);
+      if (ph === undefined) { ph = Math.random() * 10; this.enemyPhase.set(e, ph); }
+      const im = this.sprite(f[Math.floor(t * 4 + ph) % f.length]);
+      if (im) return im;
+    }
+    return this.sprite(`sprite_enemy_${kind}`);
   }
 
   /** 白い影絵（被弾の点滅用。絵ごとに1回だけ作る） */
