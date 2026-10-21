@@ -315,7 +315,7 @@ export class Menus {
       if (!x) {
         party.append(h("div", { class: "chosen solo" }, this.portrait(null, "big"),
           h("div", { class: "cbody" }, h("span", { class: "clabel" }, `${i + 1}体目`), h("span", { class: "cname" }, "空き"),
-            h("p", { class: "small" }, i === 0 ? `記録庫から選ぶ。誰も連れていかなければ単独（経験値 +${Math.round(D.solo_xp_bonus * 100 * (1 + (lin.mods.solo_xp ?? 0)))}%）。` : "2体目も選べる。"))));
+            h("p", { class: "small" }, i === 0 ? `記録庫から選ぶ。誰も連れていかなければ単独${D.spawn.modes[hub.mode].solo_xp > 0 ? `（経験値 +${Math.round(D.spawn.modes[hub.mode].solo_xp * 100 * (1 + (lin.mods.solo_xp ?? 0)))}%）` : ""}。` : "2体目も選べる。"))));
         continue;
       }
       const seg = h("div", { class: "seg rites" });

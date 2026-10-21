@@ -289,6 +289,8 @@ export class RunSim {
   dmgScale(): number { return 1 + this.spawnMode().dmg_growth * this.growthT(); }
   /** モードごとの敵の伸び（長いモードほど主人公が育つので、大きく伸ばす） */
   spawnMode(): SpawnMode { return this.D.spawn.modes[this.mode]; }
+  /** 単独出撃の経験値ボーナス（モードごと。30分モードは無し） */
+  soloXp(): number { return this.spawnMode().solo_xp * (1 + this.mod("solo_xp")); }
   hpGrowth(): number { return this.spawnMode().hp_growth; }
   /** 伸び方の曲線（進み具合の curve 乗）。序盤はゆるやか・後半に急（最初は一人でも楽、後半は一人では厳しい） */
   growthT(): number { return Math.pow(this.progress(), this.spawnMode().curve); }
@@ -604,7 +606,9 @@ export class RunSim {
   hurtPlayer(d: number, cause: string): void {
     if (this.result !== "" || this.hero.iframe > 0) return;
     // 受けるダメージの軽減は掛け合わせても guard_floor（4割）より下がらない
-    d *= Math.max(this.D.guard_floor, (1 + this.curseMod("dmg_taken")) * (this.has("iron_vow") ? 0.75 : 1) * (1 - this.pv("guard")));
+    // 亡霊の守り: 連れている亡霊1体につき受けるダメージが減る（モードごと。30分モードで大きい）
+    const ghostGuard = 1 - this.spawnMode().ghost_guard * this.ghosts.length;
+    d *= Math.max(this.D.guard_floor, (1 + this.curseMod("dmg_taken")) * (this.has("iron_vow") ? 0.75 : 1) * (1 - this.pv("guard")) * ghostGuard);
     this.hp -= d;
     this.hero.iframe = this.D.player.hit_iframe;
     if (this.hp <= 0 && this.has("undying") && !this.undyingUsed) {   // 刻印: 不屈
@@ -875,7 +879,7 @@ export class RunSim {
 
     const greed = this.has("greed");
     const pick = D.player.pickup * (1 + this.pv("magnet")) * (greed ? 1.5 : 1) * Math.max(0.3, 1 + this.curseMod("pickup"));
-    const xpMul = (this.solo ? 1 + D.solo_xp_bonus * (1 + this.mod("solo_xp")) : 1) * (1 + this.curseMod("xp")) * (greed ? 1.25 : 1);
+    const xpMul = (this.solo ? 1 + this.soloXp() : 1) * (1 + this.curseMod("xp")) * (greed ? 1.25 : 1);
     let picked = false;
     compact(this.gems, (g) => {
       const ox = h.x - g.x, oy = h.y - g.y;
@@ -1192,7 +1196,7 @@ export class RunSim {
       if (c.kind === "gweapon") {
         const maxlv = D.weapon_max_level, cur = this.ghostWeaponName(g);
         if (g.lv >= maxlv) return { k: `${who}　最大Lv`, n: cur, d: `${cur}のダメージ +${Math.round(D.maxed_weapon_bonus[c.rar] * 100)}%` };
-        const to = Math.min(maxlv, g.lv + R.wlv);
+        const to = Math.min(maxlv, g.lv + R.wlv * D.ghost_cards.lv_mult);
         const need = D.ghost_cards.rank_levels[g.rank];
         const hint = !g.evolved && need !== undefined && need > g.lv ? (to >= need ? "\n次のレベルアップでランクアップ" : `\nLv${need}でランクアップ`) : "";
         return { k: `${who}　武器 Lv${g.lv} → ${to}`, n: cur, d: `亡霊のダメージ +${Math.round(W.per_level * (to - g.lv) * 100)}%` + (R.wbonus > 0 ? `\nさらに +${Math.round(R.wbonus * 100)}%` : "") + hint };
@@ -1237,7 +1241,7 @@ export class RunSim {
       if (g && c.kind === "gweapon") {
         if (g.lv >= maxlv) g.bonus += D.maxed_weapon_bonus[c.rar];
         else {
-          g.lv = Math.min(maxlv, g.lv + R.wlv);
+          g.lv = Math.min(maxlv, g.lv + R.wlv * D.ghost_cards.lv_mult);   // 亡霊の札は一度に lv_mult 倍上がる
           if (R.wbonus > 0) g.bonus += R.wbonus;
         }
       } else if (g) {

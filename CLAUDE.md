@@ -4,8 +4,8 @@
 
 ## プロジェクト
 - **呼び名**: オーナーとの会話ではカタカナの略称を使う。デモスワ = Demon Swarm、ライデ = Life Debt、デスレガ = Death Legacy（このリポジトリは「デスレガ」）。
-- ヴァンサバ型アクション＋「死んだ主人公が亡霊になり、次のランに一度だけ連れていける」ローグライト。
-- 仕様書: `docs/specs/DEATH_LEGACY_GDD.md`。**[確定]の核は変えない**: 主人公育成が中心 / 亡霊は生存時間で強くなる / 同行は任意 / **亡霊は消費しない（最大10体）・亡霊になる条件は険しい**（2026-10 にオーナー判断で「永久消費」から変更、ADR 021）。
+- ヴァンサバ型アクション＋「死んだ（または生還した）主人公を亡霊として残し、次のランに連れていって一緒に育てる」ローグライト。本番は30分モード。
+- 仕様書: `docs/specs/DEATH_LEGACY_GDD.md`。**[確定]の核は変えない**: 主人公育成が中心 / 同行は任意 / **亡霊は消費しない（最大10体）・亡霊になる条件は険しい**（ADR 021）/ **亡霊は等級・Lvを引き継がず、亡霊の札で一緒に育つ**（2026-10 オーナー判断で「生存時間で強くなる」から変更、ADR 025）。
 - 姉妹作: `high-valley/demon_swarm`, `high-valley/life_debt`（2026-10 に同じ TypeScript 構成・同じCIへ移行済み）。コードは各リポジトリで独立。
 - オーナーとのやり取りは**日本語**。報告は「何ができたか / 残っていること / 次にお願いしたいこと」を短く。専門用語はかみ砕く。
 
@@ -19,6 +19,7 @@
 - **実装済み（ADR 021）**: 亡霊は消費しない・最大2体同行・亡霊化は生存30%＋未練の欠片・主人公は武器1種・Lv3で武器の道を選ぶ・タグとセット効果・刻印・呪い。
 - **実装済み（ADR 023）**: 拠点の施設「堂守の亡霊」（霊廟タブ。鎮魂堂・武具の間・供養塔。住む亡霊は連れていけない・施設は戻せない）。
 - **実装済み（ADR 024）**: 武器のランク（武器が変わる）とレベル（ダメージ）を分けた・パッシブLv8・カード追加（パッシブ・呪い・刻印）・説明書・ランの後半ほど厳しい難度。
+- **実装済み（ADR 025）**: 亡霊の作り直し（等級なし・亡霊の札・特技・クリア時も残せる・亡霊の守り）、家系を一旦なし（`lineages_enabled`）、30分モード（`long`）を本番に。
 - **次**: オーナーと相談（施設の追加候補＝見張り塔・系譜の間は `docs/proposals/facilities.md`）
 - 公開URL: https://high-valley.github.io/Death_Legacy/
 
@@ -29,7 +30,7 @@
 ## よく使うコマンド
 ```bash
 npm install            # 初回（この作業環境では npm に繋がらないので、ln -s /opt/npm-tools/node_modules node_modules で代用できる）
-npm test               # 単体テスト 88件（Node 22.18+ が TypeScript をそのまま実行）
+npm test               # 単体テスト 94件（Node 22.18+ が TypeScript をそのまま実行）
 npm run typecheck      # tsc --noEmit
 npm run build          # dist/ に書き出し
 npm run dev            # http://localhost:8000
@@ -41,6 +42,7 @@ URL: `?demo`（見本データ・別保存先）`?fps` `?bench` `?lowres`。
 ## 設計のルール（崩さないこと）
 - `src/sim`（戦闘）と `src/meta`（セーブ・亡霊）は DOM・描画・入力に依存しない。セーブとの受け渡しは `summary()` / `snapshot()` だけ。
 - **亡霊・形見の状態**: stored → reserved（`MetaService.reserve` で出撃確定の瞬間に保存）→ 亡霊は stored に戻る / 形見は使用済み（`settle`）。喰らった亡霊は wraith（怨霊）→ 祓うと purified。弔うと released。古いセーブの consumed はそのまま。
+- **亡霊**: 戦闘中の育ち（Lv・ランク）は `Companion` が持ち、中断セーブの `gstate` にだけ残す（保管データに書き戻さない）。新しい亡霊は `settle` で `pending_ghost`（kind=offer）→ `decideOffer`。
 - **施設**: 住んでいる亡霊は `stationed_at`（状態は stored のまま）。効果は出撃時に `active_run.facility` へ写す。建てた施設は戻せない。
 - **穢れ**は保存せず「wraith の数」から計算する。戦闘の材料は `MetaService.runOpts()` の1か所で作る。
 - **`MetaService.settle` は冪等**（`settled_runs` で2回目以降は何もしない）。供物・亡霊生成・消費・世代数はすべてこの中で1回だけ。
@@ -58,6 +60,6 @@ URL: `?demo`（見本データ・別保存先）`?fps` `?bench` `?lowres`。
 - 毎ティックの処理を増やしたら `npm run bench` と `?bench` で確認。
 
 ## 既知の課題
-- 難度（2026-10-21、ADR 024）: 簡易ボットで3分 単独 16/42・亡霊2体 28/42。剣は呪術師（遠距離）に弱い。敵の硬さは後半でも雑魚 1〜1.5発（10分モードは 2.5〜3.4発）。人が遊んだ感想で `spawn.hp_growth`・`spawn.curve`・`solo_xp_bonus`・`rank_levels` を調整する。
+- 難度（2026-10-22、ADR 025）: 簡易ボットで30分 一人 2/14・亡霊2体 7/14（雷・斧は一人でも時々クリア）。10分・3分は亡霊2体だと易しめ。人が遊んだ感想で `spawn.modes.*`（hp_growth・dmg_growth・ghost_guard・solo_xp）と `ghost_cards`（base_mult・lv_mult）を調整する。
 - 仮アセット（絵はオーナーが用意中。効果音はコード生成）。
 - Steam 版（Electron＋Steamworks）は未着手。入口は `src/platform.ts`。

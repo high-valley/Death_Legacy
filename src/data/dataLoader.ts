@@ -31,7 +31,7 @@ export function loadBalance(raw: unknown): Loaded {
     "passives", "rarities", "maxed_weapon_bonus", "offerings", "altar", "library", "tree", "rites", "shelf", "enemies", "spawn", "checkpoint_interval", "lineages", "tags", "tag_points", "sigils", "sigil_chance", "curses", "curse_chance", "ghost_slots", "ghost_birth", "facilities", "lineages_enabled"], "balance")) {
     return { D, errors };
   }
-  if (need(D.ghost_cards, ["weight_one", "weight_two", "rank_levels", "base_mult", "dry_limit"], "ghost_cards")) {
+  if (need(D.ghost_cards, ["weight_one", "weight_two", "lv_mult", "rank_levels", "base_mult", "dry_limit"], "ghost_cards")) {
     D.ghost_cards.rank_levels.forEach((v, i, a) => { if (!(v >= 1) || (i > 0 && v <= a[i - 1])) errors.push("ghost_cards.rank_levels: 1以上で昇順"); });
   }
   if (!D.ghost_traits || !D.ghost_traits._) errors.push("ghost_traits に _（どのパッシブにも当てはまらない時）が要る");
@@ -43,7 +43,7 @@ export function loadBalance(raw: unknown): Loaded {
     for (const m of Object.keys(D.run_length)) {
       const sm = D.spawn.modes[m as keyof typeof D.spawn.modes];
       if (!sm) { errors.push(`spawn.modes に ${m} がない`); continue; }
-      need(sm, ["hp_growth", "dmg_growth", "curve", "elites_at", "boss_hp", "wraith_hp"], `spawn.modes.${m}`);
+      need(sm, ["hp_growth", "dmg_growth", "curve", "elites_at", "boss_hp", "wraith_hp", "solo_xp", "ghost_guard"], `spawn.modes.${m}`);
     }
   }
   need(D.player, ["weapon_mult", "hp", "speed", "radius", "dash_speed", "dash_time", "dash_cd", "hit_iframe", "pickup"], "player");

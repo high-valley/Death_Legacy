@@ -138,7 +138,7 @@ test("t06 亡霊は保管データのコピーで、生前の武器で攻撃す�
   assert.ok(r.ghost.lv === 1 && r.ghost.rank === 0, "生前の Lv・ランクは引き継がない");
 });
 
-test("亡霊の札: 3枚に混ざり、取ると亡霊の Lv が上がる。Lv2 で亡霊のランクアップ（道）が必ず出る。再開しても育ちは残り、保管データには書き戻さない", () => {
+test("亡霊の札: 3枚に混ざり、取ると亡霊の Lv が上がる。rank_levels に届くと亡霊のランクアップ（道）が必ず出る。再開しても育ちは残り、保管データには書き戻さない", () => {
   const w = new World();
   w.die(w.sortie("", "", "short", "ice", 1), 150);
   const gid = w.meta.storedGhosts()[0].ghost_id;
@@ -147,7 +147,7 @@ test("亡霊の札: 3枚に混ざり、取ると亡霊の Lv が上がる。Lv2 
   for (let i = 0; i < 100; i++) if (r.rollChoices().some((c) => c.kind === "gweapon")) seen++;
   assert.ok(seen > 30, `亡霊の札 ${seen}/100`);
   r.applyChoice({ kind: "gweapon", id: "ice", lv: 1, rar: "N", slot: 0 });
-  assert.equal(r.ghost!.lv, 2);
+  assert.equal(r.ghost!.lv, 1 + D.ghost_cards.lv_mult, "亡霊の札は lv_mult 倍上がる");
   const rk = r.rollChoices().filter((c) => c.kind === "grank");
   assert.deepEqual(rk.map((c) => c.branch), ["a", "b"], "亡霊のランクアップ（道）");
   assert.match(r.describe(rk[0]).k, /亡霊1/);
@@ -155,7 +155,7 @@ test("亡霊の札: 3枚に混ざり、取ると亡霊の Lv が上がる。Lv2 
   assert.equal(r.ghostWeaponName(r.ghost!), "アイスランス");
   assert.ok((r.tagPoints().ice ?? 0) >= D.tag_points.ghost_weapon + D.tag_points.ghost_rank, "育つと共鳴の点も増える");
   const r2 = new RunSim(D, { ...w.meta.runOpts(w.repo.data.active_run!), checkpoint: r.snapshot() });
-  assert.ok(r2.ghost!.lv === 2 && r2.ghost!.rank === 1 && r2.ghost!.branch === "b", "再開しても育ちは残る");
+  assert.ok(r2.ghost!.lv === 1 + D.ghost_cards.lv_mult && r2.ghost!.rank === 1 && r2.ghost!.branch === "b", "再開しても育ちは残る");
   assert.equal(w.meta.getGhost(gid)!.weapon_rank, 0, "保管データは変わらない");
 });
 

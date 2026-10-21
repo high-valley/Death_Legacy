@@ -247,10 +247,10 @@ export class Hud {
         }
         cx += cw + 6;
       }
-    } else if (!cards.length && !small) {
+    } else if (!cards.length && !small && sim.soloXp() > 0) {
       ctx.textAlign = touch ? "center" : "right";
       ctx.font = `11px ${FONT}`; ctx.fillStyle = C.dim;
-      ctx.fillText(`単独出撃　経験値 +${Math.round(D.solo_xp_bonus * 100 * (1 + sim.mod("solo_xp")))}%`, touch ? W / 2 : W - pad - 128, H - pad - 8);
+      ctx.fillText(`単独出撃　経験値 +${Math.round(sim.soloXp() * 100)}%`, touch ? W / 2 : W - pad - 128, H - pad - 8);
     }
 
     // ── 右下（PC）: 回避キー

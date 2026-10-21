@@ -70,9 +70,8 @@ export interface Balance {
   data_version: number;
   run_length: Record<RunMode, number>;
   vault_capacity: number;
-  solo_xp_bonus: number;
   /** 亡霊の札（ADR 025）: weight_one/two = 亡霊1体あたりの出やすさ、rank_levels = ランクアップのLv、base_mult = 主人公に対する強さ、dry_limit = この回数続けて出なければ次は必ず出す */
-  ghost_cards: { weight_one: number; weight_two: number; rank_levels: number[]; base_mult: number; dry_limit: number };
+  ghost_cards: { weight_one: number; weight_two: number; lv_mult: number; rank_levels: number[]; base_mult: number; dry_limit: number };
   ghost_traits: Record<string, GhostTrait>;
   player: { weapon_mult: number; hp: number; speed: number; radius: number; dash_speed: number; dash_time: number; dash_cd: number; hit_iframe: number; pickup: number };
   xp: { base: number; per_level: number };
@@ -117,7 +116,7 @@ export interface Balance {
 
 export type RunMode = "short" | "full" | "long";   // 3分 / 10分 / 30分（本番）
 /** モードごとの敵の伸び。boss_hp・wraith_hp は冥王・怨霊のHPの倍率 */
-export interface SpawnMode { hp_growth: number; dmg_growth: number; curve: number; elites_at: number[]; boss_hp: number; wraith_hp: number }
+export interface SpawnMode { hp_growth: number; dmg_growth: number; curve: number; elites_at: number[]; boss_hp: number; wraith_hp: number; solo_xp: number; ghost_guard: number }
 
 /** 拠点（納骨堂）の施設。亡霊を住まわせて効果を出す（ADR 023） */
 export interface FacilityStep { text: string; ghost_atk?: number; hp?: number }

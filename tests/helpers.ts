@@ -65,7 +65,8 @@ export function botPick(r: RunSim): ReturnType<RunSim["rollChoices"]>[number] {
     if (c.kind === "sigil") return 70;
     if (c.kind === "passive") {
       const t = D.passives[c.id].tag;
-      if (t && (pts[t] ?? 0) > 0) return 60 + (c.lv > 0 ? 5 : 0);
+      if (t && D.weapons[r.mainWeapon].tags.includes(t)) return 70 + (c.lv > 0 ? 5 : 0);   // 主人公の武器のタグを優先
+      if (t && (pts[t] ?? 0) > 0) return 55 + (c.lv > 0 ? 5 : 0);
       if (["might", "haste", "area", "vigor"].includes(c.id)) return 50;
       return t ? 10 : 30;
     }
