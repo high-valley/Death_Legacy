@@ -39,7 +39,13 @@ export function loadBalance(raw: unknown): Loaded {
     prev = t.from;
   });
   if (D.tiers.length > 0 && D.tiers[0].from !== 0) errors.push("tiers[0].from は 0");
-  need(D.spawn, ["base_per_sec", "per_progress", "max_alive", "hp_growth", "dmg_growth", "full_hp_growth", "full_dmg_growth", "full_curve", "curve"], "spawn");
+  if (need(D.spawn, ["base_per_sec", "per_progress", "max_alive", "modes"], "spawn")) {
+    for (const m of Object.keys(D.run_length)) {
+      const sm = D.spawn.modes[m as keyof typeof D.spawn.modes];
+      if (!sm) { errors.push(`spawn.modes に ${m} がない`); continue; }
+      need(sm, ["hp_growth", "dmg_growth", "curve", "elites_at", "boss_hp", "wraith_hp"], `spawn.modes.${m}`);
+    }
+  }
   need(D.player, ["weapon_mult", "hp", "speed", "radius", "dash_speed", "dash_time", "dash_cd", "hit_iframe", "pickup"], "player");
   for (const id of Object.keys(D.weapons)) {
     if (!need(D.weapons[id], ["name", "desc", "cd", "damage", "per_level", "grades", "tags"], `weapons.${id}`)) continue;

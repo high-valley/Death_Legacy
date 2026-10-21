@@ -67,7 +67,7 @@ export interface Rites {
 export interface Balance {
   schema_version: number;
   data_version: number;
-  run_length: Record<"full" | "short", number>;
+  run_length: Record<RunMode, number>;
   vault_capacity: number;
   solo_xp_bonus: number;
   tiers: Tier[];
@@ -96,8 +96,8 @@ export interface Balance {
   shelf: { unlock_generation: number; capacity: number; max_level: number; weapon_max_level: number };
   enemies: Record<string, EnemyDef>;
   spawn: {
-    base_per_sec: number; per_progress: number; max_alive: number; hp_growth: number; dmg_growth: number; full_hp_growth: number; full_dmg_growth: number; full_curve: number; curve: number; shooter_from: number; charger_from: number;
-    shooter_share: number; charger_share: number; elites_at: number[]; boss_phase_rate: number;
+    base_per_sec: number; per_progress: number; max_alive: number; modes: Record<RunMode, SpawnMode>; shooter_from: number; charger_from: number;
+    shooter_share: number; charger_share: number; boss_phase_rate: number;
   };
   checkpoint_interval: number;
   lineages: Lineage[];
@@ -113,7 +113,9 @@ export interface Balance {
   ghost_birth: { fragments: number; min_survival: number; drops: Record<string, number> };
 }
 
-export type RunMode = "full" | "short";
+export type RunMode = "short" | "full" | "long";   // 3分 / 10分 / 30分（本番）
+/** モードごとの敵の伸び。boss_hp・wraith_hp は冥王・怨霊のHPの倍率 */
+export interface SpawnMode { hp_growth: number; dmg_growth: number; curve: number; elites_at: number[]; boss_hp: number; wraith_hp: number }
 
 /** 拠点（納骨堂）の施設。亡霊を住まわせて効果を出す（ADR 023） */
 export interface FacilityStep { text: string; ghost_atk?: number; hp?: number }

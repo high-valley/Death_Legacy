@@ -3,7 +3,7 @@
 // 表示や効果音への通知は events キュー、セーブへの受け渡しは summary() / snapshot()。
 import { RngStreams } from "../core/rng.ts";
 import { SpatialGrid, pushPair } from "../core/spatialGrid.ts";
-import type { Balance, EnemyDef, Lineage, Rarity, RarityId, RunMode } from "../data/types.ts";
+import type { Balance, EnemyDef, Lineage, Rarity, RarityId, RunMode, SpawnMode } from "../data/types.ts";
 import { gradeAt, rankCount, type Branch } from "../data/weapons.ts";
 export { gradeAt, gradeIndex, weaponGrade } from "../data/weapons.ts";
 import type { CardMods, FacilityBuff, GhostPick, GhostRecord, Heirloom, RunResult, Snapshot, Summary } from "../meta/records.ts";
@@ -276,11 +276,12 @@ export class RunSim {
   // ---------------------------------------------------------------- stats
   progress(): number { return Math.min(1, this.t / this.runLen); }
   /** 雑魚・精鋭の攻撃力は時間で上がる（冥王・怨霊は固定） */
-  dmgScale(): number { return 1 + (this.mode === "full" ? this.D.spawn.full_dmg_growth : this.D.spawn.dmg_growth) * this.growthT(); }
-  /** 敵HPの伸び（10分モードは長いぶん主人公が育つので、大きく伸ばす） */
-  hpGrowth(): number { return this.mode === "full" ? this.D.spawn.full_hp_growth : this.D.spawn.hp_growth; }
+  dmgScale(): number { return 1 + this.spawnMode().dmg_growth * this.growthT(); }
+  /** モードごとの敵の伸び（長いモードほど主人公が育つので、大きく伸ばす） */
+  spawnMode(): SpawnMode { return this.D.spawn.modes[this.mode]; }
+  hpGrowth(): number { return this.spawnMode().hp_growth; }
   /** 伸び方の曲線（進み具合の curve 乗）。序盤はゆるやか・後半に急（最初は一人でも楽、後半は一人では厳しい） */
-  growthT(): number { return Math.pow(this.progress(), this.mode === "full" ? this.D.spawn.full_curve : this.D.spawn.curve); }
+  growthT(): number { return Math.pow(this.progress(), this.spawnMode().curve); }
   xpNeed(): number { return this.D.xp.base + this.level * this.D.xp.per_level; }
   pw(id: string): number { return this.ppow[id] ?? 0; }
   /** パッシブの効果（1 = 100%）。数値は balance.json の per */
@@ -630,7 +631,7 @@ export class RunSim {
     e.x = this.hero.x + Math.cos(a) * d;
     e.y = this.hero.y + Math.sin(a) * d;
     let scale = (1 + this.hpGrowth() * this.growthT()) * (1 + this.taintHp) * (1 + this.curseMod("enemy_hp"));
-    if (kind === "boss") scale = this.mode === "short" ? (def.short_hp_mult ?? 1) : 1;
+    if (kind === "boss") scale = this.spawnMode().boss_hp;
     e.maxHp = def.hp * scale;
     e.hp = e.maxHp;
     e.cd = this.rng.spawn.randf() * 2;
@@ -655,7 +656,7 @@ export class RunSim {
     const a = this.rng.spawn.randf() * TAU;
     e.x = this.hero.x + Math.cos(a) * 640;
     e.y = this.hero.y + Math.sin(a) * 640;
-    e.maxHp = (base.hp + W.hp_per_mult * tier.mult) * (this.mode === "short" ? W.short_hp_mult : 1);
+    e.maxHp = (base.hp + W.hp_per_mult * tier.mult) * this.spawnMode().wraith_hp;
     e.hp = e.maxHp;
     e.cd = 1.5;
     this.enemies.push(e);
@@ -670,7 +671,7 @@ export class RunSim {
     const p = this.progress();
     if (!this.bossSpawned && this.t >= this.runLen) this.spawnBoss();
     if (this.wraithRec && !this.wraithSpawned && p >= this.D.rites.wraith.at) this.spawnWraith();
-    if (this.eliteIdx < S.elites_at.length && p >= S.elites_at[this.eliteIdx]) {
+    if (this.eliteIdx < this.spawnMode().elites_at.length && p >= this.spawnMode().elites_at[this.eliteIdx]) {
       this.spawnEnemy("elite");
       this.eliteIdx++;
       this.emit({ type: "toast", text: "墓暴きが来る" });

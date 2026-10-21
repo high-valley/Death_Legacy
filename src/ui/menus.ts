@@ -37,7 +37,7 @@ export class Menus {
   readonly root: HTMLElement;
   readonly meta: MetaService;
   readonly D: Balance;
-  hub = { tab: "sortie" as string, ghosts: [] as GhostPick[], heir: "", weapon: "sword", mode: "short" as RunMode, seed: 0, lineage: "nameless", node: "" };
+  hub = { tab: "sortie" as string, ghosts: [] as GhostPick[], heir: "", weapon: "sword", mode: "long" as RunMode, seed: 0, lineage: "nameless", node: "" };
   touchMode = false;
   onSortie: (r: SortieRequest) => void = () => {};
   private hotkeys: HTMLButtonElement[] = [];
@@ -364,7 +364,7 @@ export class Menus {
     }
     // ランの長さ
     const mseg = h("div", { class: "seg" });
-    for (const [id, name] of [["short", "3分でボス"], ["full", "10分"]] as const) {
+    for (const [id, name] of [["long", "30分（本番）"], ["full", "10分"], ["short", "3分（お試し）"]] as const) {
       mseg.append(h("button", { type: "button", "aria-pressed": String(hub.mode === id), onclick: () => { hub.mode = id; re(); } }, name));
     }
     const seedIn = h("input", { id: "seedIn", inputmode: "numeric", value: String(hub.seed), size: 8, "aria-label": "seed" });

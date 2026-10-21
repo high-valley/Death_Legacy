@@ -32,7 +32,7 @@ export function manualPage(D: Balance, ch: Chapter, touch: boolean): HTMLElement
   const P = D.tag_points, B = D.ghost_birth;
   if (ch === "basics") {
     box.append(
-      sec("目的", para(`敵の群れから逃げ回りながら生き延び、最後に現れる冥王を倒せばクリア。3分モード（${D.run_length.short / 60}分）と10分モード（${D.run_length.full / 60}分）がある。10分モードは後半ほど敵が急に強くなる。`)),
+      sec("目的", para(`敵の群れから逃げ回りながら生き延び、最後に現れる冥王を倒せばクリア。本番は${D.run_length.long / 60}分モード。短く遊べる${D.run_length.full / 60}分モードと、お試しの${D.run_length.short / 60}分モードもある。どのモードも後半ほど敵が急に強くなり、${D.run_length.long / 60}分モードは一人ではまず生き残れない。亡霊と共に挑むこと。`)),
       sec("操作", para(touch
         ? "画面をドラッグして移動。攻撃は自動。右下のボタンで回避（少しの間ダメージを受けない）、右上で一時停止。横向きがおすすめ。"
         : "WASD・矢印キーで移動。攻撃は自動。Space で回避（少しの間ダメージを受けない）、Esc で一時停止。強化カードは 1・2・3 キーでも選べる。")),
