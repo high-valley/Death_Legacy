@@ -9,8 +9,7 @@ import { D, World } from "./helpers.ts";
 function withGhosts(n: number, offer = 50): World {
   const w = new World();
   for (let i = 0; i < n; i++) {
-    w.die(w.sortie("", "", "short", ["sword", "fire", "bow"][i % 3]), 120);
-    w.meta.resolveHeirloom(-1);
+    w.die(w.sortie("", "short", ["sword", "fire", "bow"][i % 3]), 120);
   }
   w.repo.data.offerings.earned += offer;
   return w;
@@ -40,7 +39,7 @@ test("住まわせた亡霊は連れていけず・喰らえず、保管庫の�
   assert.equal(w.meta.storedGhosts().length, 3);
   assert.equal(w.meta.availableGhosts().length, 2);
   assert.equal(w.sortie(g.ghost_id), null, "連れていけない");
-  assert.equal(w.sortie(g.ghost_id, "", "short", "sword", 1, "nameless", "devour"), null, "喰らえない");
+  assert.equal(w.sortie(g.ghost_id, "short", "sword", 1, "nameless", "devour"), null, "喰らえない");
   assert.ok(w.meta.unstation(g.ghost_id));
   assert.ok(w.sortie(g.ghost_id) !== null);
 });
@@ -73,7 +72,6 @@ test("鎮魂堂: 住む亡霊1体につき決まった供物×生き延びた割
   const r = w.sortie()!;
   const rec = w.die(r, 90);
   assert.equal(rec.facility_offer, Math.round(D.facilities.find((f) => f.id === "chinkon")!.effect.offer! * 0.5));
-  w.meta.resolveHeirloom(-1);
   const r2 = w.sortie()!;
   r2.t = 170; r2.end("retired");
   const rec2 = w.meta.settle(r2.summary(), "retired")!;
@@ -110,7 +108,7 @@ test("v3 のセーブ: 施設は空、弔った回数は残っている記録か
     run_history: [], settled_runs: [], progress: { generation: 2 },
   }));
   w.reload();
-  assert.equal(w.repo.data.schema_version, 6);
+  assert.equal(w.repo.data.schema_version, 7);
   assert.deepEqual(w.repo.data.buildings, []);
   assert.equal(w.repo.data.progress.mourned_count, 1);
 });

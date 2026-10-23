@@ -28,7 +28,7 @@ export function loadBalance(raw: unknown): Loaded {
 
   const D = raw as Balance;
   if (!need(raw, ["schema_version", "data_version", "run_length", "vault_capacity", "ghost_cards", "ghost_traits", "player", "xp", "weapons", "rank_levels", "weapon_card_weight", "cd_cut_max", "guard_floor", "crit_mult",
-    "passives", "rarities", "maxed_weapon_bonus", "offerings", "altar", "library", "tree", "rites", "shelf", "enemies", "spawn", "checkpoint_interval", "lineages", "tags", "tag_points", "sigils", "sigil_chance", "curses", "curse_chance", "ghost_slots", "ghost_birth", "facilities", "lineages_enabled"], "balance")) {
+    "passives", "rarities", "maxed_weapon_bonus", "offerings", "altar", "library", "tree", "rites", "enemies", "spawn", "checkpoint_interval", "lineages", "tags", "tag_points", "sigils", "sigil_chance", "curses", "curse_chance", "ghost_slots", "ghost_birth", "facilities", "lineages_enabled"], "balance")) {
     return { D, errors };
   }
   if (need(D.ghost_cards, ["weight_one", "weight_two", "lv_mult", "rank_levels", "base_mult", "dry_limit"], "ghost_cards")) {

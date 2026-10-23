@@ -1,6 +1,6 @@
 // ゲーム全体の状態機械と配線。
-//   title → hub（出撃・祭壇・書庫・形見の棚）→ play ⇄ (level / pause) → result → hub
-// RunSim（戦闘ロジック）・MetaService（亡霊・供物・形見・ラン終了処理）・表示・入力をつなぐだけ。
+//   title → hub（出撃・祭壇の樹・霊廟）→ play ⇄ (level / pause) → result → hub
+// RunSim（戦闘ロジック）・MetaService（亡霊・供物・施設・ラン終了処理）・表示・入力をつなぐだけ。
 import balance from "../data/balance.json" with { type: "json" };
 import { loadBalance } from "./data/dataLoader.ts";
 import { InputRouter } from "./input/inputRouter.ts";
@@ -242,7 +242,7 @@ class Game {
   toHub(): void {
     this.dropSim();
     this.setState("hub");
-    if (this.meta.S.pending_ghost || this.meta.S.pending_heirloom) {
+    if (this.meta.S.pending_ghost) {
       this.menus.showPending(() => this.toHub());
       return;
     }
@@ -270,15 +270,13 @@ class Game {
 
   private sortie(r: SortieRequest): void {
     const rid = uuid();
-    // 出撃確定の瞬間に予約を保存（亡霊・形見は reserved）
-    if (!this.meta.reserve(rid, r.seed, r.mode, r.weapon, r.ghosts, r.heirId, r.lineage)) {
+    // 出撃確定の瞬間に予約を保存（亡霊は reserved）
+    if (!this.meta.reserve(rid, r.seed, r.mode, r.weapon, r.ghosts, r.lineage)) {
       this.toHub();
       return;
     }
     const s = new RunSim(this.D, this.meta.runOpts(this.meta.S.active_run!));
     this.menus.hub.ghosts = [];
-    this.menus.hub.heir = "";
-    if (r.heirId) this.hud.toast("形見を身につけた");
     this.begin(s);
   }
 
@@ -375,13 +373,13 @@ class Game {
   }
 
   // ---------------------------------------------------------------- demo
-  /** ?demo: 見本データ（亡霊3体・怨霊1体・形見・供物・樹）。本物のセーブとは別の場所に作る */
+  /** ?demo: 見本データ（亡霊・怨霊1体・供物・樹・施設）。本物のセーブとは別の場所に作る */
   private seedDemo(): void {
     this.repo.wipe();
     const ws = ["bow", "fire", "ice", "sword", "bow"];
     for (let k = 0; k < 5; k++) {
       const rid = uuid();
-      this.meta.reserve(rid, k, "short", ws[k], "", "");
+      this.meta.reserve(rid, k, "short", ws[k], "");
       const r = new RunSim(this.D, { run_id: rid, seed: k, mode: "short", weapon: ws[k] });
       r.t = [100, 150, 172, 120, 110][k];
       r.weapons[r.mainWeapon] = 6;
@@ -395,7 +393,6 @@ class Game {
       r.end("player_death");
       this.meta.settle(r.summary(), "player_death");
       this.meta.decideOffer(true);
-      this.meta.resolveHeirloom(0);
     }
     const d = this.repo.data;
     d.ghosts[d.ghosts.length - 1].status = "wraith";   // 喰らわれて怨霊になった例

@@ -29,9 +29,9 @@ export class World {
   }
 
   /** 出撃（予約まで含む）。失敗時は null */
-  sortie(ghostId = "", heirId = "", mode: RunMode = "short", weapon = "sword", seed = 1, lineage = "nameless", ghostMode: GhostMode = "bring"): RunSim | null {
+  sortie(ghostId = "", mode: RunMode = "short", weapon = "sword", seed = 1, lineage = "nameless", ghostMode: GhostMode = "bring"): RunSim | null {
     const rid = uuid();
-    if (!this.meta.reserve(rid, seed, mode, weapon, ghostId, heirId, lineage, ghostMode)) return null;
+    if (!this.meta.reserve(rid, seed, mode, weapon, ghostId, lineage, ghostMode)) return null;
     return new RunSim(D, this.meta.runOpts(this.repo.data.active_run!));
   }
 

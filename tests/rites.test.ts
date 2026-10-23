@@ -7,7 +7,6 @@ import { D, World } from "./helpers.ts";
 /** 亡霊を1体作って id を返す（120秒生存 = 3分ランで英霊） */
 function makeGhost(w: World, t = 120): string {
   const out = w.die(w.sortie(), t);
-  w.meta.resolveHeirloom(-1);
   return out.new_ghost_id;
 }
 
@@ -17,8 +16,7 @@ test("喰らう: 同行せず力を取り込み、ラン後に怨霊になる（
   const g = w.meta.getGhost(gid)!;
   const base = w.sortie()!;
   w.meta.abandonActive();
-  w.meta.resolveHeirloom(-1);
-  const r = w.sortie(gid, "", "short", "sword", 2, "nameless", "devour")!;
+  const r = w.sortie(gid, "short", "sword", 2, "nameless", "devour")!;
   assert.equal(r.ghost, null, "喰らった亡霊は横にいない");
   assert.ok(r.devour && r.devour.rec.ghost_id === gid);
   assert.ok(!r.solo, "単独の経験値ボーナスはつかない");
@@ -40,9 +38,8 @@ test("喰らう: 同行せず力を取り込み、ラン後に怨霊になる（
 test("怨霊はランの途中で現れ、倒すと祓える（穢れ −1・供物）", () => {
   const w = new World();
   const gid = makeGhost(w);
-  w.die(w.sortie(gid, "", "short", "sword", 2, "nameless", "devour"), 10);
-  w.meta.resolveHeirloom(-1);
-  const r = w.sortie("", "", "short", "sword", 3)!;
+  w.die(w.sortie(gid, "short", "sword", 2, "nameless", "devour"), 10);
+  const r = w.sortie("", "short", "sword", 3)!;
   assert.equal(w.repo.data.active_run!.wraith_id, gid, "出撃時に現れる怨霊が決まる");
   r.t = D.run_length.short * D.rites.wraith.at - STEP / 2;
   r.step(STEP, 0, 0);
@@ -62,28 +59,24 @@ test("怨霊はランの途中で現れ、倒すと祓える（穢れ −1・供
 test("怨霊を倒せなければ残り、次のランでまた現れる", () => {
   const w = new World();
   const gid = makeGhost(w);
-  w.die(w.sortie(gid, "", "short", "sword", 2, "nameless", "devour"), 10);
-  w.meta.resolveHeirloom(-1);
-  const out = w.die(w.sortie("", "", "short", "sword", 3), 20);
+  w.die(w.sortie(gid, "short", "sword", 2, "nameless", "devour"), 10);
+  const out = w.die(w.sortie("", "short", "sword", 3), 20);
   assert.equal(out.wraith_escaped, w.meta.getGhost(gid)!.display_name);
   assert.equal(w.meta.taint(), 1);
-  w.meta.resolveHeirloom(-1);
-  w.sortie("", "", "short", "sword", 4);
+  w.sortie("", "short", "sword", 4);
   assert.equal(w.repo.data.active_run!.wraith_id, gid);
 });
 
 test("穢れの分だけ敵が硬くなり、清めの塩で半分になる", () => {
   const w = new World();
   const gid = makeGhost(w);
-  w.die(w.sortie(gid, "", "short", "sword", 2, "nameless", "devour"), 10);
-  w.meta.resolveHeirloom(-1);
+  w.die(w.sortie(gid, "short", "sword", 2, "nameless", "devour"), 10);
   const per = D.rites.wraith.enemy_hp_per_taint;
   assert.ok(Math.abs(w.meta.taintHpBonus() - per) < 1e-9);
-  const r = w.sortie("", "", "short", "sword", 5)!;
+  const r = w.sortie("", "short", "sword", 5)!;
   const e = r.spawnEnemy("chaser");
   assert.ok(Math.abs(e.maxHp - D.enemies.chaser.hp * (1 + per)) < 1e-9);
   w.meta.abandonActive();
-  w.meta.resolveHeirloom(-1);
   w.repo.data.offerings.earned += 10;
   assert.ok(w.meta.openNode("pure1"));
   assert.ok(Math.abs(w.meta.taintHpBonus() - per * 0.5) < 1e-9);
@@ -107,10 +100,9 @@ test("弔う: その場で成仏して供物になり、もう選べない", () 
 test("中断から再開: 喰らった力・怨霊の状態が戻り、倒した怨霊は出直さない", () => {
   const w = new World();
   const a = makeGhost(w), b = makeGhost(w, 60);
-  w.die(w.sortie(a, "", "short", "sword", 2, "nameless", "devour"), 10);
-  w.meta.resolveHeirloom(-1);
+  w.die(w.sortie(a, "short", "sword", 2, "nameless", "devour"), 10);
   // 怨霊 a が出るランで、b を喰らって出撃
-  const r = w.sortie(b, "", "short", "sword", 6, "nameless", "devour")!;
+  const r = w.sortie(b, "short", "sword", 6, "nameless", "devour")!;
   r.t = D.run_length.short * 0.5;
   r.step(STEP, 0, 0);
   assert.ok(r.wraith);

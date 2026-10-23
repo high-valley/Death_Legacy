@@ -36,16 +36,6 @@ export interface GhostRecord {
   stationed_at?: string;   // v4: 住んでいる施設（住んでいる間は連れていけない・喰らえない）
 }
 
-export interface HeirOption { type: "weapon" | "passive"; id: string; level: number }
-
-export interface Heirloom extends HeirOption {
-  heir_id: string;
-  name: string;
-  from_generation: number;
-  status: "stored" | "reserved";
-  reserved_by_run?: string;
-}
-
 /** 祭壇の樹から戦闘に渡す値 */
 export interface CardMods {
   altar: number; affinity: Record<string, number>; seals: string[];
@@ -76,7 +66,7 @@ export interface Summary {
   run_id: string; seed: number; mode: RunMode; t: number; run_len: number; main_weapon: string;
   weapons: Record<string, number>; passives: Record<string, number>; ppow: Record<string, number>;
   wbonus: Record<string, number>; evolved: Record<string, boolean>;
-  level: number; kills: number; boss_kills: number; death_cause: string; heirloom_id: string;
+  level: number; kills: number; boss_kills: number; death_cause: string;
   lineage_id: string;
   ghosts: GhostPick[];
   fragments: number;
@@ -86,7 +76,7 @@ export interface Summary {
 }
 
 export interface ActiveRun {
-  run_id: string; seed: number; mode: RunMode; weapon: string; heirloom_id: string;
+  run_id: string; seed: number; mode: RunMode; weapon: string;
   lineage_id: string; started_at: string; checkpoint: Snapshot | null;
   ghosts: GhostPick[];      // v3: 最大2体（古いセーブの ghost_id / ghost_mode は migrate で移す）
   wraith_id?: string;       // このランに現れる怨霊（出撃時に決める）
@@ -101,7 +91,7 @@ export interface RunRecord {
   selected_ghost_id: string; player_build: { weapons: Record<string, number>; passives: Record<string, number> };
   player_level: number; kills: number; boss_kills: number; ended_at: string;
   consumed_ghost: string; new_ghost_id: string; new_ghost?: string; new_ghost_pending: boolean;
-  used_heirloom: string; offerings: number; generation: number;
+  offerings: number; generation: number;
   lineage_id: string; unlocked_lineages: string[];
   ghost_mode?: GhostMode; devoured?: string; purified?: string; wraith_escaped?: string;
   companions?: string[];                        // 一緒に戦って保管庫へ戻った亡霊
@@ -122,7 +112,6 @@ export interface SaveData {
   active_run: ActiveRun | null;
   pending_ghost: GhostRecord | null;
   pending_ghost_kind: "" | "offer" | "full";     // v6: offer = 亡霊にするか選ぶ / full = 保管庫が満杯で入れ替え
-  pending_heirloom: { run_id: string; generation: number; options: HeirOption[] } | null;
   progress: {
     clears: number; deaths: number; runs: number; generation: number; total_survival: number;
     companion_runs: number;                      // 亡霊を連れて出撃して終えたラン数（墓守の解放条件）
@@ -133,7 +122,5 @@ export interface SaveData {
   offerings: { earned: number; mourned: number };   // mourned = 弔って得た分（earned に含む）
   tree: string[];                                     // 開いた節
   alloc: Alloc;
-  heirlooms: Heirloom[];
-  heir_seq: number;
   buildings: string[];                           // v4: 建てた施設（戻せない）
 }

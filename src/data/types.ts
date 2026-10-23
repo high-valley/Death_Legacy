@@ -41,7 +41,7 @@ export type LineageUnlock =
   | { type: "weapon_level"; weapon: string; level: number; text: string }
   | { type: "companion_runs"; count: number; text: string };
 export interface LineageMods {
-  heir_level_bonus?: number; fire_area?: number; fire_burn?: number; max_hp?: number;
+  fire_area?: number; fire_burn?: number; max_hp?: number;
   ghost_unlock_step?: number; ghost_atk?: number; solo_xp?: number; speed?: number;
 }
 export interface Lineage {
@@ -94,7 +94,6 @@ export interface Balance {
   library: { affinity_step: number; affinity_max: number };
   tree: TreeNode[];
   rites: Rites;
-  shelf: { unlock_generation: number; capacity: number; max_level: number; weapon_max_level: number };
   enemies: Record<string, EnemyDef>;
   spawn: {
     base_per_sec: number; per_progress: number; max_alive: number; modes: Record<RunMode, SpawnMode>; shooter_from: number; charger_from: number;

@@ -12,24 +12,22 @@ test("新しいセーブでは無名だけが使え、未解放の家系では�
   const w = new World();
   assert.ok(w.meta.lineageUnlocked("nameless"));
   assert.ok(!w.meta.lineageUnlocked("firekeeper") && !w.meta.lineageUnlocked("gravekeeper"));
-  assert.equal(w.sortie("", "", "short", "sword", 1, "firekeeper"), null);
+  assert.equal(w.sortie("", "short", "sword", 1, "firekeeper"), null);
   assert.equal(w.repo.data.active_run, null, "失敗した出撃で予約が残らない");
 });
 
 test("火守: 魔導書を Lv15 まで育てると解放され、魔導書固定・炎強化・HP減で出撃する", () => {
   const w = new World();
-  const r = w.sortie("", "", "short", "fire", 1)!;
+  const r = w.sortie("", "short", "fire", 1)!;
   r.weapons.fire = 14;
   const out1 = w.die(r, 60);
   assert.deepEqual(out1.unlocked_lineages, [], "Lv14では解放されない");
-  w.meta.resolveHeirloom(-1);
-  const r2 = w.sortie("", "", "short", "fire", 2)!;
+  const r2 = w.sortie("", "short", "fire", 2)!;
   r2.weapons.fire = 15;
   const out2 = w.die(r2, 60);
   assert.deepEqual(out2.unlocked_lineages, ["firekeeper"]);
   assert.ok(w.meta.lineageUnlocked("firekeeper"));
-  w.meta.resolveHeirloom(-1);
-  const f = w.sortie("", "", "short", "sword", 3, "firekeeper")!;
+  const f = w.sortie("", "short", "sword", 3, "firekeeper")!;
   assert.equal(f.mainWeapon, "fire", "火守は魔導書で出撃（選んだ武器より優先）");
   assert.equal(f.maxHp, Math.round(D.player.hp * 0.8), "最大HP −20%");
   const n = new RunSim(D, { run_id: "n", seed: 3, mode: "short", weapon: "fire" });
@@ -45,14 +43,12 @@ test("火守: 魔導書を Lv15 まで育てると解放され、魔導書固定
 test("墓守: 亡霊を連れたランを3回終えると解放。亡霊の解放が1段階早く、単独の経験値ボーナスがない", () => {
   const w = new World();
   for (let i = 0; i < 4; i++) {
-    w.die(w.sortie("", "", "short", "sword", 10 + i), 60);
-    w.meta.resolveHeirloom(-1);
+    w.die(w.sortie("", "short", "sword", 10 + i), 60);
   }
   const outs = [];
   for (let i = 0; i < 3; i++) {
     const gid = w.meta.storedGhosts()[0].ghost_id;
-    outs.push(w.die(w.sortie(gid, "", "short", "sword", 20 + i), 60));
-    w.meta.resolveHeirloom(-1);
+    outs.push(w.die(w.sortie(gid, "short", "sword", 20 + i), 60));
   }
   assert.deepEqual(outs[1].unlocked_lineages, []);
   assert.deepEqual(outs[2].unlocked_lineages, ["gravekeeper"], "3回目で解放");
@@ -79,20 +75,12 @@ test("家系の札はその家系の時だけ候補に出て、効果が働く�
   assert.match(f.describe({ kind: "lineage", id: "okuribi", lv: 0, rar: "N" }).d, /10%/);
 });
 
-test("無名は形見が1Lv強くなる。亡霊の名前に家系が入る", () => {
+test("亡霊の名前に家系が入る（無名は入らない）", () => {
   const w = new World();
-  const r = w.sortie("", "", "short", "bow", 40)!;
-  r.weapons.bow = 4;
-  w.die(r, 100);
-  w.meta.resolveHeirloom(0);
-  const h = w.meta.storedHeirs()[0];
-  assert.equal(h.level, 2);
-  const r2 = w.sortie("", h.heir_id, "short", "sword", 41)!;
-  assert.equal(r2.weapons.sword, 3, "形見 Lv2 + 無名の効果 1（主人公の武器に乗る）");
+  const r2 = w.sortie("", "short", "sword", 41)!;
   w.repo.data.lineages.push("firekeeper");
   w.die(r2, 60);
-  w.meta.resolveHeirloom(-1);
-  const f = w.sortie("", "", "short", "fire", 42, "firekeeper")!;
+  const f = w.sortie("", "short", "fire", 42, "firekeeper")!;
   w.die(f, 60);
   const names = w.meta.storedGhosts().map((g) => g.display_name);
   assert.ok(names.some((n) => n.includes("火守・")), names.join(" / "));
@@ -102,7 +90,7 @@ test("無名は形見が1Lv強くなる。亡霊の名前に家系が入る", ()
 test("中断・再開しても家系と家系の札は保たれる", () => {
   const w = new World();
   w.repo.data.lineages.push("firekeeper");
-  const f = w.sortie("", "", "short", "fire", 50, "firekeeper")!;
+  const f = w.sortie("", "short", "fire", 50, "firekeeper")!;
   f.applyChoice({ kind: "lineage", id: "okuribi", lv: 0, rar: "SR" });
   f.t = 30;
   w.meta.checkpoint(f.run_id, f.snapshot());

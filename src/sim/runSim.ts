@@ -6,7 +6,7 @@ import { SpatialGrid, pushPair } from "../core/spatialGrid.ts";
 import type { Balance, EnemyDef, GhostTrait, Lineage, Rarity, RarityId, RunMode, SpawnMode } from "../data/types.ts";
 import { gradeAt, rankCount, type Branch } from "../data/weapons.ts";
 export { gradeAt, gradeIndex, weaponGrade } from "../data/weapons.ts";
-import type { CardMods, FacilityBuff, GhostPick, GhostRecord, Heirloom, RunResult, Snapshot, Summary } from "../meta/records.ts";
+import type { CardMods, FacilityBuff, GhostPick, GhostRecord, RunResult, Snapshot, Summary } from "../meta/records.ts";
 
 export const STEP = 1 / 60;
 const TAU = Math.PI * 2;
@@ -104,7 +104,6 @@ export interface RunOpts {
   lineage?: string;
   ghost?: GhostRecord | null;        // 1体だけ連れていく時の書き方（ghosts と同じ）
   ghosts?: GhostRecord[];           // 連れていく亡霊（最大2体）
-  heirloom?: Heirloom | null;
   card_mods?: CardMods;
   checkpoint?: Snapshot | null;
   /** 喰らった亡霊（同行はしない。力だけを取り込む） */
@@ -155,7 +154,6 @@ export class RunSim {
   readonly lineage: Lineage;
   lineageLv = 0;     // 家系の札の取得回数
   lpow = 0;          // 家系の札の効果量（レア度込み）
-  heirloomId = "";
   solo: boolean;
   devours: Devour[] = [];
   /** 喰らった力の合計 */
@@ -248,28 +246,7 @@ export class RunSim {
     this.solo = this.ghosts.length === 0 && this.devours.length === 0;
     if (o.wraith) this.wraithRec = structuredClone(o.wraith);
     this.taintHp = Math.max(0, o.taint_hp ?? 0);
-    if (o.heirloom) {
-      this.heirloomId = o.heirloom.heir_id;
-      if (!o.checkpoint) this.applyHeirloom(o.heirloom);
-    }
     if (o.checkpoint) this.restore(o.checkpoint);
-  }
-
-  private applyHeirloom(h: Heirloom): void {
-    const cap = h.type === "weapon" ? this.D.weapon_max_level : this.D.passive_max_level;
-    // 武器の形見はレベル（ダメージ）だけ。ランクはランクアップの札で上げる
-    const lv = Math.min(cap, h.level + (this.lineage.mods.heir_level_bonus ?? 0));
-    if (h.type === "weapon") {
-      // 主人公は武器1種なので、武器の形見は「いまの武器のLv」になる
-      this.weapons[this.mainWeapon] = Math.max(this.weapons[this.mainWeapon] ?? 0, lv);
-    } else {
-      this.passives[h.id] = lv;
-      this.ppow[h.id] = lv;
-      if (h.id === "vigor") {
-        this.maxHp += this.D.passives.vigor.per * lv;
-        this.hp = this.maxHp;
-      }
-    }
   }
 
   // ---------------------------------------------------------------- events
@@ -1375,7 +1352,7 @@ export class RunSim {
     return {
       run_id: this.run_id, seed: this.seed, mode: this.mode, t: this.t, run_len: this.runLen, main_weapon: this.mainWeapon,
       weapons: { ...this.weapons }, passives: { ...this.passives }, ppow: { ...this.ppow }, wbonus: { ...this.wbonus }, evolved: { ...this.evolved },
-      level: this.level, kills: this.kills, boss_kills: this.bossKills, death_cause: this.deathCause, heirloom_id: this.heirloomId,
+      level: this.level, kills: this.kills, boss_kills: this.bossKills, death_cause: this.deathCause,
       lineage_id: this.lineage.id, ghosts: this.picks(), fragments: this.fragments, branch: { ...this.branch }, rank: { ...this.rank },
       wraith_id: this.wraithRec?.ghost_id ?? "", wraith_purified: this.wraithDead,
     };

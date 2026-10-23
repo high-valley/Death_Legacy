@@ -10,7 +10,7 @@
 - オーナーとのやり取りは**日本語**。報告は「何ができたか / 残っていること / 次にお願いしたいこと」を短く。専門用語はかみ砕く。
 
 ## 経緯と現在地（2026-10）
-- 拠点画面の名前は「ホーム」（2026-10-22 オーナー判断で「納骨堂」から変更。コード・ドキュメントの古い記述は納骨堂のまま）。「第N代」の世代表示もなくした（亡霊の名前は「弓の亡霊」、同名は「・二」。内部の世代数 `progress.generation` はラン数として残す）。
+- 拠点画面の名前は「ホーム」（2026-10-22 オーナー判断で「納骨堂」から変更。コード・ドキュメントの古い記述は納骨堂のまま）。「第N代」の世代表示と形見もなくした（ADR 026）（亡霊の名前は「弓の亡霊」、同名は「・二」。内部の世代数 `progress.generation` はラン数として残す）。
 - 単一HTMLのブラウザ試作で手触りを確認 → 世代交代まわりを拡張 → Godot 版を作成 → **iPhone のブラウザで重く遊べなかったため TypeScript（Canvas 2D）へ移行**（ADR 011, 012）。Godot 版は `godot-legacy` ブランチ。
 - **実装済み（フェーズ1）**: MVP一式（3武器・6パッシブ・3敵種＋冥王・亡霊の生成/予約/消費・保管庫10体と入れ替え・セーブと中断復帰）＋ カードのレア度5段階（N/R/SR/UR/LR、LRは武器進化）＋ 供物（祭壇=レア率、書庫=縁・封印）＋ 形見。
 - **実装済み（フェーズ2）**: 家系の解放（無名・火守・墓守。特性・弱点・専用カード・解放条件、ADR 013）＋ 画面のつくり直し（ADR 014）。
@@ -31,7 +31,7 @@
 ## よく使うコマンド
 ```bash
 npm install            # 初回（この作業環境では npm に繋がらないので、ln -s /opt/npm-tools/node_modules node_modules で代用できる）
-npm test               # 単体テスト 94件（Node 22.18+ が TypeScript をそのまま実行）
+npm test               # 単体テスト 92件（Node 22.18+ が TypeScript をそのまま実行）
 npm run typecheck      # tsc --noEmit
 npm run build          # dist/ に書き出し
 npm run dev            # http://localhost:8000
@@ -42,7 +42,7 @@ URL: `?demo`（見本データ・別保存先）`?fps` `?bench` `?lowres`。
 
 ## 設計のルール（崩さないこと）
 - `src/sim`（戦闘）と `src/meta`（セーブ・亡霊）は DOM・描画・入力に依存しない。セーブとの受け渡しは `summary()` / `snapshot()` だけ。
-- **亡霊・形見の状態**: stored → reserved（`MetaService.reserve` で出撃確定の瞬間に保存）→ 亡霊は stored に戻る / 形見は使用済み（`settle`）。喰らった亡霊は wraith（怨霊）→ 祓うと purified。弔うと released。古いセーブの consumed はそのまま。
+- **亡霊の状態**: stored → reserved（`MetaService.reserve` で出撃確定の瞬間に保存）→ stored に戻る（`settle`）。形見は 2026-10-22 になくした（ADR 026）。喰らった亡霊は wraith（怨霊）→ 祓うと purified。弔うと released。古いセーブの consumed はそのまま。
 - **亡霊**: 戦闘中の育ち（Lv・ランク）は `Companion` が持ち、中断セーブの `gstate` にだけ残す（保管データに書き戻さない）。新しい亡霊は `settle` で `pending_ghost`（kind=offer）→ `decideOffer`。
 - **施設**: 住んでいる亡霊は `stationed_at`（状態は stored のまま）。効果は出撃時に `active_run.facility` へ写す。建てた施設は戻せない。
 - **穢れ**は保存せず「wraith の数」から計算する。戦闘の材料は `MetaService.runOpts()` の1か所で作る。

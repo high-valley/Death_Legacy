@@ -170,7 +170,7 @@ test("氷と雷でも最後まで遊べる（簡易ボット）", () => {
   }
 });
 
-test("形見で最初からランクアップのLv以上なら、最初のレベルアップでランクアップの札が出る", () => {
+test("最初からランクアップのLv以上なら、最初のレベルアップでランクアップの札が出る", () => {
   const r = sim("sword", 5);
   r.weapons.sword = D.rank_levels[0] + 1;
   assert.ok(r.rollChoices().some((c) => c.kind === "rank" && !!c.branch), "道を選ぶ札が出る");

@@ -1,10 +1,10 @@
 // ランをまたぐ要素をまとめて扱う。
-//   亡霊の保管・入れ替え / 死亡した主人公から亡霊を作る / 供物と祭壇の樹 / 形見 / 亡霊の3択と穢れ・怨霊 /
+//   亡霊の保管・入れ替え / 死亡・生還した主人公から亡霊を作る / 供物と祭壇の樹 / 施設 / 亡霊の3択と穢れ・怨霊 /
 //   出撃予約 → チェックポイント → ラン終了処理（冪等）
-// 亡霊と形見の状態: stored → reserved（出撃中）→ consumed / 使用済み（喰らった亡霊は wraith → 祓うと purified、弔うと released）。異常終了しても reserved のまま残り、同じランを再開できる。
+// 亡霊の状態: stored → reserved（出撃中）→ stored（喰らった亡霊は wraith → 祓うと purified、弔うと released）。異常終了しても reserved のまま残り、同じランを再開できる。
 import type { Balance, Facility, FacilityStep, GhostTrait, Lineage, RunMode, TreeEffect, TreeNode } from "../data/types.ts";
 import { neutralLineage, type RunOpts } from "../sim/runSim.ts";
-import type { ActiveRun, CardMods, FacilityBuff, GhostMode, GhostPick, GhostRecord, Heirloom, HeirOption, RunRecord, RunResult, SaveData, Snapshot, Summary } from "./records.ts";
+import type { ActiveRun, CardMods, FacilityBuff, GhostMode, GhostPick, GhostRecord, RunRecord, RunResult, SaveData, Snapshot, Summary } from "./records.ts";
 import type { SaveRepository } from "./saveRepository.ts";
 
 export function uuid(): string {
@@ -150,48 +150,6 @@ export class MetaService {
     return true;
   }
 
-  // ================================================================ heirlooms
-  storedHeirs(): Heirloom[] {
-    return this.S.heirlooms.filter((h) => h.status === "stored");
-  }
-
-  getHeir(id: string): Heirloom | null {
-    return this.S.heirlooms.find((h) => h.heir_id === id) ?? null;
-  }
-
-  private itemName(o: HeirOption): string {
-    return o.type === "weapon" ? this.D.weapons[o.id].name : this.D.passives[o.id].name;
-  }
-
-  heirLabel(o: HeirOption): string {
-    return `${this.itemName(o)} Lv${o.level}`;
-  }
-
-  heirEffect(o: HeirOption): string {
-    return o.type === "weapon" ? `出撃時から武器を Lv${o.level} で持つ（ダメージだけ。どの主人公でも）` : `出撃時から${this.itemName(o)}をLv${o.level}で持つ`;
-  }
-
-  /** index = 選んだ候補、-1 = 残さない */
-  resolveHeirloom(index: number): void {
-    const p = this.S.pending_heirloom;
-    if (!p) return;
-    if (index >= 0 && index < p.options.length) {
-      const o = p.options[index];
-      this.S.heir_seq += 1;
-      this.S.heirlooms.push({
-        heir_id: uuid(), name: `形見・${this.heirLabel(o)}`, type: o.type, id: o.id,
-        level: o.level, from_generation: p.generation, status: "stored",
-      });
-      const st = this.storedHeirs();
-      if (st.length > this.D.shelf.capacity) {
-        const old = st[0];
-        this.S.heirlooms = this.S.heirlooms.filter((h) => h.heir_id !== old.heir_id);
-      }
-    }
-    this.S.pending_heirloom = null;
-    this.repo.write();
-  }
-
   // ================================================================ offerings / 祭壇の樹
   /** 開いた節に払った供物の合計 */
   offeringsUsed(): number {
@@ -259,10 +217,6 @@ export class MetaService {
     let n = 0;
     for (const k in this.S.alloc.affinity) n += this.S.alloc.affinity[k];
     return n;
-  }
-
-  shelfUnlocked(): boolean {
-    return this.S.progress.generation >= this.D.shelf.unlock_generation;
   }
 
   affinity(id: string): number {
@@ -362,7 +316,7 @@ export class MetaService {
       ghosts: picks.filter((x) => x.p.mode === "bring").map((x) => x.g),
       devours: picks.filter((x) => x.p.mode === "devour").map((x) => ({ rec: x.g, ...this.devourPower(x.g) })),
       wraith: ar.wraith_id ? this.getGhost(ar.wraith_id) : null, taint_hp: this.taintHpBonus(),
-      heirloom: ar.heirloom_id ? this.getHeir(ar.heirloom_id) : null, card_mods: this.cardMods(), checkpoint: ar.checkpoint,
+      card_mods: this.cardMods(), checkpoint: ar.checkpoint,
       facility: ar.facility,
     };
   }
@@ -490,9 +444,9 @@ export class MetaService {
   }
 
   // ================================================================ sortie / settlement
-  /** 出撃確定の瞬間に保存。亡霊・形見は reserved になり、異常終了しても複製されない */
+  /** 出撃確定の瞬間に保存。亡霊は reserved になり、異常終了しても複製されない */
   /** ghosts は亡霊1体の id（文字列）か、選んだ亡霊の一覧（最大 ghostSlots 体） */
-  reserve(runId: string, seed: number, mode: RunMode, weapon: string, ghosts: string | GhostPick[], heirId: string, lineageId = "nameless", ghostMode: GhostMode = "bring"): boolean {
+  reserve(runId: string, seed: number, mode: RunMode, weapon: string, ghosts: string | GhostPick[], lineageId = "nameless", ghostMode: GhostMode = "bring"): boolean {
     if (this.S.active_run) return false;
     if (!this.lineageUnlocked(lineageId)) return false; // 未解放の家系では出撃できない
     const lin = this.lineage(lineageId);
@@ -506,17 +460,11 @@ export class MetaService {
       if (!g || g.status !== "stored" || g.stationed_at) return false; // 出撃中・怨霊・成仏済み・施設に住んでいる亡霊は選べない
       gs.push(g);
     }
-    let h: Heirloom | null = null;
-    if (heirId) {
-      h = this.getHeir(heirId);
-      if (!h || h.status !== "stored") return false;
-    }
     for (const g of gs) { g.status = "reserved"; g.reserved_by_run = runId; }
-    if (h) { h.status = "reserved"; h.reserved_by_run = runId; }
     // 怨霊は一番古いものから1体ずつ現れる（再開しても同じ怨霊になるよう出撃時に決める）
     const wraith = this.wraiths()[0];
     this.S.active_run = {
-      run_id: runId, seed, mode, weapon, heirloom_id: heirId, lineage_id: lin.id, started_at: now(), checkpoint: null,
+      run_id: runId, seed, mode, weapon, lineage_id: lin.id, started_at: now(), checkpoint: null,
       ghosts: picks, wraith_id: wraith ? wraith.ghost_id : "", facility: this.facilityBuff(),
     };
     this.repo.write();
@@ -539,7 +487,7 @@ export class MetaService {
       run_id: sm.run_id, seed: sm.seed, mode: sm.mode, duration_seconds: Math.floor(sm.t), result: res,
       selected_ghost_id: sm.ghosts[0]?.id ?? "", player_build: { weapons: sm.weapons, passives: sm.passives }, player_level: sm.level,
       kills: sm.kills, boss_kills: sm.boss_kills, ended_at: ended, consumed_ghost: "", new_ghost_id: "", new_ghost_pending: false,
-      used_heirloom: "", offerings: 0, generation: 0, lineage_id: sm.lineage_id, unlocked_lineages: [],
+      offerings: 0, generation: 0, lineage_id: sm.lineage_id, unlocked_lineages: [],
       ghost_mode: sm.ghosts.some((p) => p.mode === "devour") ? "devour" : "bring",
       companions: [], devoured_all: [], ghost_failed: "", fragments: sm.fragments,
     };
@@ -575,7 +523,6 @@ export class MetaService {
       }
     }
     // ② 亡霊の候補: 死亡（生存時間と未練の欠片が足りた時）とクリア（無条件）。「亡霊にする / しない」を選ばせる（ADR 025）。
-    //    世代数を先に進めて、亡霊の「第N代」と形見の世代をそろえる
     s.progress.generation += 1;
     const fail = res === "player_death" ? this.birthCheck(sm) : "";
     out.ghost_failed = fail;
@@ -595,7 +542,7 @@ export class MetaService {
     if (sm.ghosts.some((p) => p.mode === "bring")) s.progress.companion_runs += 1;
     for (const id in sm.weapons) s.progress.best_weapon_level[id] = Math.max(s.progress.best_weapon_level[id] ?? 0, sm.weapons[id]);
     out.unlocked_lineages = this.checkUnlocks();
-    // ③ 世代交代: 供物・形見の候補・世代数
+    // ③ 供物・ラン数
     const of = D.offerings;
     const frac = Math.min(1, sm.t / sm.run_len);
     let offer = Math.floor(frac * 10) * of.per_tenth_survived + Math.floor(sm.kills / 100) * of.per_100_kills + (res === "boss_cleared" ? of.clear_bonus : 0);
@@ -609,21 +556,6 @@ export class MetaService {
     out.offerings = offer;
     s.progress.total_survival += Math.floor(sm.t);
     out.generation = s.progress.generation;
-    if (sm.heirloom_id) {
-      const h = this.getHeir(sm.heirloom_id);
-      if (h && h.status === "reserved" && h.reserved_by_run === sm.run_id) {
-        out.used_heirloom = h.name;
-        s.heirlooms = s.heirlooms.filter((x) => x.heir_id !== h.heir_id);
-      }
-    }
-    if (res !== "retired") {
-      const cap = D.shelf.max_level, wcap = D.shelf.weapon_max_level;
-      const options: HeirOption[] = [
-        ...Object.keys(sm.weapons).map((id): HeirOption => ({ type: "weapon", id, level: Math.min(wcap, Math.ceil(sm.weapons[id] / 2)) })),
-        ...Object.keys(sm.passives).map((id): HeirOption => ({ type: "passive", id, level: Math.min(cap, Math.ceil(sm.passives[id] / 2)) })),
-      ];
-      s.pending_heirloom = { run_id: sm.run_id, generation: s.progress.generation, options };
-    }
     // ④ 履歴・処理済み記録・出撃中フラグの解除を同じ書き込みで確定
     s.run_history.unshift(out);
     s.run_history = s.run_history.slice(0, 30);
@@ -639,7 +571,7 @@ export class MetaService {
     return out;
   }
 
-  /** 中断したランを再開せずに放棄する（リタイア扱い: 連れていた亡霊は戻る・喰らった亡霊は怨霊・形見は消費、亡霊は生まれない） */
+  /** 中断したランを再開せずに放棄する（リタイア扱い: 連れていた亡霊は戻る・喰らった亡霊は怨霊、亡霊は生まれない） */
   abandonActive(): RunRecord | null {
     const ar = this.S.active_run;
     if (!ar) return null;
@@ -648,7 +580,7 @@ export class MetaService {
       run_id: ar.run_id, seed: ar.seed, mode: ar.mode, t: cp?.t ?? 0, run_len: this.D.run_length[ar.mode],
       main_weapon: ar.weapon, weapons: cp?.weapons ?? { [ar.weapon]: 1 }, passives: cp?.passives ?? {}, ppow: cp?.ppow ?? {},
       wbonus: cp?.wbonus ?? {}, evolved: cp?.evolved ?? {}, level: cp?.level ?? 1, kills: cp?.kills ?? 0,
-      boss_kills: 0, death_cause: "", heirloom_id: ar.heirloom_id ?? "", lineage_id: ar.lineage_id ?? "nameless",
+      boss_kills: 0, death_cause: "", lineage_id: ar.lineage_id ?? "nameless",
       ghosts: ar.ghosts ?? [], fragments: cp?.fragments ?? 0, branch: cp?.branch ?? {},
       wraith_id: ar.wraith_id ?? "", wraith_purified: cp?.wraith_dead ?? false,
     };

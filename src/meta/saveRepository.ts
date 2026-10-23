@@ -3,9 +3,13 @@
 //   読み込み: 本体が壊れていれば .bak から復元
 // ブラウザでは localStorage、テストではメモリ、将来の Steam 版（Electron）ではファイルに差し替える。
 import { legacyWeapon } from "../data/weapons.ts";
-import type { GhostRecord, HeirOption, SaveData, Snapshot } from "./records.ts";
+import type { GhostRecord, SaveData, Snapshot } from "./records.ts";
 
-export const SCHEMA_VERSION = 6;
+/** 形見（2026-10-22 になくした）の古いデータの形。移行のためだけに使う */
+interface OldHeir { type: "weapon" | "passive"; level: number; name?: string }
+type OldSave = SaveData & { heirlooms?: OldHeir[]; pending_heirloom?: { options: OldHeir[] } | null; heir_seq?: number };
+
+export const SCHEMA_VERSION = 7;
 
 /** localStorage と同じ形の保存先 */
 export interface KV {
@@ -25,11 +29,11 @@ export function freshSave(dataVersion = 1): SaveData {
   return {
     schema_version: SCHEMA_VERSION, data_version: dataVersion,
     ghost_seq: 0, ghosts: [], run_history: [], settled_runs: [],
-    active_run: null, pending_ghost: null, pending_ghost_kind: "", pending_heirloom: null,
+    active_run: null, pending_ghost: null, pending_ghost_kind: "",
     progress: { clears: 0, deaths: 0, runs: 0, generation: 0, total_survival: 0, companion_runs: 0, best_weapon_level: {}, mourned_count: 0 },
     lineages: ["nameless"],
     offerings: { earned: 0, mourned: 0 }, tree: [], alloc: { affinity: {}, seals: [] },
-    heirlooms: [], heir_seq: 0, buildings: [],
+    buildings: [],
   };
 }
 
@@ -57,7 +61,6 @@ export function migrate(d: SaveData): SaveData {
   for (const g of [...(d.ghosts ?? []), ...(d.pending_ghost ? [d.pending_ghost] : [])]) {
     if (typeof g.display_name === "string") g.display_name = g.display_name.replace(/^第\d+代・/, "");
   }
-  for (const h of d.heirlooms ?? []) if (typeof h.name === "string") h.name = h.name.replace(/^第\d+代の/, "");
   // v4 → v5: 武器のランクとレベルを分けた（ADR 024）。古い武器Lv（1〜5）→ ランク＋新しいレベル（1〜20）、パッシブLv（〜5）→ 〜8
   if ((d.schema_version ?? 1) < 5) migrateLevels(d);
   // v3 → v4: 施設。弔った回数は、残っている記録（弔うと consumed_at が付く）から数える
@@ -80,6 +83,10 @@ export function migrate(d: SaveData): SaveData {
   if (!Array.isArray(d.tree)) d.tree = [];
   if (!Array.isArray(d.buildings)) d.buildings = [];
   if (oldMourned >= 0) d.progress.mourned_count = Math.max(d.progress.mourned_count ?? 0, oldMourned);
+  // v6 → v7: 形見をなくした（2026-10-22）。古い形見・形見の候補は捨てる（出撃中のランの形見の効果は、もう反映しない）
+  const od = d as OldSave;
+  delete od.heirlooms; delete od.pending_heirloom; delete od.heir_seq;
+  if (d.active_run) delete (d.active_run as unknown as Record<string, unknown>).heirloom_id;
   d.schema_version = SCHEMA_VERSION;
   return d;
 }
@@ -153,14 +160,15 @@ function migrateLevels(d: SaveData): void {
   };
   for (const g of d.ghosts ?? []) ghost(g);
   ghost(d.pending_ghost);
-  const heir = (o: HeirOption): void => {
+  const od = d as OldSave;
+  const heir = (o: OldHeir): void => {
     o.level = o.type === "weapon" ? Math.min(10, legacyWeapon(o.level).level) : Math.min(5, Math.round(o.level * 1.6));
   };
-  for (const h of d.heirlooms ?? []) {
+  for (const h of od.heirlooms ?? []) {
     heir(h);
-    h.name = h.name.replace(/Lv\d+$/, `Lv${h.level}`);   // 名前に入っている古いLvも直す
+    if (h.name) h.name = h.name.replace(/Lv\d+$/, `Lv${h.level}`);   // 名前に入っている古いLvも直す
   }
-  for (const o of d.pending_heirloom?.options ?? []) heir(o);
+  for (const o of od.pending_heirloom?.options ?? []) heir(o);
   const best = d.progress?.best_weapon_level ?? {};
   for (const k in best) best[k] = legacyWeapon(best[k]).level;
   const cp: Snapshot | null | undefined = d.active_run?.checkpoint;
