@@ -105,10 +105,5 @@ export class TouchControls {
       ctx.fillText("画面をドラッグで移動（攻撃は自動）", 16, this.H * 0.62);
     }
     ctx.lineWidth = 1;
-    if (this.H > this.W) {
-      ctx.fillStyle = C.candle; ctx.textAlign = "center"; ctx.font = `14px ${FONT}`;
-      ctx.fillText("横向きにすると遊びやすくなります", this.W / 2, 120);
-      ctx.textAlign = "left";
-    }
   }
 }

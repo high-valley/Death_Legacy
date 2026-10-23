@@ -63,6 +63,7 @@ export class Hud {
 
   draw(ctx: CanvasRenderingContext2D, sim: RunSim, W: number, H: number, touch: boolean, debug: boolean, perf: Perf): void {
     const pad = 14, small = W < 760 || H < 480;
+    const tall = H > W;   // スマホ縦向き: 上を2段に分けて重ならないようにする
     const D = sim.D, h = sim.hero;
     ctx.textBaseline = "middle";
 
@@ -88,7 +89,7 @@ export class Hud {
     } else {
       drawIcon(ctx, sim.lineage.card.id === "grit" ? "ghost" : sim.lineage.card.id, ex, ey, er * 1.1, GOLD);
     }
-    const bx = ex + er + 8, bw = Math.min(small ? 200 : 260, W * 0.3), bh = small ? 14 : 16;
+    const bx = ex + er + 8, bw = tall ? Math.min(260, W - bx - pad - (touch ? 58 : 0)) : Math.min(small ? 200 : 260, W * 0.3), bh = small ? 14 : 16;
     if (this.shownHp < 0 || sim.hp > this.shownHp) this.shownHp = sim.hp;
     else this.shownHp += (sim.hp - this.shownHp) * 0.06;
     bar(ctx, bx, ey - bh + 1, bw, bh, this.shownHp / sim.maxHp, "rgba(214,90,94,.35)");
@@ -120,23 +121,24 @@ export class Hud {
     // ── 中央上: 残り時間・ボス・怨霊
     ctx.textAlign = "center";
     const tsz = small ? 22 : 30;
+    const ty0 = tall ? pad + er * 2 + 16 : pad;   // 縦向きは2段目に
     const tstr = sim.bossSpawned ? fmt(sim.t) : fmt(sim.runLen - sim.t);
     ctx.font = `600 ${tsz}px ${SERIF}`;
     const tw = ctx.measureText(tstr).width;
-    plate(ctx, W / 2 - tw / 2 - 34, pad, tw + 56, tsz + 14);
-    drawIcon(ctx, "clock", W / 2 - tw / 2 - 16, pad + (tsz + 14) / 2, small ? 14 : 16, GOLD);
+    plate(ctx, W / 2 - tw / 2 - 34, ty0, tw + 56, tsz + 14);
+    drawIcon(ctx, "clock", W / 2 - tw / 2 - 16, ty0 + (tsz + 14) / 2, small ? 14 : 16, GOLD);
     ctx.fillStyle = sim.bossSpawned ? "#ff8a8e" : C.bone;
-    ctx.fillText(tstr, W / 2 + 10, pad + (tsz + 14) / 2 + 1);
+    ctx.fillText(tstr, W / 2 + 10, ty0 + (tsz + 14) / 2 + 1);
     ctx.font = `11px ${SERIF}`; ctx.fillStyle = C.dim;
-    ctx.fillText(sim.bossSpawned ? "冥王戦" : "冥王が来るまで", W / 2, pad + tsz + 24);
-    let by = pad + tsz + 34;
+    ctx.fillText(sim.bossSpawned ? "冥王戦" : "冥王が来るまで", W / 2, ty0 + tsz + 24);
+    let by = ty0 + tsz + 34;
     if (sim.boss && !sim.boss.dead) {
-      const w = Math.min(420, W - 260);
+      const w = tall ? W * 0.62 : Math.min(420, W - 260);
       bar(ctx, W / 2 - w / 2, by, w, 8, sim.boss.hp / sim.boss.maxHp, C.blood);
       by += 14;
     }
     if (sim.wraith && !sim.wraith.dead) {
-      const w = Math.min(300, W - 300);
+      const w = tall ? W * 0.5 : Math.min(300, W - 300);
       bar(ctx, W / 2 - w / 2, by, w, 6, sim.wraith.hp / sim.wraith.maxHp, C.taint);
       ctx.font = `11px ${SERIF}`; ctx.fillStyle = C.taint;
       ctx.fillText("怨霊", W / 2, by + 16);
@@ -144,8 +146,8 @@ export class Hud {
     }
 
     // ── 右上: ミニマップ・撃破数
-    const ms = small ? 78 : 118;
-    const mx = W - pad - ms - (touch ? 58 : 0), my = pad;
+    const ms = tall ? 64 : small ? 78 : 118;
+    const mx = tall ? W - pad - ms : W - pad - ms - (touch ? 58 : 0), my = tall ? ty0 : pad;   // 縦向きは2段目の右（一時停止の下）
     this.minimap(ctx, sim, mx, my, ms);
     ctx.textAlign = "right"; ctx.font = `12px ${FONT}`; ctx.fillStyle = C.dim;
     const kills = String(sim.kills);

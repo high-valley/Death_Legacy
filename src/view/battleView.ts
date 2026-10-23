@@ -82,7 +82,8 @@ export class BattleView {
 
   draw(ctx: CanvasRenderingContext2D, sim: RunSim, W: number, H: number, touch: boolean): void {
     const h = sim.hero;
-    const z = (this.zoom = touch ? Math.min(W, H) / 520 : Math.min(W / 1280, H / 720) * 1.05);
+    // スマホ: 縦向きは横幅が狭いので少し寄る（見える範囲は縦に長くなる）
+    const z = (this.zoom = touch ? Math.min(W, H) / (H > W ? 430 : 520) : Math.min(W / 1280, H / 720) * 1.05);
     const sx = (Math.random() - 0.5) * this.shake, sy = (Math.random() - 0.5) * this.shake;
     ctx.save();
     ctx.translate(W / 2 + sx, H / 2 + sy);

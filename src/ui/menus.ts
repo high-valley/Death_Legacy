@@ -172,7 +172,7 @@ export class Menus {
         menu,
         active ? h("p", { class: "small mute" }, "放棄すると、そのランはリタイア扱いになる。") : null,
         h("p", { class: "help" }, this.touchMode
-          ? "画面をドラッグで移動。攻撃は自動。右下で回避、右上でポーズ。横向きがおすすめ。"
+          ? "画面をドラッグで移動。攻撃は自動。右下で回避、右上でポーズ。縦向き・横向きどちらでも遊べる。"
           : "WASD・矢印キーで移動。攻撃は自動。Space で回避、Esc で一時停止、強化は 1・2・3 でも選べる。"),
         this.meta.repo.source === "backup" ? h("p", { class: "gold small" }, "セーブが壊れていたため、バックアップから復元した。") : null,
         h("p", { class: "ver" }, `試作版 ${__VERSION__}`)),
