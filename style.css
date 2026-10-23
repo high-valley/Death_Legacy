@@ -607,3 +607,5 @@ kbd { display: inline-block; min-width: 24px; padding: 1px 6px; border: 1px soli
   .title-left { align-content: end; padding-bottom: max(48px, env(safe-area-inset-bottom)); }
   .menu-item .en { font-size: 16px; letter-spacing: .03em; }
 }
+.title-left .ver { align-items: center; gap: 10px; }
+button.small-btn { padding: 4px 10px; font-size: 12px; min-height: 0; }

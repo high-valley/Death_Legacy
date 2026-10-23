@@ -27,6 +27,17 @@ export function kanjiNum(n: number): string {
   return String(n);
 }
 
+/**
+ * 最新版に更新する（ホーム画面に追加して起動していると、ブラウザの再読み込みができないため）。
+ * index.html をキャッシュを使わずに取り直し、URL に時刻を付けて開き直す（main.js・style.css はビルドごとに ?v= が変わる）
+ */
+export async function reloadLatest(): Promise<void> {
+  try { await fetch("index.html", { cache: "reload" }); } catch { /* 通信できなくても開き直しはする */ }
+  const u = new URL(location.href);
+  u.searchParams.set("r", String(Date.now()));
+  location.replace(u.toString());
+}
+
 /** 背景の絵（あれば） */
 function backdrop(key: string): HTMLElement | null {
   const src = Art.file(key);
@@ -175,7 +186,7 @@ export class Menus {
           ? "画面をドラッグで移動。攻撃は自動。右下で回避、右上でポーズ。縦向き・横向きどちらでも遊べる。"
           : "WASD・矢印キーで移動。攻撃は自動。Space で回避、Esc で一時停止、強化は 1・2・3 でも選べる。"),
         this.meta.repo.source === "backup" ? h("p", { class: "gold small" }, "セーブが壊れていたため、バックアップから復元した。") : null,
-        h("p", { class: "ver" }, `試作版 ${__VERSION__}`)),
+        h("p", { class: "ver row" }, `試作版 ${__VERSION__}`, button("最新版に更新", () => { void reloadLatest(); }, "small-btn"))),
     ];
     for (const n of parts) if (n) p.append(n);
   }
@@ -681,6 +692,7 @@ export class Menus {
       h("label", { for: "volIn" }, "音量", vol),
       h("label", { class: "check" }, shake, "被弾した時に画面を揺らす"),
       h("label", { class: "check" }, dbg, "FPS などの計測値を表示する"),
+      h("div", { class: "row" }, button("最新版に更新", () => { void reloadLatest(); }), h("span", { class: "small mute" }, `いまの版: ${__VERSION__}。ホーム画面から起動している時の再読み込みの代わり。セーブは消えない。`)),
       h("div", { class: "row" }, button("負荷試験（敵300体・10秒）", on.loadTest), h("span", { class: "small mute" }, loadText)),
       h("div", { class: "row" }, button("セーブを消去", () => {
         if (!armed) {
