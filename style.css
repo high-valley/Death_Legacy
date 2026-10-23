@@ -594,3 +594,16 @@ kbd { display: inline-block; min-width: 24px; padding: 1px 6px; border: 1px soli
   .hub-head .purses { gap: 6px; flex-wrap: nowrap; }
   .hub-head .purses button { padding: 6px 10px; font-size: 13px; }
 }
+
+/* ---------- タイトル: 飾り文字（Cinzel）が後から読み込まれて幅が広がっても重ならないように（2026-10-24） ---------- */
+.menu-item { display: flex; align-items: baseline; gap: 12px; }
+.menu-item .en { flex: 0 0 auto; white-space: nowrap; }
+.menu-item .ja { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.menu-item .arrow { flex: 0 0 auto; margin-left: auto; }
+/* 縦向き: 背景の絵の人物（右寄り）が見えるように左へずらし、文字の下だけ暗くする */
+@media (orientation: portrait) {
+  .title-screen .backdrop { background-position: 64% center; }
+  .title-screen .backdrop::after { background: linear-gradient(180deg, rgba(5,6,8,.15) 0%, rgba(5,6,8,.25) 35%, rgba(5,6,8,.8) 62%, rgba(5,6,8,.92) 100%); }
+  .title-left { align-content: end; padding-bottom: max(48px, env(safe-area-inset-bottom)); }
+  .menu-item .en { font-size: 16px; letter-spacing: .03em; }
+}
